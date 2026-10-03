@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - "feat/**"
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+          cache: true
+
+      - name: Restore
+        run: dotnet restore --locked-mode
+
+      - name: Build
+        run: >
+          dotnet build
+          --configuration Release
+          --no-restore
+          -p:TreatWarningsAsErrors=true
+
+      - name: Run tests
+        run: >
+          dotnet test
+          --configuration Release
+          --no-build
+          --no-restore
