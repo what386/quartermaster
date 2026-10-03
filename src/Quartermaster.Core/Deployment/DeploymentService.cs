@@ -11,12 +11,6 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
         return await InspectUnlocked(workspace, ct).ConfigureAwait(false);
     }
 
-    public async Task<DeploymentPlan> PreviewAsync(DeploymentRequest request, string targetDirectory, CancellationToken ct = default)
-    {
-        await using var workspace = await storage.OpenAsync(targetDirectory, ct).ConfigureAwait(false);
-        return DeploymentPlanner.Create(request);
-    }
-
     public async Task<DeploymentLedger> DeployAsync(DeploymentRequest request, string targetDirectory,
         DeploymentOptions? options = null, CancellationToken ct = default)
     {

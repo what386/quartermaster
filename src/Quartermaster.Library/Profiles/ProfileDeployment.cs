@@ -28,8 +28,6 @@ public static class ProfilePatches
 /// <summary>Connects profiles to Core's deployment service; Core owns execution and deployment health.</summary>
 public sealed class ProfileDeploymentService(DeploymentService deployment)
 {
-    public Task<DeploymentPlan> PreviewAsync(LibraryState state, Guid profileId, string targetDirectory, CancellationToken ct = default) =>
-        deployment.PreviewAsync(ProfilePatches.Resolve(state, profileId), targetDirectory, ct);
     public Task<DeploymentLedger> DeployAsync(LibraryState state, Guid profileId, string targetDirectory,
         DeploymentOptions? options = null, CancellationToken ct = default) =>
         deployment.DeployAsync(ProfilePatches.Resolve(state, profileId), targetDirectory, options, ct);

@@ -10,66 +10,51 @@
     <DataTemplate DataType="{x:Type providers:ProvidersViewModel}"><providers:ProvidersView /></DataTemplate>
     <DataTemplate DataType="{x:Type settings:SettingsViewModel}"><settings:SettingsView /></DataTemplate>
   </Window.DataTemplates>
-  <Grid ColumnDefinitions="72,*" RowDefinitions="48,*,66,30">
-    <Border Grid.RowSpan="3" Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
-      <Grid RowDefinitions="70,*,92">
-        <Grid ToolTip.Tip="Quartermaster">
-          <Path Data="M22,5 L39,15 L39,35 L22,45 L5,35 L5,15 Z" Stroke="#C6C9CC" StrokeThickness="1.5" Width="44" Height="50" HorizontalAlignment="Center" VerticalAlignment="Center" />
-          <Path Data="M7,16 L17,7 L27,16 M7,23 L17,14 L27,23 M10,29 L17,23 L24,29" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2.5" Width="34" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center" />
-        </Grid>
-        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
-          <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding Operations.CanInteract}">
-            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" Margin="0,12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
-              <Button Classes="profileButton" Classes.active="{Binding IsActive}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center" />
-            </DataTemplate></ItemsControl.ItemTemplate>
-          </ItemsControl>
+  <Grid ColumnDefinitions="72,*">
+    <Border Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
+      <Grid RowDefinitions="70,1,*,Auto">
+        <ContentControl Content="{Binding LibraryNavigation}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+          <ContentControl.ContentTemplate><DataTemplate x:DataType="local:NavigationItem">
+            <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Library">
+              <Path Data="{Binding Icon}" Width="26" Height="26" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" />
+            </Button>
+          </DataTemplate></ContentControl.ContentTemplate>
+        </ContentControl>
+        <Border Grid.Row="1" Background="{DynamicResource LineBrush}" Margin="12,0" />
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
+          <StackPanel Spacing="12" Margin="0,12">
+            <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding Operations.CanInteract}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
+                <Button Classes="profileButton" Classes.active="{Binding IsActive}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center" />
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button x:Name="AddProfileButton" Classes="profileButton" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center" />
+          </StackPanel>
         </ScrollViewer>
-        <StackPanel Grid.Row="2" Spacing="6" HorizontalAlignment="Center">
-          <Button Classes="icon" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile" AutomationProperties.Name="Create a profile" FontSize="23" Background="Transparent" />
-        <Button Classes="icon" Command="{Binding RefreshCommand}" ToolTip.Tip="Refresh library" AutomationProperties.Name="Refresh library" HorizontalAlignment="Center" VerticalAlignment="Center" Background="Transparent">
-          <Path Data="M20,8 A9,9 0 1 0 21,16 M20,2 L20,8 L14,8" Width="24" Height="24" Stroke="#969DA5" StrokeThickness="1.5" />
-        </Button>
-        </StackPanel>
-      </Grid>
-    </Border>
-    <Border Grid.Column="1" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="16,0">
-      <Grid ColumnDefinitions="180,*,Auto" VerticalAlignment="Center">
-        <TextBlock Text="QUARTERMASTER" Classes="accent" FontSize="11" LetterSpacing="2" FontWeight="SemiBold" VerticalAlignment="Center" />
-        <StackPanel Grid.Column="1" Spacing="2" Margin="0,0,12,0">
-          <TextBlock Text="{Binding ProfileLabel}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-          <TextBlock Text="{Binding SelectionSummary}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis" />
-        </StackPanel>
-        <ItemsControl Grid.Column="2" x:Name="MenuBar" ItemsSource="{Binding NavigationItems}">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+        <ItemsControl Grid.Row="3" ItemsSource="{Binding UtilityNavigationItems}" Margin="0,12">
+          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
           <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:NavigationItem">
-            <Button Classes="menuButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" AutomationProperties.Name="{Binding Label}">
-              <StackPanel Orientation="Horizontal" Spacing="8"><Path Data="{Binding Icon}" Width="17" Height="17" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" /><TextBlock Text="{Binding Label}" VerticalAlignment="Center" /></StackPanel>
+            <Button Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
+              <Path Data="{Binding Icon}" Width="24" Height="24" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" />
             </Button>
           </DataTemplate></ItemsControl.ItemTemplate>
         </ItemsControl>
       </Grid>
     </Border>
-    <Border Grid.Column="1" Grid.Row="1" Padding="12" ClipToBounds="True">
-      <ContentControl x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
-    </Border>
-    <Border Grid.Column="1" Grid.Row="2" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="12,8">
-      <Grid ColumnDefinitions="96,96,104,96,*">
-        <StackPanel Margin="10,0" Spacing="7"><TextBlock Text="LIBRARY" Classes="eyebrow" /><TextBlock Text="{Binding LibraryCount}" FontWeight="SemiBold" /></StackPanel>
-        <StackPanel Grid.Column="1" Margin="10,0" Spacing="7"><TextBlock Text="PROFILES" Classes="eyebrow" /><TextBlock Text="{Binding ProfileCount}" FontWeight="SemiBold" /></StackPanel>
-        <StackPanel Grid.Column="2" Margin="10,0" Spacing="7"><TextBlock Text="DEPLOYED" Classes="eyebrow" /><TextBlock Text="{Binding DeployedCount}" Classes="success" FontWeight="SemiBold" /></StackPanel>
-        <StackPanel Grid.Column="3" Margin="10,0" Spacing="7"><TextBlock Text="COLLISIONS" Classes="eyebrow" /><TextBlock Text="{Binding CollisionCount}" Foreground="{DynamicResource ClashBrush}" FontWeight="SemiBold" /></StackPanel>
-        <Border Grid.Column="4" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1" CornerRadius="3" Padding="12,6">
-          <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="*,Auto"><TextBlock Text="GAME FOLDER" Classes="eyebrow" /><TextBlock Grid.Column="1" Text="{Binding GameState}" Classes="success" FontSize="10" LetterSpacing="1" /><TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding GameFolder}" Classes="muted" TextTrimming="CharacterEllipsis" Margin="0,6,0,0" FontSize="11" /></Grid>
+    <Border Grid.Column="1" Padding="12" ClipToBounds="True">
+      <Grid RowDefinitions="Auto,Auto,*">
+        <Border IsVisible="{Binding Operations.IsBusy}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
+          <Grid ColumnDefinitions="*,Auto,Auto">
+            <TextBlock Text="{Binding Operations.Message}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="110" Height="3" VerticalAlignment="Center" Margin="12,0" />
+            <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
+          </Grid>
         </Border>
-      </Grid>
-    </Border>
-    <Border Grid.ColumnSpan="2" Grid.Row="3" Background="#151719" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Padding="12,4">
-      <Grid ColumnDefinitions="Auto,*,Auto,Auto">
-        <TextBlock Text="v0.1.0  ·  LOCAL" Classes="eyebrow" VerticalAlignment="Center" Margin="0,0,20,0" />
-        <TextBlock Grid.Column="1" x:Name="OperationMessage" Text="{Binding Operations.Message}" Classes.error="{Binding Operations.IsError}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" FontSize="11" ToolTip.Tip="{Binding Operations.Message}" />
-        <ProgressBar Grid.Column="2" IsIndeterminate="True" IsVisible="{Binding Operations.IsBusy}" Width="110" Height="3" VerticalAlignment="Center" Margin="12,0" />
-        <Button Grid.Column="3" Content="Cancel" Command="{Binding Operations.CancelCommand}" IsVisible="{Binding Operations.IsBusy}" Padding="8,0" MinHeight="20" />
+        <Border Grid.Row="1" IsVisible="{Binding Operations.IsError}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
+          <TextBlock x:Name="OperationMessage" Text="{Binding Operations.Message}" Classes="error" TextWrapping="Wrap" />
+        </Border>
+        <ContentControl Grid.Row="2" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
       </Grid>
     </Border>
   </Grid>

@@ -9,10 +9,14 @@ public interface IDialogService
     Task<string?> PickModZipAsync();
     Task<string?> PickFolderAsync(string title);
     Task<bool> ConfirmAsync(string title, string message, string acceptLabel);
+    Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel);
 }
 
 public sealed class DialogService(Func<Window> owner) : IDialogService
 {
+    public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel) =>
+        new TextInputDialog(title, prompt, acceptLabel).ShowDialog<string?>(owner());
+
     public async Task<string?> PickModZipAsync()
     {
         var files = await owner().StorageProvider.OpenFilePickerAsync(new()

@@ -89,11 +89,6 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         try { Inspection = await Task.Run(() => new DeploymentService(storage).InspectAsync(GameDirectory, ct), ct); }
         catch (Exception ex) when (ex is IOException or ArgumentException) { DeploymentProblem = ex.Message; }
     }
-    public async Task<DeploymentPlan> PreviewAsync(Guid profileId, CancellationToken ct)
-    {
-        var request = ProfilePatches.Resolve(State, profileId);
-        return await Task.Run(() => new DeploymentService(storage).PreviewAsync(request, RequireGame(), ct), ct);
-    }
     private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException("Choose your game folder in Settings first.");
     public async Task DeployAsync(Guid profileId, bool repair, CancellationToken ct)
     {

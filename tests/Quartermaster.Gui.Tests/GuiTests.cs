@@ -41,9 +41,18 @@ public class GuiTests
             };
             foreach (var (page, view) in routes)
             {
-                var menu = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
-                    button => button.DataContext is NavigationItem item && item.Page == page);
-                menu.Command!.Execute(null);
+                if (page == PageKind.Profiles)
+                {
+                    var selector = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                        button => button.DataContext is SidebarProfile { Name: "Default" });
+                    await Assert.IsType<AsyncCommand>(selector.Command).ExecuteAsync();
+                }
+                else
+                {
+                    var menu = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                        button => button.DataContext is NavigationItem item && item.Page == page);
+                    menu.Command!.Execute(null);
+                }
                 Dispatcher.UIThread.RunJobs();
                 using var frame = window.CaptureRenderedFrame();
                 Assert.NotNull(frame); Assert.Equal(page, f.Shell.SelectedNavigation.Page);
@@ -65,14 +74,15 @@ public class GuiTests
     }
 
     [AvaloniaFact]
-    public async Task SidebarSelectsAndPersistsProfileIndependentlyOfMenu()
+    public async Task SidebarSelectsPersistsAndOpensProfilesIncludingActiveProfile()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         f.Dialogs.ZipPath = f.Zip("Cape");
         await Page<ModsViewModel>(f, PageKind.Mods).ImportZipCommand.ExecuteAsync();
         var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
         await profiles.AddCommand.ExecuteAsync();
-        profiles.NewProfileName = "Alternate"; await profiles.CreateCommand.ExecuteAsync();
+        f.Dialogs.InputText = "Alternate";
+        await f.Shell.AddProfileCommand.ExecuteAsync();
         Assert.Equal("Alternate", f.Shell.ProfileLabel);
         var window = new MainWindow { DataContext = f.Shell }; window.Show();
         try
@@ -84,7 +94,7 @@ public class GuiTests
             var selector = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
                 button => button.DataContext is SidebarProfile item && item.Name == "Default");
             await Assert.IsType<AsyncCommand>(selector.Command).ExecuteAsync();
-            Assert.Equal(PageKind.Mods, f.Shell.SelectedNavigation.Page);
+            Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
             Assert.Equal("Default", profiles.SelectedProfile!.Name);
             Assert.Equal("Default", f.Shell.ProfileLabel);
             Assert.Equal("1 selected for deployment", f.Shell.SelectionSummary);
@@ -93,11 +103,64 @@ public class GuiTests
             var reopened = new AppServices(f.Data, f.Dialogs, () => []);
             await reopened.Session.InitializeAsync(CancellationToken.None);
             Assert.Equal("Default", reopened.Session.ActiveProfile!.Name);
-            f.Shell.AddProfileCommand.Execute(null);
+            // Opening the active profile must work after visiting the library too.
+            f.Shell.Navigate(PageKind.Mods); Dispatcher.UIThread.RunJobs();
+            var active = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                button => button.DataContext is SidebarProfile { Name: "Default" });
+            await Assert.IsType<AsyncCommand>(active.Command).ExecuteAsync();
             Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
-            Assert.True(profiles.ShowSettings);
+            var plus = window.FindControl<Button>("AddProfileButton")!;
+            f.Dialogs.InputText = null;
+            await Assert.IsType<AsyncCommand>(plus.Command).ExecuteAsync();
+            Assert.Equal(2, f.Shell.SidebarProfiles.Count);
+            Assert.Equal("Default", profiles.SelectedProfile!.Name);
+            f.Dialogs.InputText = "   ";
+            await f.Shell.AddProfileCommand.ExecuteAsync(); Assert.Equal(2, f.Shell.SidebarProfiles.Count);
+            f.Dialogs.InputText = "  My loadout  ";
+            await Assert.IsType<AsyncCommand>(plus.Command).ExecuteAsync();
+            Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
+            Assert.Equal("My loadout", profiles.SelectedProfile!.Name);
+            Assert.Equal(3, f.Shell.SidebarProfiles.Count);
+            Assert.Empty(profiles.Entries);
+            f.Dialogs.InputText = "Second loadout";
+            await f.Shell.AddProfileCommand.ExecuteAsync();
+            Assert.Equal("Second loadout", profiles.SelectedProfile!.Name);
+            var persisted = new AppServices(f.Data, f.Dialogs, () => []);
+            await persisted.Session.InitializeAsync(CancellationToken.None);
+            Assert.Equal("Second loadout", persisted.Session.ActiveProfile!.Name);
+            Assert.Equal(4, persisted.Session.State.Profiles.Count);
+            Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            Assert.DoesNotContain(window.GetVisualDescendants(), control => control is Expander);
         }
         finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ProfileNameDialogValidatesInputAndReturnsNameOrCancellation()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var owner = new MainWindow { DataContext = f.Shell }; owner.Show();
+        try
+        {
+            var dialogs = new DialogService(() => owner);
+            var result = dialogs.RequestTextAsync("Create profile", "Name your profile", "Create");
+            var popup = Assert.IsType<TextInputDialog>(Assert.Single(owner.OwnedWindows));
+            popup.CaptureRenderedFrame()?.Dispose();
+            var input = popup.FindControl<TextBox>("NameInput")!;
+            var accept = popup.FindControl<Button>("AcceptButton")!;
+            Assert.False(accept.IsEnabled);
+            input.Text = "   "; Dispatcher.UIThread.RunJobs(); Assert.False(accept.IsEnabled);
+            input.Text = "  Squad alpha  "; Dispatcher.UIThread.RunJobs(); Assert.True(accept.IsEnabled);
+            accept.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Equal("Squad alpha", await result);
+            result = dialogs.RequestTextAsync("Create profile", "Name your profile", "Create");
+            popup = Assert.IsType<TextInputDialog>(Assert.Single(owner.OwnedWindows));
+            popup.CaptureRenderedFrame()?.Dispose();
+            var cancel = Assert.Single(popup.GetVisualDescendants().OfType<Button>(), button => Equals(button.Content, "Cancel"));
+            cancel.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.Null(await result);
+        }
+        finally { owner.Close(); }
     }
 
     [AvaloniaFact]
@@ -121,8 +184,7 @@ public class GuiTests
         var foreign = Path.Combine(f.Game, Fixture.Archive + ".patch_8.stream");
         f.Dialogs.Confirm = false; await profiles.DeployCommand.ExecuteAsync();
         Assert.Null(f.Services.Session.Inspection!.Ledger.SelectionId);
-        f.Dialogs.Confirm = true; await profiles.PreviewCommand.ExecuteAsync();
-        Assert.Contains("2 patch sets", profiles.PreviewSummary);
+        f.Dialogs.Confirm = true;
         await profiles.DeployCommand.ExecuteAsync();
         Assert.Equal(4, f.Services.Session.Inspection!.Ledger.Files.Count);
         Assert.All(f.Services.Session.Inspection.Ledger.Files, file => Assert.InRange(file.Slot, 0, 1));
@@ -147,7 +209,13 @@ public class GuiTests
         {
             window.CaptureRenderedFrame()?.Dispose();
             var option = Assert.Single(profiles.Options!.Options);
-            var choice = Assert.Single(window.GetVisualDescendants().OfType<ComboBox>(), c => c.DataContext == option);
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<ComboBox>(), c => c.DataContext == option);
+            var details = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ModDetailsButton");
+            details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Dispatcher.UIThread.RunJobs();
+            var popup = Assert.IsType<ModSettingsWindow>(Assert.Single(window.OwnedWindows));
+            popup.CaptureRenderedFrame()?.Dispose();
+            var choice = Assert.Single(popup.GetVisualDescendants().OfType<ComboBox>(), c => c.DataContext == option);
             choice.SelectedIndex = 1; Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, option.ChoiceIndex);
             await profiles.ApplyOptionsCommand.ExecuteAsync();
@@ -155,6 +223,7 @@ public class GuiTests
             Assert.Equal(new[] { "common", "red" }, PatchSelection.Select(mod, entry).Select(p => p.Folder));
             var reopened = new AppServices(f.Data, f.Dialogs, () => []); await reopened.Session.InitializeAsync(CancellationToken.None);
             Assert.Equal(1, Assert.Single(reopened.Session.ActiveProfile!.Entries[0].Options).ChoiceIndex);
+            popup.Close(); Dispatcher.UIThread.RunJobs();
         }
         finally { window.Close(); }
     }
@@ -206,7 +275,8 @@ public class GuiTests
         Assert.Equal(1, f.Launches);
         Assert.Contains("loadout is not deployed", f.Dialogs.Confirmations[^1].Message);
         f.Dialogs.Confirm = true; await profiles.RunCommand.ExecuteAsync(); Assert.Equal(2, f.Launches);
-        profiles.NewProfileName = "B"; await profiles.CreateCommand.ExecuteAsync();
+        f.Dialogs.InputText = "B";
+        await f.Shell.AddProfileCommand.ExecuteAsync();
         f.Dialogs.Confirm = false; await profiles.RunCommand.ExecuteAsync(); Assert.Equal(2, f.Launches);
         Assert.Contains("Default", f.Dialogs.Confirmations[^1].Message);
         await File.WriteAllTextAsync(Path.Combine(f.Data, "deployment.lock"), "{broken");

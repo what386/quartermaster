@@ -26,12 +26,9 @@ public sealed class ProfilesViewModel : SessionViewModel
     private Profile? profile;
     private ProfileModItem? selectedMod;
     private Mod? modToAdd;
-    private string newProfileName = "";
     private string search = "";
     private string profileName = "";
-    private bool showSettings;
     private bool repair = true;
-    private string preview = "Preview the deployment to check slot allocation.";
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
     public IReadOnlyList<ProfileModItem> Entries { get; private set; } = [];
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
@@ -41,6 +38,7 @@ public sealed class ProfilesViewModel : SessionViewModel
     public string Search { get => search; set { if (Set(ref search, value)) Notify(nameof(VisibleEntries)); } }
     public string EntrySummary => $"{Entries.Count} mods · {Entries.Count(e => e.Entry.Enabled)} on";
     public string SelectedModName => SelectedMod?.Name ?? "Select a mod";
+    public bool HasSelectedMod => SelectedMod is not null;
     public bool HasProfile => SelectedProfile is not null;
     public bool HasConflicts => Conflicts.Count > 0;
     public string PriorityLabel => SelectedProfile?.Priority == PriorityDirection.FirstWins ? "Priority: earlier entries win" : "Priority: later entries win";
@@ -57,20 +55,16 @@ public sealed class ProfilesViewModel : SessionViewModel
         {
             if (!Set(ref selectedMod, value)) return;
             Options = value is null ? null : new(value.Mod, value.Entry.Options);
-            Notify(nameof(Options)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); RefreshCommands();
+            Notify(nameof(Options)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
         }
     }
     public ModOptionsViewModel? Options { get; private set; }
     public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value)) AddCommand.Refresh(); } }
-    public string NewProfileName { get => newProfileName; set { if (Set(ref newProfileName, value)) CreateCommand.Refresh(); } }
     public string ProfileName { get => profileName; set { if (Set(ref profileName, value)) RenameCommand.Refresh(); } }
-    public bool ShowSettings { get => showSettings; set => Set(ref showSettings, value); }
     public bool Repair { get => repair; set => Set(ref repair, value); }
-    public string PreviewSummary { get => preview; private set => Set(ref preview, value); }
     public string DeploymentHealth => Session.DeploymentStatus;
     public bool NeedsPurge => Session.Inspection?.NeedsPurge == true || Session.DeploymentProblem != "";
     public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
-    public AsyncCommand CreateCommand { get; }
     public AsyncCommand RenameCommand { get; }
     public AsyncCommand DeleteCommand { get; }
     public AsyncCommand MakeActiveCommand { get; }
@@ -81,19 +75,12 @@ public sealed class ProfilesViewModel : SessionViewModel
     public AsyncCommand MoveUpCommand { get; }
     public AsyncCommand MoveDownCommand { get; }
     public AsyncCommand ApplyOptionsCommand { get; }
-    public AsyncCommand PreviewCommand { get; }
     public AsyncCommand DeployCommand { get; }
     public AsyncCommand RunCommand { get; }
     public AsyncCommand PurgeCommand { get; }
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
-        CreateCommand = Operations.CreateCommand("Creating profile", async ct =>
-        {
-            var created = ProfileEditor.Create(NewProfileName);
-            await Session.SaveProfileAsync(created, true, ct);
-            SelectedProfile = Profiles.Single(p => p.Id == created.Id); NewProfileName = "";
-        }, () => !string.IsNullOrWhiteSpace(NewProfileName));
         RenameCommand = Operations.CreateCommand("Renaming profile", ct => Save(SelectedProfile! with { Name = ProfileName.Trim() }, ct),
             () => HasProfile && !string.IsNullOrWhiteSpace(ProfileName) && ProfileName.Trim() != SelectedProfile!.Name);
         DeleteCommand = Operations.CreateCommand("Deleting profile", async ct =>
@@ -111,15 +98,10 @@ public sealed class ProfilesViewModel : SessionViewModel
         MoveUpCommand = Operations.CreateCommand("Moving mod", ct => Save(ProfileEditor.Move(SelectedProfile!, SelectedMod!.Mod.Id, SelectedMod.Index - 1), ct), () => SelectedMod?.Index > 0);
         MoveDownCommand = Operations.CreateCommand("Moving mod", ct => Save(ProfileEditor.Move(SelectedProfile!, SelectedMod!.Mod.Id, SelectedMod.Index + 1), ct), () => SelectedMod is not null && SelectedMod.Index < Entries.Count - 1);
         ApplyOptionsCommand = Operations.CreateCommand("Saving mod options", ct => Save(ProfileEditor.SetOptions(SelectedProfile!, SelectedMod!.Mod, Options!.Selections()), ct), () => Options?.HasOptions == true);
-        PreviewCommand = Operations.CreateCommand("Checking deployment", async ct =>
-        {
-            var plan = await Session.PreviewAsync(SelectedProfile!.Id, ct);
-            PreviewSummary = $"{plan.Patches.Count} patch sets · {plan.Patches.Sum(p => p.Files.Count)} files · {Conflicts.Count} resource collisions";
-        }, () => HasProfile && Session.GameDirectory != "");
         DeployCommand = Operations.CreateCommand("Deploying profile", async ct =>
         {
-            var current = SelectedProfile!; var plan = await Session.PreviewAsync(current.Id, ct);
-            if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with {plan.Patches.Count} patch sets ({plan.Patches.Sum(p => p.Files.Count)} files).", "Deploy"))
+            var current = SelectedProfile!;
+            if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout.", "Deploy"))
                 await Session.DeployAsync(current.Id, Repair, ct);
         }, () => HasProfile && Session.GameDirectory != "");
         RunCommand = Operations.CreateCommand("Launching game", async ct =>
@@ -163,12 +145,11 @@ public sealed class ProfilesViewModel : SessionViewModel
         ArchiveSummary = $"{ModPresentation.Count(report.Archives.Count, "shared archive")} · {ModPresentation.Count(Conflicts.Count, "overlapping resource")}";
         Notify(nameof(Conflicts)); Notify(nameof(HasConflicts)); Notify(nameof(ArchiveSummary));
         Notify(nameof(HasProfile)); Notify(nameof(PriorityLabel)); Notify(nameof(ActiveLabel));
-        PreviewSummary = "Preview the deployment to check slot allocation.";
         RefreshCommands();
     }
     private void RefreshCommands()
     {
         foreach (var command in new[] { RenameCommand, DeleteCommand, MakeActiveCommand, PriorityCommand, AddCommand, RemoveCommand,
-            ToggleCommand, MoveUpCommand, MoveDownCommand, ApplyOptionsCommand, PreviewCommand, DeployCommand, RunCommand, PurgeCommand }) command.Refresh();
+            ToggleCommand, MoveUpCommand, MoveDownCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand }) command.Refresh();
     }
 }

@@ -21,7 +21,7 @@ public class DeploymentTests
         var foreign = Path.Combine(f.Game, Fixture.Archive + ".patch_0.stream");
         var deployment = new ProfileDeploymentService(new DeploymentService(new FileDeploymentStorage(f.App, f.Contents)));
         var state = await f.Library.LoadAsync();
-        var plan = await deployment.PreviewAsync(state, profile.Id, f.Game);
+        var plan = DeploymentPlanner.Create(ProfilePatches.Resolve(state, profile.Id));
         Assert.Equal(new[] { 0, 1, 0 }, plan.Patches.Select(p => p.Slot));
         var ledger = await deployment.DeployAsync(state, profile.Id, f.Game);
         Assert.Equal(6, ledger.Files.Count);
@@ -131,7 +131,7 @@ public class DeploymentTests
         Assert.Equal(0xaa, File.ReadAllBytes(Path.Combine(f.Game, main.Name))[^1]);
         Assert.Equal(Fixture.Patch(), File.ReadAllBytes(f.Contents.GetFilePath(mod.Id, mod.PatchSets[0].Files[0])));
         var health = await service.InspectAsync(f.Game);
-        Assert.Equal(ModDeploymentStatus.Deployed, DeploymentTracking.ForMod(mod.Id, await service.PreviewAsync(state, profile.Id, f.Game), ledger, health.Files));
+        Assert.Equal(ModDeploymentStatus.Deployed, DeploymentTracking.ForMod(mod.Id, DeploymentPlanner.Create(ProfilePatches.Resolve(state, profile.Id)), ledger, health.Files));
         service = new(new DeploymentService(new FileDeploymentStorage(f.App, f.Contents), new FakeRepair(1)));
         await Assert.ThrowsAsync<InvalidDataException>(() => service.DeployAsync(state, profile.Id, f.Game, new(Repatch: true)));
         Assert.Equal(ledger.Signature, (await service.InspectAsync(f.Game)).Ledger.Signature);

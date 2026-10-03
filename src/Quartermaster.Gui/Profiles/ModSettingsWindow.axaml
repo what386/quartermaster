@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
+        x:Class="Quartermaster.Gui.Profiles.ModSettingsWindow" x:DataType="vm:ProfilesViewModel"
+        Title="Mod details" Width="560" Height="600" MinWidth="420" MinHeight="380" WindowStartupLocation="CenterOwner">
+  <Grid RowDefinitions="*,Auto" Margin="16">
+    <Border IsEnabled="{Binding Operations.CanInteract}">
+      <Border Classes="card"><ScrollViewer><StackPanel Spacing="12">
+        <TextBlock Text="SELECTED MOD" Classes="eyebrow" />
+        <TextBlock Text="{Binding SelectedModName}" Classes="sectionTitle" TextWrapping="Wrap" />
+        <TextBlock Text="Options" FontWeight="SemiBold" />
+        <mods:ModOptionsView DataContext="{Binding Options}" />
+        <Button Content="Apply options" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
+        <TextBlock Text="Choose variants above, then apply them to this profile." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,6,0,0" Padding="0,12,0,0"><StackPanel Spacing="10">
+          <TextBlock Text="COLLISIONS" Classes="eyebrow" />
+          <TextBlock Text="{Binding ArchiveSummary}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <TextBlock Text="No overlapping resources." IsVisible="{Binding !HasConflicts}" Classes="success" FontSize="11" />
+          <ItemsControl ItemsSource="{Binding Conflicts}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </StackPanel></Border>
+      </StackPanel></ScrollViewer></Border>
+    </Border>
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,12,0,0">
+      <TextBlock Text="{Binding Operations.Message}" Classes.error="{Binding Operations.IsError}" Classes="muted" TextWrapping="Wrap" Margin="0,0,12,0" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Close" Click="CloseDialog" />
+    </Grid>
+  </Grid>
+</Window>
