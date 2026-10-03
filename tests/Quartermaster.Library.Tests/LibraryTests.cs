@@ -1,0 +1,168 @@
+using Quartermaster.Core.Patching;
+using global::System.IO.Compression;
+using global::System.Text.Json;
+using Quartermaster.Library.Mods;
+using Quartermaster.Library.Profiles;
+using Quartermaster.Library.Importing;
+using Quartermaster.Library.Storage;
+using Xunit;
+
+namespace Quartermaster.Library.Tests;
+
+public class LibraryTests
+{
+    [Fact]
+    public async Task LegacyLibraryStateMigratesToSeparateMetadataFiles()
+    {
+        using var f = new Fixture();
+        var modId = Guid.NewGuid(); var profileId = Guid.NewGuid(); var setId = Guid.NewGuid();
+        Directory.CreateDirectory(f.App);
+        await File.WriteAllTextAsync(Path.Combine(f.App, "state.json"), $$"""
+            {"schemaVersion":1,"activeProfileId":"{{profileId}}","updateChecks":[],"mods":[
+              {"id":"{{modId}}","name":"Legacy","description":"","version":null,"manifestId":null,
+               "importedAt":"2026-01-01T00:00:00Z","options":[],"sources":[],"patchSets":[
+                 {"id":"{{setId}}","archive":"{{Fixture.Archive}}","originalSlot":7,"folder":"",
+                  "files":[{"relativePath":"{{Fixture.Archive}}.patch_7","kind":"Main","size":80,"sha256":"{{new string('a', 64)}}"}],
+                  "resources":[{"id":1,"type":123}]}]}],
+             "profiles":[{"id":"{{profileId}}","name":"Default","priority":"LastWins",
+                          "entries":[{"modId":"{{modId}}","enabled":true,"options":[]}]}]}
+            """);
+        var state = await f.Library.LoadAsync();
+        Assert.Equal(profileId, state.ActiveProfileId);
+        Assert.Equal(modId, Assert.Single(state.Mods).Id);
+        var selected = Assert.Single(ProfilePatches.Resolve(state, profileId).Patches);
+        Assert.Equal(modId, selected.SourceId); Assert.Equal(setId, selected.PatchSetId);
+        await f.Store.SaveAsync(state);
+        Assert.Equal(profileId, (await new JsonLibraryStore(f.App).LoadAsync()).ActiveProfileId);
+        Assert.False(File.Exists(Path.Combine(f.App, "state.json")));
+        using var library = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(f.App, "library.json")));
+        using var profiles = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(f.App, "profiles.json")));
+        Assert.True(library.RootElement.TryGetProperty("mods", out _));
+        Assert.False(library.RootElement.TryGetProperty("profiles", out _));
+        Assert.True(profiles.RootElement.TryGetProperty("profiles", out _));
+        Assert.False(profiles.RootElement.TryGetProperty("mods", out _));
+        Assert.True(File.Exists(Path.Combine(f.App, "patches.json")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ImportsFolderOrZipPreservesOriginalsAndPersistsProfiles(bool zip)
+    {
+        using var f = new Fixture(); var source = f.Source("source");
+        var before = File.ReadAllBytes(Path.Combine(source, Fixture.Archive + ".patch_7"));
+        var mod = await f.Library.ImportAsync(zip ? f.Zip(source) : source, "Named mod");
+        var set = Assert.Single(mod.PatchSets);
+        Assert.Equal(2, set.Files.Count); Assert.Equal(7, set.OriginalSlot);
+        Assert.Equal(before, File.ReadAllBytes(f.Contents.GetFilePath(mod.Id, set.Files[0])));
+        File.WriteAllBytes(Path.Combine(source, Fixture.Archive + ".patch_7"), [0]);
+        Assert.Equal(before, File.ReadAllBytes(f.Contents.GetFilePath(mod.Id, set.Files[0])));
+        var profile = ProfileEditor.Add(ProfileEditor.Create("Default"), mod);
+        await f.Library.SaveProfileAsync(profile, makeActive: true);
+        var state = await new JsonLibraryStore(f.App).LoadAsync();
+        Assert.Equal(profile.Id, state.ActiveProfileId); Assert.Equal(mod.Id, Assert.Single(state.Mods).Id);
+        Assert.Equal(1UL, Assert.Single(state.Mods[0].PatchSets[0].Resources).Id);
+        await f.Library.SetSourcesAsync(mod.Id, [new("custom", "remote-1")]);
+        await f.Library.RecordUpdateCheckAsync(new(mod.Id, "custom", DateTimeOffset.UtcNow, "v2", "file2"));
+        Assert.Single((await f.Library.LoadAsync()).UpdateChecks);
+        await f.Library.RemoveAsync(mod.Id);
+        state = await f.Library.LoadAsync(); Assert.Empty(state.Mods); Assert.Empty(state.Profiles[0].Entries); Assert.Empty(state.UpdateChecks);
+        Assert.False(Directory.Exists(f.Contents.GetModDirectory(mod.Id)));
+    }
+
+    [Fact]
+    public async Task ManifestOptionsResolveFoldersAndEmptyChoices()
+    {
+        using var f = new Fixture();
+        var root = Path.Combine(f.Root, "variants");
+        foreach (var folder in new[] { "common", "blue", "red" })
+        {
+            Directory.CreateDirectory(Path.Combine(root, folder));
+            File.WriteAllBytes(Path.Combine(root, folder, Fixture.Archive + ".patch_0"), Fixture.Patch());
+        }
+        await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), """
+            {"version":1,"name":"Variants","guid":"86bc5845-f890-4685-9d46-9c213ff36ba8",
+             "options":[{"name":"Color","include":["common"],"subOptions":[
+               {"name":"Blue","include":["blue"]},{"name":"Red","include":["red"]},{"name":"Nothing","include":[]}]}]}
+            """);
+        var mod = await f.Library.ImportAsync(f.Zip(root));
+        Assert.Equal("Variants", mod.Name); Assert.NotNull(mod.ManifestId);
+        var entry = new ProfileEntry(mod.Id, true, [new(mod.Options[0].Id, true, 1)]);
+        Assert.Equal(new[] { "common", "red" }, PatchSelection.Select(mod, entry).Select(s => s.Folder));
+        Assert.Equal("common", Assert.Single(PatchSelection.Select(mod, entry with { Options = [new(mod.Options[0].Id, true, 2)] })).Folder);
+    }
+
+    [Theory]
+    [InlineData("../escaped")]
+    [InlineData("/absolute")]
+    [InlineData("C:/escaped")]
+    public async Task ZipTraversalIsRejectedWithoutSavingState(string name)
+    {
+        using var f = new Fixture(); var path = Path.Combine(f.Root, "bad.zip");
+        using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+        { using var writer = new StreamWriter(zip.CreateEntry(name).Open()); writer.Write("bad"); }
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(path));
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+        Assert.Empty(Directory.GetDirectories(Path.Combine(f.App, "library")));
+    }
+
+    [Fact]
+    public async Task DuplicateCaseInsensitiveZipFilesAndImportLimitsAreRejected()
+    {
+        using var f = new Fixture(); var path = Path.Combine(f.Root, "duplicate.zip");
+        using (var zip = ZipFile.Open(path, ZipArchiveMode.Create))
+        {
+            foreach (var name in new[] { "file", "FILE" }) { using var writer = new StreamWriter(zip.CreateEntry(name).Open()); writer.Write("1"); }
+        }
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(path));
+        var small = new ModContentStore(f.App, new(MaxBytes: 1));
+        await Assert.ThrowsAsync<InvalidDataException>(() => small.ImportAsync(f.Source("large")));
+    }
+
+    [Fact]
+    public async Task CorruptedPatchesOrUnsafeManifestIncludesLeaveNoImportedContent()
+    {
+        using var f = new Fixture(); var source = f.Source("source");
+        await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), """{"Version":1,"Options":[{"Name":"Unsafe","Include":["../outside"]}]}""");
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(source));
+        File.Delete(Path.Combine(source, "manifest.json"));
+        File.WriteAllBytes(Path.Combine(source, Fixture.Archive + ".patch_7"), [1, 2]);
+        await Assert.ThrowsAnyAsync<IOException>(() => f.Library.ImportAsync(source));
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+        Assert.Empty(Directory.GetDirectories(Path.Combine(f.App, "library")));
+    }
+
+    [Fact]
+    public async Task LibraryLockRejectsConcurrentWritersAndMalformedState()
+    {
+        using var f = new Fixture();
+        await using (var lease = await f.Store.AcquireLockAsync())
+            await Assert.ThrowsAsync<IOException>(async () => { await using var other = await new JsonLibraryStore(f.App).AcquireLockAsync(); });
+        await File.WriteAllTextAsync(Path.Combine(f.App, "state.json"), """{"schemaVersion":99,"mods":[],"profiles":[],"activeProfileId":null}""");
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Store.LoadAsync());
+    }
+
+    [Fact]
+    public async Task SymbolicLinkedContentIsRejected()
+    {
+        if (OperatingSystem.IsWindows()) return; // Creating symlinks requires developer mode/privileges on Windows.
+        using var f = new Fixture(); var source = f.Source("source");
+        File.CreateSymbolicLink(Path.Combine(source, "linked"), Path.Combine(source, Fixture.Archive + ".patch_7"));
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(source));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task MissingOrTruncatedReferencedCompanionsAreRejected(bool missing)
+    {
+        using var f = new Fixture(); var source = f.Source("source");
+        var path = Path.Combine(source, Fixture.Archive + ".patch_7");
+        var patch = File.ReadAllBytes(path);
+        global::System.Buffers.Binary.BinaryPrimitives.WriteUInt32LittleEndian(patch.AsSpan(164), 20);
+        File.WriteAllBytes(path, patch);
+        if (missing) File.Delete(path + ".stream");
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(source));
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+    }
+}
