@@ -17,7 +17,8 @@ public sealed class NavigationItem(PageKind page, string label, string iconPath)
     public Command OpenCommand { get; internal set; } = new(() => { });
 }
 
-public sealed record SidebarProfile(Profile Profile, bool IsActive, AsyncCommand SelectCommand)
+public sealed record SidebarProfile(Profile Profile, bool IsActive, AsyncCommand SelectCommand,
+    AsyncCommand RenameCommand, AsyncCommand DeleteCommand)
 {
     public string Name => Profile.Name;
     public string Monogram => string.Concat(Profile.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));

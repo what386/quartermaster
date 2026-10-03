@@ -136,6 +136,46 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task ProfileContextMenuTargetsClickedProfileAndPersistsChanges()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+        f.Shell.Navigate(PageKind.Mods);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var button = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                b => b.DataContext is SidebarProfile { Name: "Default" });
+            var menu = button.ContextMenu!; menu.Open(button); Dispatcher.UIThread.RunJobs();
+            var rename = Assert.IsType<MenuItem>(menu.Items[0]);
+            f.Dialogs.InputText = "  Renamed default  ";
+            await Assert.IsType<AsyncCommand>(rename.Command).ExecuteAsync(); menu.Close();
+            Assert.Equal("Default", f.Dialogs.InitialInputText);
+            Assert.Equal("Other", f.Services.Session.ActiveProfile!.Name);
+            Assert.Equal(PageKind.Mods, f.Shell.SelectedNavigation.Page);
+            Assert.Contains(f.Shell.SidebarProfiles, profile => profile.Name == "Renamed default");
+            Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            button = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                b => b.DataContext is SidebarProfile { Name: "Renamed default" });
+            menu = button.ContextMenu!; menu.Open(button); Dispatcher.UIThread.RunJobs();
+            var delete = Assert.IsType<MenuItem>(menu.Items[1]);
+            f.Dialogs.Confirm = false; await Assert.IsType<AsyncCommand>(delete.Command).ExecuteAsync();
+            Assert.Equal(2, f.Shell.SidebarProfiles.Count);
+            f.Dialogs.Confirm = true; await Assert.IsType<AsyncCommand>(delete.Command).ExecuteAsync(); menu.Close();
+            Assert.Equal("Other", Assert.Single(f.Shell.SidebarProfiles).Name);
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            Assert.Equal("Other", Assert.Single(persisted.Profiles).Name);
+            Assert.Equal(f.Services.Session.ActiveProfile.Id, persisted.ActiveProfileId);
+            await Assert.Single(f.Shell.SidebarProfiles).SelectCommand.ExecuteAsync();
+            await Assert.Single(f.Shell.SidebarProfiles).DeleteCommand.ExecuteAsync();
+            Assert.Empty(f.Shell.SidebarProfiles); Assert.Equal(PageKind.Mods, f.Shell.SelectedNavigation.Page);
+            Assert.Empty((await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync()).Profiles);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ProfileNameDialogValidatesInputAndReturnsNameOrCancellation()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -144,23 +184,85 @@ public class GuiTests
         {
             var dialogs = new DialogService(() => owner);
             var result = dialogs.RequestTextAsync("Create profile", "Name your profile", "Create");
-            var popup = Assert.IsType<TextInputDialog>(Assert.Single(owner.OwnedWindows));
-            popup.CaptureRenderedFrame()?.Dispose();
+            using (var frame = owner.CaptureRenderedFrame())
+            {
+                if (frame is not null && Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } output)
+                {
+                    Directory.CreateDirectory(output); frame.Save(Path.Combine(output, "ProfileDialog.png"));
+                }
+            }
+            var popup = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
+            Assert.Empty(owner.OwnedWindows);
+            Assert.False(owner.FindControl<Grid>("ShellContent")!.IsEnabled);
             var input = popup.FindControl<TextBox>("NameInput")!;
+            Assert.True(input.IsFocused);
             var accept = popup.FindControl<Button>("AcceptButton")!;
             Assert.False(accept.IsEnabled);
             input.Text = "   "; Dispatcher.UIThread.RunJobs(); Assert.False(accept.IsEnabled);
             input.Text = "  Squad alpha  "; Dispatcher.UIThread.RunJobs(); Assert.True(accept.IsEnabled);
             accept.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Assert.Equal("Squad alpha", await result);
+            Assert.True(owner.FindControl<Grid>("ShellContent")!.IsEnabled);
             result = dialogs.RequestTextAsync("Create profile", "Name your profile", "Create");
-            popup = Assert.IsType<TextInputDialog>(Assert.Single(owner.OwnedWindows));
-            popup.CaptureRenderedFrame()?.Dispose();
+            owner.CaptureRenderedFrame()?.Dispose();
+            popup = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
             var cancel = Assert.Single(popup.GetVisualDescendants().OfType<Button>(), button => Equals(button.Content, "Cancel"));
             cancel.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Assert.Null(await result);
         }
         finally { owner.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ModalOverlaySupportsKeyboardFocusAndConfirmationWithoutExtraWindows()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var owner = new MainWindow { DataContext = f.Shell }; owner.Show();
+        try
+        {
+            owner.CaptureRenderedFrame()?.Dispose();
+            var origin = owner.FindControl<Button>("AddProfileButton")!; origin.Focus();
+            var dialogs = new DialogService(() => owner);
+            var answer = dialogs.ConfirmAsync("Delete profile", "Delete this profile?", "Delete");
+            owner.CaptureRenderedFrame()?.Dispose(); Dispatcher.UIThread.RunJobs();
+            var modal = Assert.Single(owner.GetVisualDescendants().OfType<ConfirmationDialog>());
+            var overlay = owner.FindControl<DialogHost>("DialogOverlay")!;
+            Assert.Empty(owner.OwnedWindows); Assert.True(overlay.IsOpen);
+            Assert.False(owner.FindControl<Grid>("ShellContent")!.IsEnabled);
+            modal.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
+            Assert.False(await answer); Dispatcher.UIThread.RunJobs();
+            Assert.False(overlay.IsOpen); Assert.True(origin.IsFocused);
+            answer = dialogs.ConfirmAsync("Delete profile", "Delete this profile?", "Delete");
+            owner.CaptureRenderedFrame()?.Dispose();
+            modal = Assert.Single(owner.GetVisualDescendants().OfType<ConfirmationDialog>());
+            modal.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter });
+            Assert.True(await answer); Assert.False(overlay.IsOpen);
+            var text = dialogs.RequestTextAsync("Create profile", "Name your profile", "Create");
+            owner.CaptureRenderedFrame()?.Dispose();
+            var naming = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
+            naming.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter });
+            Assert.False(text.IsCompleted);
+            naming.FindControl<TextBox>("NameInput")!.Text = "Named profile";
+            naming.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter });
+            Assert.Equal("Named profile", await text);
+        }
+        finally { owner.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ClosingWindowDismissesDialogAndReleasesWaitingOperation()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var owner = new MainWindow { DataContext = f.Shell }; owner.Show();
+        var dialogs = new DialogService(() => owner);
+        var operation = f.Services.Operations.RunAsync("Waiting for confirmation", async _ =>
+            await dialogs.ConfirmAsync("Confirm", "Continue?", "Continue"));
+        Dispatcher.UIThread.RunJobs();
+        Assert.True(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+        owner.Close(); await operation; await f.Services.Operations.WhenIdle;
+        Dispatcher.UIThread.RunJobs();
+        Assert.False(owner.IsVisible); Assert.False(f.Services.Operations.IsBusy);
+        Assert.False(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
     }
 
     [AvaloniaFact]
@@ -213,8 +315,10 @@ public class GuiTests
             var details = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ModDetailsButton");
             details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
             Dispatcher.UIThread.RunJobs();
-            var popup = Assert.IsType<ModSettingsWindow>(Assert.Single(window.OwnedWindows));
-            popup.CaptureRenderedFrame()?.Dispose();
+            var popup = Assert.Single(window.GetVisualDescendants().OfType<ModSettingsDialog>());
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Empty(window.OwnedWindows);
+            Assert.False(window.FindControl<Grid>("ShellContent")!.IsEnabled);
             var choice = Assert.Single(popup.GetVisualDescendants().OfType<ComboBox>(), c => c.DataContext == option);
             choice.SelectedIndex = 1; Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, option.ChoiceIndex);
@@ -223,7 +327,7 @@ public class GuiTests
             Assert.Equal(new[] { "common", "red" }, PatchSelection.Select(mod, entry).Select(p => p.Folder));
             var reopened = new AppServices(f.Data, f.Dialogs, () => []); await reopened.Session.InitializeAsync(CancellationToken.None);
             Assert.Equal(1, Assert.Single(reopened.Session.ActiveProfile!.Entries[0].Options).ChoiceIndex);
-            popup.Close(); Dispatcher.UIThread.RunJobs();
+            popup.Cancel(); Dispatcher.UIThread.RunJobs();
         }
         finally { window.Close(); }
     }
@@ -238,6 +342,14 @@ public class GuiTests
         settings.GamePath = f.Game; await settings.SavePathCommand.ExecuteAsync();
         Assert.False(f.Services.Operations.IsError); Assert.Equal(f.Game, f.Services.Session.GameDirectory);
         await settings.DiscoverCommand.ExecuteAsync(); Assert.Empty(settings.Installations);
+        Assert.Equal("Default", settings.ActiveProfileName);
+        var previousPriority = f.Services.Session.ActiveProfile!.Priority;
+        await settings.PriorityCommand.ExecuteAsync();
+        Assert.NotEqual(previousPriority, f.Services.Session.ActiveProfile!.Priority);
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        Assert.NotEqual(previousPriority, f.Services.Session.ActiveProfile!.Priority);
+        await settings.PriorityCommand.ExecuteAsync();
+        Assert.Equal(previousPriority, f.Services.Session.ActiveProfile!.Priority);
         settings.GamePath = "unsaved edit"; await f.Services.Session.ReloadAsync(CancellationToken.None);
         Assert.Equal("unsaved edit", settings.GamePath);
     }

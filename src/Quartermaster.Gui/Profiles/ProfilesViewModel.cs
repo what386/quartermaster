@@ -27,7 +27,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     private ProfileModItem? selectedMod;
     private Mod? modToAdd;
     private string search = "";
-    private string profileName = "";
     private bool repair = true;
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
     public IReadOnlyList<ProfileModItem> Entries { get; private set; } = [];
@@ -41,12 +40,11 @@ public sealed class ProfilesViewModel : SessionViewModel
     public bool HasSelectedMod => SelectedMod is not null;
     public bool HasProfile => SelectedProfile is not null;
     public bool HasConflicts => Conflicts.Count > 0;
-    public string PriorityLabel => SelectedProfile?.Priority == PriorityDirection.FirstWins ? "Priority: earlier entries win" : "Priority: later entries win";
     public string ActiveLabel => SelectedProfile?.Id == Session.State.ActiveProfileId ? "Active profile" : "";
     public Profile? SelectedProfile
     {
         get => profile;
-        set { if (Set(ref profile, value)) { ProfileName = value?.Name ?? ""; RebuildEntries(); } }
+        set { if (Set(ref profile, value)) { RebuildEntries(); } }
     }
     public ProfileModItem? SelectedMod
     {
@@ -60,15 +58,9 @@ public sealed class ProfilesViewModel : SessionViewModel
     }
     public ModOptionsViewModel? Options { get; private set; }
     public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value)) AddCommand.Refresh(); } }
-    public string ProfileName { get => profileName; set { if (Set(ref profileName, value)) RenameCommand.Refresh(); } }
     public bool Repair { get => repair; set => Set(ref repair, value); }
-    public string DeploymentHealth => Session.DeploymentStatus;
-    public bool NeedsPurge => Session.Inspection?.NeedsPurge == true || Session.DeploymentProblem != "";
     public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
-    public AsyncCommand RenameCommand { get; }
-    public AsyncCommand DeleteCommand { get; }
     public AsyncCommand MakeActiveCommand { get; }
-    public AsyncCommand PriorityCommand { get; }
     public AsyncCommand AddCommand { get; }
     public AsyncCommand RemoveCommand { get; }
     public AsyncCommand ToggleCommand { get; }
@@ -81,17 +73,7 @@ public sealed class ProfilesViewModel : SessionViewModel
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
-        RenameCommand = Operations.CreateCommand("Renaming profile", ct => Save(SelectedProfile! with { Name = ProfileName.Trim() }, ct),
-            () => HasProfile && !string.IsNullOrWhiteSpace(ProfileName) && ProfileName.Trim() != SelectedProfile!.Name);
-        DeleteCommand = Operations.CreateCommand("Deleting profile", async ct =>
-        {
-            var current = SelectedProfile!;
-            if (await Services.Dialogs.ConfirmAsync("Delete profile", $"Delete {current.Name}? Your imported mods and deployed game files will remain.", "Delete"))
-                await Session.DeleteProfileAsync(current.Id, ct);
-        }, () => HasProfile);
         MakeActiveCommand = Operations.CreateCommand("Selecting active profile", ct => Session.SaveProfileAsync(SelectedProfile!, true, ct), () => HasProfile);
-        PriorityCommand = Operations.CreateCommand("Changing priority", ct => Save(SelectedProfile! with
-        { Priority = SelectedProfile!.Priority == PriorityDirection.LastWins ? PriorityDirection.FirstWins : PriorityDirection.LastWins }, ct), () => HasProfile);
         AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Save(ProfileEditor.Add(SelectedProfile!, ModToAdd!), ct), () => HasProfile && ModToAdd is not null);
         RemoveCommand = Operations.CreateCommand("Removing mod from profile", ct => Save(ProfileEditor.Remove(SelectedProfile!, SelectedMod!.Mod.Id), ct), () => SelectedMod is not null);
         ToggleCommand = Operations.CreateCommand("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, SelectedMod!.Mod.Id, !SelectedMod.Entry.Enabled), ct), () => SelectedMod is not null);
@@ -124,7 +106,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     protected override void Refresh()
     {
         Profiles = Session.State.Profiles.ToArray(); Notify(nameof(Profiles));
-        Notify(nameof(DeploymentHealth)); Notify(nameof(NeedsPurge));
         SelectedProfile = Session.ActiveProfile ?? Profiles.FirstOrDefault();
         RebuildEntries();
     }
@@ -144,12 +125,12 @@ public sealed class ProfilesViewModel : SessionViewModel
         Conflicts = report.Resources.Select(c => $"{c.Archive} · {c.Resource.Id:x16}/{c.Resource.Type:x16} · {mods[c.WinningSourceId].Name} wins").ToArray();
         ArchiveSummary = $"{ModPresentation.Count(report.Archives.Count, "shared archive")} · {ModPresentation.Count(Conflicts.Count, "overlapping resource")}";
         Notify(nameof(Conflicts)); Notify(nameof(HasConflicts)); Notify(nameof(ArchiveSummary));
-        Notify(nameof(HasProfile)); Notify(nameof(PriorityLabel)); Notify(nameof(ActiveLabel));
+        Notify(nameof(HasProfile)); Notify(nameof(ActiveLabel));
         RefreshCommands();
     }
     private void RefreshCommands()
     {
-        foreach (var command in new[] { RenameCommand, DeleteCommand, MakeActiveCommand, PriorityCommand, AddCommand, RemoveCommand,
+        foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
             ToggleCommand, MoveUpCommand, MoveDownCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand }) command.Refresh();
     }
 }

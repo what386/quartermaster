@@ -1,29 +1,22 @@
 using Avalonia.Controls;
-using Avalonia.Input;
 using Avalonia.Interactivity;
 
 namespace Quartermaster.Gui.Shared;
 
-public partial class TextInputDialog : Window
+public partial class TextInputDialog : UserControl, IModalDialog
 {
-    public TextInputDialog()
-    {
-        InitializeComponent();
-        Opened += (_, _) => NameInput.Focus();
-    }
-    public TextInputDialog(string title, string prompt, string acceptLabel) : this()
-    { Title = title; PromptText.Text = prompt; AcceptButton.Content = acceptLabel; }
+    public event Action<object?>? Completed;
+    public TextInputDialog() => InitializeComponent();
+    public TextInputDialog(string title, string prompt, string acceptLabel, string? initialValue = null) : this()
+    { TitleText.Text = title; PromptText.Text = prompt; AcceptButton.Content = acceptLabel; NameInput.Text = initialValue; }
     private void NameChanged(object? sender, TextChangedEventArgs e) =>
         AcceptButton.IsEnabled = !string.IsNullOrWhiteSpace(NameInput.Text);
-    private void AcceptInput(object? sender, RoutedEventArgs e)
+    public bool TryAccept()
     {
-        if (!string.IsNullOrWhiteSpace(NameInput.Text)) Close(NameInput.Text.Trim());
+        if (string.IsNullOrWhiteSpace(NameInput.Text)) return false;
+        Completed?.Invoke(NameInput.Text.Trim()); return true;
     }
-    private void CancelInput(object? sender, RoutedEventArgs e) => Close(null);
-    protected override void OnKeyDown(KeyEventArgs e)
-    {
-        if (e.Key == Key.Escape) { Close(null); e.Handled = true; }
-        else if (e.Key == Key.Enter && AcceptButton.IsEnabled) { Close(NameInput.Text!.Trim()); e.Handled = true; }
-        else base.OnKeyDown(e);
-    }
+    public void Cancel() => Completed?.Invoke(null);
+    private void AcceptInput(object? sender, RoutedEventArgs e) => TryAccept();
+    private void CancelInput(object? sender, RoutedEventArgs e) => Cancel();
 }

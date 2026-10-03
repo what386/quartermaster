@@ -1,8 +1,8 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
-        x:Class="Quartermaster.Gui.Profiles.ModSettingsWindow" x:DataType="vm:ProfilesViewModel"
-        Title="Mod details" Width="560" Height="600" MinWidth="420" MinHeight="380" WindowStartupLocation="CenterOwner">
-  <Grid RowDefinitions="*,Auto" Margin="16">
+        x:Class="Quartermaster.Gui.Profiles.ModSettingsDialog" x:DataType="vm:ProfilesViewModel"
+        Width="520" Height="540">
+  <Grid RowDefinitions="*,Auto">
     <Border IsEnabled="{Binding Operations.CanInteract}">
       <Border Classes="card"><ScrollViewer><StackPanel Spacing="12">
         <TextBlock Text="SELECTED MOD" Classes="eyebrow" />
@@ -24,4 +24,4 @@
       <Button Grid.Column="1" Content="Close" Click="CloseDialog" />
     </Grid>
   </Grid>
-</Window>
+</UserControl>

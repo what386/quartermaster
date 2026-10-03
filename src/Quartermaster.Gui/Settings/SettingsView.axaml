@@ -10,6 +10,12 @@
       <ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Discovered installations" />
       <Button Content="Use selected installation" Command="{Binding UseInstallationCommand}" HorizontalAlignment="Left" />
     </StackPanel></Border>
+    <Border Classes="card"><StackPanel Spacing="12">
+      <TextBlock Text="Profile load priority" Classes="sectionTitle" />
+      <TextBlock Text="{Binding ActiveProfileName}" Classes="muted" />
+      <TextBlock Text="Choose which entries in this profile take precedence when mods overlap." Classes="muted" TextWrapping="Wrap" />
+      <Button Content="{Binding PriorityLabel}" Command="{Binding PriorityCommand}" HorizontalAlignment="Left" />
+    </StackPanel></Border>
     <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Deployment health" Classes="sectionTitle" /><TextBlock Text="{Binding DeploymentStatus}" TextWrapping="Wrap" /><Button Content="Purge patches" Command="{Binding PurgeCommand}" HorizontalAlignment="Left" /></StackPanel></Border>
     <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Library storage" Classes="sectionTitle" /><TextBlock Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" /><TextBlock Text="Imported originals, profiles and deployment records are stored here." Classes="muted" TextWrapping="Wrap" /></StackPanel></Border>
   </StackPanel></ScrollViewer>

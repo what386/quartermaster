@@ -61,11 +61,17 @@ public sealed class MainWindowViewModel : ViewModelBase
             await services.Session.SaveProfileAsync(ProfileEditor.Create(name.Trim()), true, ct);
             Navigate(PageKind.Profiles);
         });
-        services.Session.Changed += (_, _) => { RefreshProfiles(); NotifyStatus(); };
+        services.Session.Changed += (_, _) =>
+        {
+            RefreshProfiles(); NotifyStatus();
+            if (services.Session.State.Profiles.Count == 0 && SelectedNavigation.Page == PageKind.Profiles)
+                Navigate(PageKind.Mods);
+        };
         Operations.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(OperationState.IsBusy)) return;
-            foreach (var entry in SidebarProfiles) entry.SelectCommand.Refresh();
+            foreach (var entry in SidebarProfiles)
+            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); }
         };
         RefreshProfiles();
         ((ProfilesViewModel)pages[PageKind.Profiles]).PropertyChanged += (_, e) =>
@@ -84,13 +90,28 @@ public sealed class MainWindowViewModel : ViewModelBase
                     if (Operations.IsError) return;
                 }
                 Navigate(PageKind.Profiles);
-            }, () => Operations.CanInteract, Operations.ReportError))).ToArray();
+            }, () => Operations.CanInteract, Operations.ReportError),
+            new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+            new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))).ToArray();
         Notify(nameof(SidebarProfiles));
     }
     private void NotifyStatus()
     {
         foreach (var name in new[] { nameof(ProfileLabel), nameof(LibraryCount), nameof(SelectionSummary), nameof(CollisionCount) }) Notify(name);
     }
+    private Task RenameProfileAsync(Guid id) => Operations.RunAsync("Renaming profile", async ct =>
+    {
+        var profile = services.Session.State.Profiles.Single(p => p.Id == id);
+        var name = await services.Dialogs.RequestTextAsync("Rename profile", "Profile name", "Rename", profile.Name);
+        if (string.IsNullOrWhiteSpace(name) || name.Trim() == profile.Name) return;
+        await services.Session.SaveProfileAsync(profile with { Name = name.Trim() }, false, ct);
+    });
+    private Task DeleteProfileAsync(Guid id) => Operations.RunAsync("Deleting profile", async ct =>
+    {
+        var profile = services.Session.State.Profiles.Single(p => p.Id == id);
+        if (await services.Dialogs.ConfirmAsync("Delete profile", $"Delete {profile.Name}? Your imported mods and deployed game files will remain.", "Delete"))
+            await services.Session.DeleteProfileAsync(id, ct);
+    });
     public void Navigate(PageKind page) => SelectedNavigation = NavigationItems.Single(n => n.Page == page);
     public Task InitializeAsync() => Operations.RunAsync("Loading library", services.Session.InitializeAsync);
 }

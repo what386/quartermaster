@@ -1,12 +1,13 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="Quartermaster.Gui.Shared.TextInputDialog"
-        Width="420" CanResize="False" SizeToContent="Height" WindowStartupLocation="CenterOwner">
-  <StackPanel Margin="24" Spacing="16">
-    <TextBlock x:Name="PromptText" Classes="sectionTitle" TextWrapping="Wrap" />
+        Width="360">
+  <StackPanel Spacing="16">
+    <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
+    <TextBlock x:Name="PromptText" Classes="muted" TextWrapping="Wrap" />
     <TextBox x:Name="NameInput" PlaceholderText="Profile name" TextChanged="NameChanged" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
       <Button Content="Cancel" Click="CancelInput" />
       <Button x:Name="AcceptButton" Classes="primary" IsEnabled="False" Click="AcceptInput" />
     </StackPanel>
   </StackPanel>
-</Window>
+</UserControl>

@@ -69,7 +69,13 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
     }
     public async Task DeleteProfileAsync(Guid id, CancellationToken ct)
     {
-        await Task.Run(() => library.RemoveProfileAsync(id, ct), ct);
+        await Task.Run(async () =>
+        {
+            await library.RemoveProfileAsync(id, ct);
+            var state = await library.LoadAsync(CancellationToken.None);
+            if (state.ActiveProfileId is null && state.Profiles.FirstOrDefault() is { } next)
+                await library.SaveProfileAsync(next, true, CancellationToken.None);
+        }, ct);
         await ReloadAsync(CancellationToken.None);
     }
     public Task<IReadOnlyList<string>> DiscoverAsync(CancellationToken ct) => Task.Run(discover, ct);

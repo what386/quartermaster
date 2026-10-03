@@ -22,7 +22,9 @@ internal sealed class FakeDialogs : IDialogService
     public string? FolderPath { get; set; }
     public bool Confirm { get; set; } = true;
     public string? InputText { get; set; }
-    public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel) => Task.FromResult(InputText);
+    public string? InitialInputText { get; private set; }
+    public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null)
+    { InitialInputText = initialValue; return Task.FromResult(InputText); }
     public List<(string Title, string Message)> Confirmations { get; } = [];
     public Task<string?> PickModZipAsync() => Task.FromResult(ZipPath);
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(FolderPath);

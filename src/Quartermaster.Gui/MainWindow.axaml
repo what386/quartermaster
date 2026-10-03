@@ -1,5 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:local="clr-namespace:Quartermaster.Gui"
+        xmlns:local="clr-namespace:Quartermaster.Gui" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
         xmlns:mods="clr-namespace:Quartermaster.Gui.Mods" xmlns:profiles="clr-namespace:Quartermaster.Gui.Profiles"
         xmlns:providers="clr-namespace:Quartermaster.Gui.Providers" xmlns:settings="clr-namespace:Quartermaster.Gui.Settings"
         x:Class="Quartermaster.Gui.MainWindow" x:DataType="local:MainWindowViewModel"
@@ -10,52 +10,60 @@
     <DataTemplate DataType="{x:Type providers:ProvidersViewModel}"><providers:ProvidersView /></DataTemplate>
     <DataTemplate DataType="{x:Type settings:SettingsViewModel}"><settings:SettingsView /></DataTemplate>
   </Window.DataTemplates>
-  <Grid ColumnDefinitions="72,*">
-    <Border Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
-      <Grid RowDefinitions="70,1,*,Auto">
-        <ContentControl Content="{Binding LibraryNavigation}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
-          <ContentControl.ContentTemplate><DataTemplate x:DataType="local:NavigationItem">
-            <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Library">
-              <Path Data="{Binding Icon}" Width="26" Height="26" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" />
-            </Button>
-          </DataTemplate></ContentControl.ContentTemplate>
-        </ContentControl>
-        <Border Grid.Row="1" Background="{DynamicResource LineBrush}" Margin="12,0" />
-        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
-          <StackPanel Spacing="12" Margin="0,12">
-            <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding Operations.CanInteract}">
-              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-              <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
-                <Button Classes="profileButton" Classes.active="{Binding IsActive}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center" />
-              </DataTemplate></ItemsControl.ItemTemplate>
-            </ItemsControl>
-            <Button x:Name="AddProfileButton" Classes="profileButton" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center" />
-          </StackPanel>
-        </ScrollViewer>
-        <ItemsControl Grid.Row="3" ItemsSource="{Binding UtilityNavigationItems}" Margin="0,12">
-          <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-          <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:NavigationItem">
-            <Button Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
-              <Path Data="{Binding Icon}" Width="24" Height="24" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" />
-            </Button>
-          </DataTemplate></ItemsControl.ItemTemplate>
-        </ItemsControl>
-      </Grid>
-    </Border>
-    <Border Grid.Column="1" Padding="12" ClipToBounds="True">
-      <Grid RowDefinitions="Auto,Auto,*">
-        <Border IsVisible="{Binding Operations.IsBusy}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
-          <Grid ColumnDefinitions="*,Auto,Auto">
-            <TextBlock Text="{Binding Operations.Message}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-            <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="110" Height="3" VerticalAlignment="Center" Margin="12,0" />
-            <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
-          </Grid>
-        </Border>
-        <Border Grid.Row="1" IsVisible="{Binding Operations.IsError}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
-          <TextBlock x:Name="OperationMessage" Text="{Binding Operations.Message}" Classes="error" TextWrapping="Wrap" />
-        </Border>
-        <ContentControl Grid.Row="2" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
-      </Grid>
-    </Border>
+  <Grid>
+    <Grid x:Name="ShellContent" ColumnDefinitions="72,*" IsEnabled="{Binding !IsOpen, ElementName=DialogOverlay}">
+      <Border Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
+        <Grid RowDefinitions="70,1,*,Auto">
+          <ContentControl Content="{Binding LibraryNavigation}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+            <ContentControl.ContentTemplate><DataTemplate x:DataType="local:NavigationItem">
+              <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Library">
+                <Path Data="{Binding Icon}" Width="26" Height="26" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" />
+              </Button>
+            </DataTemplate></ContentControl.ContentTemplate>
+          </ContentControl>
+          <Border Grid.Row="1" Background="{DynamicResource LineBrush}" Margin="12,0" />
+          <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="12" Margin="0,12">
+              <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding Operations.CanInteract}">
+                <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
+                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
+                    <Button.ContextMenu><ContextMenu>
+                      <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
+                      <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+                    </ContextMenu></Button.ContextMenu>
+                  </Button>
+                </DataTemplate></ItemsControl.ItemTemplate>
+              </ItemsControl>
+              <Button x:Name="AddProfileButton" Classes="profileButton" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center" />
+            </StackPanel>
+          </ScrollViewer>
+          <ItemsControl Grid.Row="3" ItemsSource="{Binding UtilityNavigationItems}" Margin="0,12">
+            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:NavigationItem">
+              <Button Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
+                <Path Data="{Binding Icon}" Width="24" Height="24" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.5" />
+              </Button>
+            </DataTemplate></ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+      </Border>
+      <Border Grid.Column="1" Padding="12" ClipToBounds="True">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <Border IsVisible="{Binding Operations.IsBusy}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBlock Text="{Binding Operations.Message}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+              <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="110" Height="3" VerticalAlignment="Center" Margin="12,0" />
+              <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
+            </Grid>
+          </Border>
+          <Border Grid.Row="1" IsVisible="{Binding Operations.IsError}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
+            <TextBlock x:Name="OperationMessage" Text="{Binding Operations.Message}" Classes="error" TextWrapping="Wrap" />
+          </Border>
+          <ContentControl Grid.Row="2" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+        </Grid>
+      </Border>
+    </Grid>
+    <shared:DialogHost x:Name="DialogOverlay" />
   </Grid>
 </Window>

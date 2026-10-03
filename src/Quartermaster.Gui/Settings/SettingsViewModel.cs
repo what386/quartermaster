@@ -1,3 +1,4 @@
+using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Shared;
 
@@ -13,6 +14,9 @@ public sealed class SettingsViewModel : SessionViewModel
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public string LibraryDirectory => Services.DataDirectory;
     public string DeploymentStatus => Session.DeploymentStatus;
+    public string ActiveProfileName => Session.ActiveProfile?.Name ?? "No profile selected";
+    public string PriorityLabel => Session.ActiveProfile?.Priority == PriorityDirection.FirstWins ? "Earlier entries win" : "Later entries win";
+    public AsyncCommand PriorityCommand { get; }
     public AsyncCommand BrowseCommand { get; }
     public AsyncCommand SavePathCommand { get; }
     public AsyncCommand DiscoverCommand { get; }
@@ -20,6 +24,12 @@ public sealed class SettingsViewModel : SessionViewModel
     public AsyncCommand PurgeCommand { get; }
     public SettingsViewModel(AppServices services) : base(services)
     {
+        PriorityCommand = Operations.CreateCommand("Changing load priority", ct =>
+        {
+            var profile = Session.ActiveProfile!;
+            return Session.SaveProfileAsync(profile with
+            { Priority = profile.Priority == PriorityDirection.LastWins ? PriorityDirection.FirstWins : PriorityDirection.LastWins }, false, ct);
+        }, () => Session.ActiveProfile is not null);
         BrowseCommand = Operations.CreateCommand("Selecting game folder", async ct =>
         {
             var path = await Services.Dialogs.PickFolderAsync("Choose Helldivers 2 installation or data folder");
@@ -42,6 +52,7 @@ public sealed class SettingsViewModel : SessionViewModel
     protected override void Refresh()
     {
         if (savedPath != Session.GameDirectory) { savedPath = Session.GameDirectory; GamePath = savedPath; }
-        Notify(nameof(DeploymentStatus)); PurgeCommand.Refresh();
+        Notify(nameof(DeploymentStatus)); Notify(nameof(ActiveProfileName)); Notify(nameof(PriorityLabel));
+        PurgeCommand.Refresh(); PriorityCommand.Refresh();
     }
 }
