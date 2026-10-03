@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
+             x:Class="Quartermaster.Gui.Profiles.ProfilesView" x:DataType="vm:ProfilesViewModel">
+  <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,8">
+      <TextBox Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search mods in this profile…" Margin="0,0,8,0" />
+      <Button Grid.Column="1" Content="Preview" Command="{Binding PreviewCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="2" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Content="▶  Run" Command="{Binding RunCommand}" />
+    </Grid>
+    <Expander Grid.Row="1" Header="Profile settings · create, add mods, and change priority" IsExpanded="{Binding ShowSettings, Mode=TwoWay}" HorizontalAlignment="Stretch" Margin="0,0,0,10">
+      <vm:ProfileSettingsView />
+    </Expander>
+    <Border Grid.Row="2" Classes="groupHeader" Margin="0,0,0,4">
+      <Grid ColumnDefinitions="Auto,*,Auto"><TextBlock Text="LOADOUT" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding ActiveLabel}" Margin="16,0" /><TextBlock Grid.Column="2" Text="{Binding EntrySummary}" /></Grid>
+    </Border>
+    <Grid Grid.Row="3" ColumnDefinitions="*,300">
+      <Grid RowDefinitions="24,*" Margin="0,0,12,0">
+        <Border Background="#25282C" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="106,0,0,0" /></Grid></Border>
+        <ListBox Grid.Row="1" x:Name="ProfileModsList" Classes="modList" ItemsSource="{Binding VisibleEntries}" SelectedItem="{Binding SelectedMod, Mode=TwoWay}">
+          <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileModItem"><mods:ModRowView /></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+      <Border Grid.Column="1" Classes="card"><ScrollViewer><StackPanel Spacing="12">
+        <TextBlock Text="SELECTED MOD" Classes="eyebrow" />
+        <TextBlock Text="{Binding SelectedModName}" Classes="sectionTitle" TextWrapping="Wrap" />
+        <TextBlock Text="Options" FontWeight="SemiBold" />
+        <mods:ModOptionsView DataContext="{Binding Options}" />
+        <Button Content="Apply options" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
+        <TextBlock Text="Choose variants above, then apply them to this profile." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+        <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,6,0,0" Padding="0,12,0,0"><StackPanel Spacing="10">
+          <TextBlock Text="COLLISIONS" Classes="eyebrow" />
+          <TextBlock Text="{Binding ArchiveSummary}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <TextBlock Text="No overlapping resources." IsVisible="{Binding !HasConflicts}" Classes="success" FontSize="11" />
+          <ItemsControl ItemsSource="{Binding Conflicts}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </StackPanel></Border>
+      </StackPanel></ScrollViewer></Border>
+    </Grid>
+    <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,10">
+      <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" /><Button Content="Move up" Command="{Binding MoveUpCommand}" /><Button Content="Move down" Command="{Binding MoveDownCommand}" /><Button Content="Remove from profile" Command="{Binding RemoveCommand}" /></StackPanel>
+      <Button Grid.Column="1" Content="Purge patches" Classes="danger" Command="{Binding PurgeCommand}" />
+    </Grid>
+    <StackPanel Grid.Row="5" Spacing="6">
+      <TextBlock Text="{Binding DeploymentHealth}" Classes.error="{Binding NeedsPurge}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+      <CheckBox Content="Repair patches against the installed game before deploying" IsChecked="{Binding Repair, Mode=TwoWay}" />
+      <TextBlock Text="{Binding PreviewSummary}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+    </StackPanel>
+  </Grid>
+</UserControl>

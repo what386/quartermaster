@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.SettingsView" x:DataType="vm:SettingsViewModel">
+  <ScrollViewer><StackPanel Margin="12" Spacing="18" IsEnabled="{Binding Operations.CanInteract}">
+    <StackPanel Spacing="8"><TextBlock Text="Settings" Classes="pageTitle" /><TextBlock Text="Connect your local library to the installed game." Classes="muted" /></StackPanel>
+    <Border Classes="card"><StackPanel Spacing="16">
+      <TextBlock Text="Helldivers 2 installation" Classes="sectionTitle" />
+      <TextBlock Text="Select the installation folder or its data folder." Classes="muted" />
+      <TextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="Path to Helldivers 2" />
+      <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Browse" Command="{Binding BrowseCommand}" /><Button Content="Save folder" Classes="primary" Command="{Binding SavePathCommand}" /><Button Content="Find Steam installations" Command="{Binding DiscoverCommand}" /></StackPanel>
+      <ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Discovered installations" />
+      <Button Content="Use selected installation" Command="{Binding UseInstallationCommand}" HorizontalAlignment="Left" />
+    </StackPanel></Border>
+    <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Deployment health" Classes="sectionTitle" /><TextBlock Text="{Binding DeploymentStatus}" TextWrapping="Wrap" /><Button Content="Purge patches" Command="{Binding PurgeCommand}" HorizontalAlignment="Left" /></StackPanel></Border>
+    <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Library storage" Classes="sectionTitle" /><TextBlock Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" /><TextBlock Text="Imported originals, profiles and deployment records are stored here." Classes="muted" TextWrapping="Wrap" /></StackPanel></Border>
+  </StackPanel></ScrollViewer>
+</UserControl>

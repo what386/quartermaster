@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles"
+             xmlns:model="clr-namespace:Quartermaster.Library.Mods;assembly=Quartermaster.Library"
+             x:Class="Quartermaster.Gui.Profiles.ProfileSettingsView" x:DataType="vm:ProfilesViewModel">
+  <StackPanel Spacing="10" Margin="0,6,0,12">
+    <Grid ColumnDefinitions="*,Auto,*,Auto">
+      <TextBox Text="{Binding NewProfileName, Mode=TwoWay}" PlaceholderText="New profile name" />
+      <Button Grid.Column="1" Content="Create" Command="{Binding CreateCommand}" Margin="8,0,18,0" />
+      <TextBox Grid.Column="2" Text="{Binding ProfileName, Mode=TwoWay}" PlaceholderText="Profile name" />
+      <Button Grid.Column="3" Content="Rename" Command="{Binding RenameCommand}" Margin="8,0,0,0" />
+    </Grid>
+    <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+      <ComboBox ItemsSource="{Binding AvailableMods}" SelectedItem="{Binding ModToAdd, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Choose a library mod">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="model:Mod"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <Button Grid.Column="1" Content="Add mod" Command="{Binding AddCommand}" Margin="8,0" />
+      <Button Grid.Column="2" Content="{Binding PriorityLabel}" Command="{Binding PriorityCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Content="Delete profile" Classes="danger" Command="{Binding DeleteCommand}" />
+    </Grid>
+  </StackPanel>
+</UserControl>

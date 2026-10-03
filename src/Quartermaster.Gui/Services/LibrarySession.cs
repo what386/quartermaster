@@ -1,0 +1,127 @@
+using Quartermaster.Core.Deployment;
+using Quartermaster.Core.Patching;
+using Quartermaster.Library;
+using Quartermaster.Library.Mods;
+using Quartermaster.Library.Profiles;
+using Quartermaster.Repatcher.Archives;
+using Quartermaster.Gui.Shared;
+
+namespace Quartermaster.Gui.Services;
+
+/// <summary>Shared loaded state. Backend work runs on workers; notifications return to the UI caller.</summary>
+public sealed class LibrarySession(LibraryService library, IDeploymentStorage storage, SettingsStore settingsStore,
+    Func<IReadOnlyList<string>> discover) : ViewModelBase
+{
+    public event EventHandler? Changed;
+    public LibraryState State { get; private set; } = LibraryState.Empty;
+    public ApplicationSettings Settings { get; private set; } = new();
+    public DeploymentInspection? Inspection { get; private set; }
+    public string DeploymentProblem { get; private set; } = "";
+    public Profile? ActiveProfile => State.Profiles.FirstOrDefault(p => p.Id == State.ActiveProfileId);
+    public string GameDirectory => Settings.GameDataDirectory ?? "";
+    public string DeploymentStatus => GameDirectory == "" ? "Choose your game folder in Settings" :
+        DeploymentProblem != "" ? DeploymentProblem : Inspection is null ? "Not inspected" :
+        Inspection.NeedsPurge ? "Deployment incomplete or unknown. Purge patches, then redeploy." :
+        Inspection.Ledger.Files.Count == 0 ? "No managed patches deployed" : $"{Inspection.Ledger.Files.Count} managed files deployed";
+    public string DeployedProfileName => Inspection?.Ledger.SelectionName ?? State.Profiles.FirstOrDefault(p => p.Id == Inspection?.Ledger.SelectionId)?.Name ?? "None";
+
+    public async Task InitializeAsync(CancellationToken ct)
+    {
+        Settings = await Task.Run(() => settingsStore.LoadAsync(ct), ct);
+        State = await Task.Run(() => library.LoadAsync(ct), ct);
+        if (State.Profiles.Count == 0)
+        {
+            await Task.Run(() => library.SaveProfileAsync(ProfileEditor.Create("Default"), true, ct), ct);
+            State = await Task.Run(() => library.LoadAsync(ct), ct);
+        }
+        if (GameDirectory == "")
+        {
+            var found = await Task.Run(discover, ct);
+            if (found.Count == 1)
+            {
+                Settings = Settings with { GameDataDirectory = found[0] };
+                await Task.Run(() => settingsStore.SaveAsync(Settings, ct), ct);
+            }
+        }
+        await RefreshInspectionAsync(ct);
+        Publish();
+    }
+    public async Task ReloadAsync(CancellationToken ct)
+    {
+        State = await Task.Run(() => library.LoadAsync(ct), ct);
+        await RefreshInspectionAsync(ct); Publish();
+    }
+    private void Publish() { Notify(nameof(State)); Notify(nameof(GameDirectory)); Notify(nameof(DeploymentStatus)); Changed?.Invoke(this, EventArgs.Empty); }
+    public async Task ImportAsync(string source, CancellationToken ct)
+    {
+        await Task.Run(() => library.ImportAsync(source, cancellationToken: ct), ct);
+        await ReloadAsync(CancellationToken.None);
+    }
+    public async Task RemoveModAsync(Guid id, CancellationToken ct)
+    {
+        await Task.Run(() => library.RemoveAsync(id, ct), ct);
+        await ReloadAsync(CancellationToken.None);
+    }
+    public async Task SaveProfileAsync(Profile profile, bool active, CancellationToken ct)
+    {
+        await Task.Run(() => library.SaveProfileAsync(profile, active, ct), ct);
+        await ReloadAsync(CancellationToken.None);
+    }
+    public async Task DeleteProfileAsync(Guid id, CancellationToken ct)
+    {
+        await Task.Run(() => library.RemoveProfileAsync(id, ct), ct);
+        await ReloadAsync(CancellationToken.None);
+    }
+    public Task<IReadOnlyList<string>> DiscoverAsync(CancellationToken ct) => Task.Run(discover, ct);
+    public async Task SetGameDirectoryAsync(string path, CancellationToken ct)
+    {
+        var resolved = await Task.Run(() => SteamGameDiscovery.ResolveDataDirectory(path), ct)
+            ?? throw new ArgumentException("Choose a Helldivers 2 installation or its data folder.");
+        var settings = Settings with { GameDataDirectory = resolved };
+        await Task.Run(() => settingsStore.SaveAsync(settings, ct), ct);
+        Settings = settings;
+        await RefreshInspectionAsync(ct); Publish();
+    }
+    private async Task RefreshInspectionAsync(CancellationToken ct)
+    {
+        Inspection = null; DeploymentProblem = "";
+        if (GameDirectory == "") return;
+        try { Inspection = await Task.Run(() => new DeploymentService(storage).InspectAsync(GameDirectory, ct), ct); }
+        catch (Exception ex) when (ex is IOException or ArgumentException) { DeploymentProblem = ex.Message; }
+    }
+    public async Task<DeploymentPlan> PreviewAsync(Guid profileId, CancellationToken ct)
+    {
+        var request = ProfilePatches.Resolve(State, profileId);
+        return await Task.Run(() => new DeploymentService(storage).PreviewAsync(request, RequireGame(), ct), ct);
+    }
+    private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException("Choose your game folder in Settings first.");
+    public async Task DeployAsync(Guid profileId, bool repair, CancellationToken ct)
+    {
+        var request = ProfilePatches.Resolve(State, profileId); var target = RequireGame();
+        try
+        {
+            await Task.Run(async () =>
+            {
+                IPatchRepairer? adapter = repair ? new RepatcherAdapter(GameArchives.Open(target, ct)) : null;
+                await new DeploymentService(storage, adapter).DeployAsync(request, target, new(Repatch: repair), ct);
+            }, ct);
+        }
+        finally { await ReloadAsync(CancellationToken.None); }
+    }
+    public async Task PurgeAsync(CancellationToken ct)
+    {
+        try { await Task.Run(() => new DeploymentService(storage).PurgeAsync(RequireGame(), ct), ct); }
+        finally { await ReloadAsync(CancellationToken.None); }
+    }
+    public async Task<string?> GetLaunchWarningAsync(Guid profileId, CancellationToken ct)
+    {
+        await RefreshInspectionAsync(ct); Publish();
+        if (DeploymentProblem != "") return DeploymentProblem + " Purge patches, then redeploy.";
+        if (Inspection is null) return "Deployment could not be inspected. Choose a game folder in Settings.";
+        if (Inspection.NeedsPurge) return "Deployment is incomplete or unknown. Purge patches, then redeploy before running the game.";
+        var plan = DeploymentPlanner.Create(ProfilePatches.Resolve(State, profileId));
+        if (Inspection.Ledger.SelectionId != profileId || Inspection.Ledger.Signature != plan.Signature)
+            return $"The selected profile or its loadout is not deployed. Currently deployed profile: {DeployedProfileName}. Deploy the selected profile before running, or continue with the installed loadout.";
+        return null;
+    }
+}

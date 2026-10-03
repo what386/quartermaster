@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModsView" x:DataType="vm:ModsViewModel">
+  <Grid RowDefinitions="Auto,Auto,*,Auto" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+      <TextBox Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search names in your mod library…" />
+      <Button Grid.Column="1" x:Name="ImportZipButton" Content="Import ZIP" Classes="primary" Command="{Binding ImportZipCommand}" Margin="8,0" />
+      <Button Grid.Column="2" Content="Import folder" Command="{Binding ImportFolderCommand}" />
+    </Grid>
+    <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4">
+      <Grid ColumnDefinitions="*,Auto"><TextBlock Text="LOCAL LIBRARY" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding CountLabel}" /></Grid>
+    </Border>
+    <Grid Grid.Row="2" ColumnDefinitions="*,330">
+      <Grid RowDefinitions="24,*" Margin="0,0,12,0">
+        <Border Background="#25282C" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="56,0,0,0" /></Grid></Border>
+        <ListBox Grid.Row="1" x:Name="ModsList" Classes="modList" ItemsSource="{Binding Mods}" SelectedItem="{Binding SelectedMod, Mode=TwoWay}">
+          <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ModListItem"><vm:ModRowView /></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+      <Border Grid.Column="1" Classes="card">
+        <Grid>
+          <TextBlock Text="Select a mod or import a ZIP or folder to get started." Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !HasSelection}" />
+          <Border IsVisible="{Binding HasSelection}"><vm:ModDetailsView DataContext="{Binding Details}" /></Border>
+        </Grid>
+      </Border>
+    </Grid>
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+      <TextBlock Text="Imported originals are kept in your local library." Classes="muted" FontSize="11" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Remove selected mod" Classes="danger" Command="{Binding RemoveCommand}" />
+    </Grid>
+  </Grid>
+</UserControl>

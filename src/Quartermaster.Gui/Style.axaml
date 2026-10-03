@@ -1,0 +1,50 @@
+<Styles xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <Styles.Resources>
+    <SolidColorBrush x:Key="AppBackground">#191B1E</SolidColorBrush>
+    <SolidColorBrush x:Key="SidebarBackground">#101214</SolidColorBrush>
+    <SolidColorBrush x:Key="CardBackground">#202327</SolidColorBrush>
+    <SolidColorBrush x:Key="LineBrush">#34383D</SolidColorBrush>
+    <SolidColorBrush x:Key="MutedBrush">#9299A1</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentBrush">#F27A22</SolidColorBrush>
+    <SolidColorBrush x:Key="SuccessBrush">#4AB98A</SolidColorBrush>
+    <SolidColorBrush x:Key="ClashBrush">#E2C457</SolidColorBrush>
+  </Styles.Resources>
+  <Style Selector="Window">
+    <Setter Property="Background" Value="{DynamicResource AppBackground}" />
+    <Setter Property="FontFamily" Value="avares://Avalonia.Fonts.Inter/Assets#Inter" />
+    <Setter Property="FontSize" Value="13" />
+  </Style>
+  <Style Selector="TextBlock.pageTitle"><Setter Property="FontSize" Value="23" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="TextBlock.sectionTitle"><Setter Property="FontSize" Value="15" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="TextBlock.eyebrow"><Setter Property="FontSize" Value="10" /><Setter Property="LetterSpacing" Value="1.5" /><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+  <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+  <Style Selector="TextBlock.accent"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /></Style>
+  <Style Selector="TextBlock.success"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></Style>
+  <Style Selector="TextBlock.error"><Setter Property="Foreground" Value="#F3A5A5" /></Style>
+  <Style Selector="TextBlock.metric"><Setter Property="FontSize" Value="27" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="Border.card">
+    <Setter Property="Background" Value="{DynamicResource CardBackground}" /><Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+    <Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="3" /><Setter Property="Padding" Value="16" />
+  </Style>
+  <Style Selector="Border.groupHeader"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Padding" Value="12,6" /></Style>
+  <Style Selector="Border.groupHeader TextBlock"><Setter Property="Foreground" Value="#17191C" /><Setter Property="FontSize" Value="11" /><Setter Property="LetterSpacing" Value="1" /></Style>
+  <Style Selector="Button"><Setter Property="Padding" Value="10,6" /><Setter Property="CornerRadius" Value="2" /><Setter Property="MinHeight" Value="30" /></Style>
+  <Style Selector="Button.primary"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="#101214" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="Button.danger"><Setter Property="Foreground" Value="#F3A5A5" /></Style>
+  <Style Selector="Button.icon"><Setter Property="Width" Value="38" /><Setter Property="Padding" Value="8" /></Style>
+  <Style Selector="Button.rowSwitch"><Setter Property="Width" Value="36" /><Setter Property="Height" Value="20" /><Setter Property="MinHeight" Value="20" /><Setter Property="Padding" Value="3" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Background" Value="#41464D" /></Style>
+  <Style Selector="Button.rowSwitch.active"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /></Style>
+  <Style Selector="ListBox.modList"><Setter Property="Background" Value="#17191C" /><Setter Property="BorderThickness" Value="0" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Background" Value="#1D1F23" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem:nth-child(2n)"><Setter Property="Background" Value="#17191C" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem:selected"><Setter Property="Background" Value="#34291F" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="#2B2723" /><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2,0,0,0" /></Style>
+  <Style Selector="Button.profileButton"><Setter Property="Width" Value="48" /><Setter Property="Height" Value="48" /><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Background" Value="#202327" /><Setter Property="BorderBrush" Value="#454B52" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="14" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
+  <Style Selector="Button.profileButton.active"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="Background" Value="#30261F" /></Style>
+  <Style Selector="Button.menuButton"><Setter Property="Background" Value="Transparent" /><Setter Property="Padding" Value="10,7" /><Setter Property="MinHeight" Value="34" /></Style>
+  <Style Selector="Button.menuButton.active"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="Background" Value="#30261F" /><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="0,0,0,2" /></Style>
+  <Style Selector="TextBox"><Setter Property="MinHeight" Value="32" /><Setter Property="CornerRadius" Value="2" /><Setter Property="Background" Value="#141619" /></Style>
+  <Style Selector="ComboBox"><Setter Property="MinHeight" Value="32" /><Setter Property="CornerRadius" Value="2" /></Style>
+  <Style Selector="Border.modTile"><Setter Property="Width" Value="44" /><Setter Property="Height" Value="44" /><Setter Property="BorderThickness" Value="2" /><Setter Property="BorderBrush" Value="#5C6269" /><Setter Property="CornerRadius" Value="7" /><Setter Property="Background" Value="#24272B" /></Style>
+  <Style Selector="Border.modTile.enabled"><Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" /></Style>
+</Styles>
