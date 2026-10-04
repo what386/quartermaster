@@ -95,7 +95,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (e.PropertyName != nameof(OperationState.IsBusy)) return;
             foreach (var entry in SidebarProfiles)
-            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); }
+            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); entry.DuplicateCommand.Refresh(); }
         };
         RefreshProfiles();
         ((ProfilesViewModel)pages[PageKind.Profiles]).PropertyChanged += (_, e) =>
@@ -135,7 +135,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 }, () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
-                new AsyncCommand(() => ExportProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
+                new AsyncCommand(() => ExportProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => DuplicateProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
             { IsDeployed = deployed });
         }
     }
@@ -177,6 +178,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         foreach (var name in new[] { nameof(ProfileLabel), nameof(LibraryCount), nameof(SelectionSummary), nameof(CollisionCount) }) Notify(name);
     }
+    private Task DuplicateProfileAsync(Guid id) => Operations.RunAsync("Duplicating profile", async ct =>
+    {
+        var profile = services.Session.State.Profiles.Single(p => p.Id == id);
+        await services.Session.SaveProfileAsync(ProfileEditor.Duplicate(profile), true, ct);
+        Navigate(PageKind.Profiles);
+    });
     private Task RenameProfileAsync(Guid id) => Operations.RunAsync("Renaming profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);

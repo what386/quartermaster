@@ -32,6 +32,7 @@
                   <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
                     <Button.ContextMenu><ContextMenu>
                       <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
+                      <MenuItem Header="Duplicate profile" Command="{Binding DuplicateCommand}" />
                       <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
                       <Separator />
                       <MenuItem Header="Export profile ZIP" Command="{Binding ExportCommand}" />

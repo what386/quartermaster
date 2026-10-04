@@ -1331,6 +1331,53 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task ProfileContextMenuDuplicatesClickedProfileWithIndependentGroupsAndOptions()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.OptionsSource(), CancellationToken.None);
+        await f.Services.Session.ImportAsync(f.Source("Cape"), CancellationToken.None);
+        var variants = f.Services.Session.State.Mods.Single(mod => mod.Options.Count > 0);
+        var cape = f.Services.Session.State.Mods.Single(mod => mod.Options.Count == 0);
+        var original = ProfileEditor.Add(ProfileEditor.Add(f.Services.Session.ActiveProfile!, variants), cape);
+        original = ProfileEditor.SetOptions(original, variants, [new(variants.Options[0].Id, true, 1)]);
+        original = ProfileEditor.SetEnabled(original, cape.Id, false);
+        original = ProfileEditor.AddGroup(original, "Equipment", [variants.Id]);
+        original = ProfileEditor.SetGroupExpanded(original, original.Groups[0].Id, false) with { Priority = PriorityDirection.FirstWins };
+        await f.Services.Session.SaveProfileAsync(original, true, CancellationToken.None);
+        f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var button = window.GetVisualDescendants().OfType<Button>().Single(item => item.DataContext is SidebarProfile profile && profile.Profile.Id == original.Id);
+            var menu = button.ContextMenu!; menu.Open(button); Dispatcher.UIThread.RunJobs();
+            var duplicate = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Duplicate profile"));
+            await Assert.IsType<AsyncCommand>(duplicate.Command).ExecuteAsync(); menu.Close();
+            Assert.False(f.Services.Operations.IsError);
+            var copy = f.Services.Session.ActiveProfile!;
+            Assert.Equal("Default (copy)", copy.Name); Assert.NotEqual(original.Id, copy.Id);
+            Assert.Equal(original.Priority, copy.Priority);
+            Assert.Equal(original.Entries.Select(entry => (entry.ModId, entry.Enabled)), copy.Entries.Select(entry => (entry.ModId, entry.Enabled)));
+            Assert.Equal(original.Entries.Single(entry => entry.ModId == variants.Id).Options, copy.Entries.Single(entry => entry.ModId == variants.Id).Options);
+            var group = Assert.Single(copy.Groups);
+            Assert.Equal("Equipment", group.Name); Assert.False(group.IsExpanded); Assert.NotEqual(original.Groups[0].Id, group.Id);
+            Assert.Equal(group.Id, copy.Entries.Single(entry => entry.ModId == variants.Id).GroupId);
+            Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
+            Assert.Equal(copy.Id, Assert.Single(f.Shell.SidebarProfiles, profile => profile.IsActive).Profile.Id);
+            Assert.Equal(2, f.Services.Session.State.Mods.Count);
+            Assert.Empty(f.Services.Session.Inspection!.Ledger.Files);
+            var changed = ProfileEditor.SetOptions(ProfileEditor.RenameGroup(copy, group.Id, "Changed"), variants, [new(variants.Options[0].Id, false, 0)]);
+            await f.Services.Session.SaveProfileAsync(changed, true, CancellationToken.None);
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            var source = persisted.Profiles.Single(profile => profile.Id == original.Id);
+            Assert.Equal("Equipment", source.Groups[0].Name);
+            Assert.Equal(1, Assert.Single(source.Entries.Single(entry => entry.ModId == variants.Id).Options).ChoiceIndex);
+            Assert.Equal("Default (copy)", persisted.Profiles.Single(profile => profile.Id == copy.Id).Name);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ProfileContextMenuTargetsClickedProfileAndPersistsChanges()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -1354,7 +1401,7 @@ public class GuiTests
             button = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
                 b => b.DataContext is SidebarProfile { Name: "Renamed default" });
             menu = button.ContextMenu!; menu.Open(button); Dispatcher.UIThread.RunJobs();
-            var delete = Assert.IsType<MenuItem>(menu.Items[1]);
+            var delete = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Delete"));
             f.Dialogs.Confirm = false; await Assert.IsType<AsyncCommand>(delete.Command).ExecuteAsync();
             Assert.Equal(2, f.Shell.SidebarProfiles.Count);
             f.Dialogs.Confirm = true; await Assert.IsType<AsyncCommand>(delete.Command).ExecuteAsync(); menu.Close();

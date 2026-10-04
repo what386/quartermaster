@@ -17,6 +17,20 @@ public sealed record Profile(Guid Id, string Name, PriorityDirection Priority, I
 public static class ProfileEditor
 {
     public static Profile Create(string name) => new(Guid.NewGuid(), Name(name), PriorityDirection.LastWins, []);
+    public static Profile Duplicate(Profile profile)
+    {
+        var groups = profile.Groups.ToDictionary(group => group.Id, group => group with { Id = Guid.NewGuid() });
+        return profile with
+        {
+            Id = Guid.NewGuid(), Name = profile.Name + " (copy)",
+            Groups = profile.Groups.Select(group => groups[group.Id]).ToArray(),
+            Entries = profile.Entries.Select(entry => entry with
+            {
+                Options = entry.Options.ToArray(),
+                GroupId = entry.GroupId is { } id ? groups[id].Id : null
+            }).ToArray()
+        };
+    }
     public static Profile Add(Profile profile, Mod mod)
     {
         if (profile.Entries.Any(e => e.ModId == mod.Id)) throw new ArgumentException("Mod is already in the profile.");
