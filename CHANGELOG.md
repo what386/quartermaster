@@ -2,6 +2,13 @@
 
 *Generated on 2026-10-04*
 
+## 0.2.0 — 2026-10-04
+
+### Changes
+
+- add duplicate profile option
+
+
 ## 0.1.0 — 2026-10-04
 
 ### Changes
