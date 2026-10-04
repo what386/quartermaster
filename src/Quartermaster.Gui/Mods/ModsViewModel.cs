@@ -1,6 +1,7 @@
 using Quartermaster.Library.Mods;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Shared;
+using System.Collections.ObjectModel;
 
 namespace Quartermaster.Gui.Mods;
 
@@ -57,18 +58,25 @@ public sealed class ModsViewModel : SessionViewModel
 {
     private string search = "";
     private ModListItem? selected;
+    public ObservableCollection<ModListItem> SelectedMods { get; } = [];
     public IReadOnlyList<ModListItem> Mods { get; private set; } = [];
     public string Search { get => search; set { if (Set(ref search, value)) Refresh(); } }
     public ModListItem? SelectedMod
     {
         get => selected;
-        set { if (Set(ref selected, value)) { Notify(nameof(Details)); Notify(nameof(HasSelection)); RemoveCommand.Refresh(); ExportRepatchedCommand.Refresh(); } }
+        set
+        {
+            if (value == selected && SelectedMods.Count <= 1) return;
+            SelectedMods.Clear();
+            if (value is not null) SelectedMods.Add(value);
+        }
     }
-    public ModDetailsViewModel? Details => SelectedMod is { } item ? new(item.Mod) : null;
+    public ModDetailsViewModel? Details => SelectedMods.Count == 1 ? new(SelectedMods[0].Mod) : null;
     public bool HasMods => Session.State.Mods.Count > 0;
     public bool HasVisibleMods => Mods.Count > 0;
     public string EmptyMessage => HasMods ? "No mods match your search." : "Import a ZIP or folder to add mods to your library.";
-    public bool HasSelection => SelectedMod is not null;
+    public bool HasSelection => SelectedMods.Count > 0;
+    public bool HasSingleSelection => SelectedMods.Count == 1;
     public string CountLabel => $"{Mods.Count} mods";
     public AsyncCommand ImportZipCommand { get; }
     public AsyncCommand ImportFolderCommand { get; }
@@ -88,31 +96,47 @@ public sealed class ModsViewModel : SessionViewModel
         });
         ExportRepatchedCommand = Operations.CreateCommand("Exporting repatched mod", async ct =>
         {
-            var mod = SelectedMod!.Mod;
+            var mod = SelectedMods.Single().Mod;
             var name = string.Concat(mod.Name.Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == '/' || c == '\\' ? '_' : c));
             var path = await Services.Dialogs.SaveModZipAsync(name + "-repatched.zip");
             if (path is not null) await Session.ExportRepatchedAsync(mod, path, ct);
-        }, () => SelectedMod is not null && Session.GameDirectory != "");
-        RemoveCommand = Operations.CreateCommand("Removing mod", async ct =>
+        }, () => HasSingleSelection && Session.GameDirectory != "");
+        RemoveCommand = Operations.CreateCommand("Removing mods", async ct =>
         {
-            var mod = SelectedMod!.Mod;
-            if (await Services.Dialogs.ConfirmAsync("Remove mod", $"Remove {mod.Name} from your library and profiles? Deployed files remain until you redeploy or purge.", "Remove"))
-                await Session.RemoveModAsync(mod.Id, ct);
-        }, () => SelectedMod is not null);
+            var mods = SelectedMods.Select(item => item.Mod).ToArray();
+            var names = string.Join("\n", mods.Select(mod => mod.Name));
+            if (await Services.Dialogs.ConfirmAsync(mods.Length == 1 ? "Remove mod" : $"Remove {mods.Length} mods",
+                $"Remove these mods from your library and profiles?\n\n{names}\n\nDeployed files remain until you redeploy or purge.", "Remove"))
+                await Session.RemoveModsAsync(mods.Select(mod => mod.Id).ToArray(), ct);
+        }, () => HasSelection);
+        SelectedMods.CollectionChanged += (_, _) => SelectionChanged();
         WatchSession();
     }
     public IReadOnlyList<Quartermaster.Library.Profiles.Profile> Profiles => Session.State.Profiles;
     public Task AddToProfileAsync(Guid modId, Guid profileId) => Operations.RunAsync("Adding mod to profile",
         ct => Session.AddModToProfileAsync(modId, profileId, ct));
+    public Task AddSelectedToProfileAsync(Guid profileId)
+    {
+        var ids = SelectedMods.Select(item => item.Mod.Id).ToArray();
+        return Operations.RunAsync("Adding mods to profile", ct => Session.AddModsToProfileAsync(ids, profileId, ct));
+    }
+    private void SelectionChanged()
+    {
+        Set(ref selected, SelectedMods.FirstOrDefault(), nameof(SelectedMod));
+        Notify(nameof(Details)); Notify(nameof(HasSelection)); Notify(nameof(HasSingleSelection));
+        RemoveCommand.Refresh(); ExportRepatchedCommand.Refresh();
+    }
     protected override void Refresh()
     {
-        var id = selected?.Mod.Id;
+        var ids = SelectedMods.Select(item => item.Mod.Id).ToHashSet();
         var collisions = Session.ActiveProfile is { } active ? Quartermaster.Core.Deployment.ConflictAnalyzer.Analyze(
             Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)).Resources.SelectMany(c => c.SourceIds).ToHashSet() : [];
         Mods = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
             .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m))).ToArray();
         Notify(nameof(Mods)); Notify(nameof(CountLabel)); Notify(nameof(HasMods)); Notify(nameof(HasVisibleMods)); Notify(nameof(EmptyMessage));
-        SelectedMod = Mods.FirstOrDefault(m => m.Mod.Id == id) ?? Mods.FirstOrDefault();
-        ExportRepatchedCommand.Refresh();
+        SelectedMods.Clear();
+        foreach (var item in Mods.Where(item => ids.Contains(item.Mod.Id))) SelectedMods.Add(item);
+        if (SelectedMods.Count == 0 && Mods.FirstOrDefault() is { } first) SelectedMods.Add(first);
+        SelectionChanged();
     }
 }

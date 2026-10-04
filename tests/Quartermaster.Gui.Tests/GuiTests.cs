@@ -23,6 +23,68 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task LibraryMultiSelectionContextActionsPreserveSelectionAndSkipProfileDuplicates()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        foreach (var name in new[] { "Armor", "Cape", "Helmet" })
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var armor = f.Services.Session.State.Mods.Single(mod => mod.Name == "Armor");
+        var target = ProfileEditor.SetEnabled(ProfileEditor.Add(ProfileEditor.Create("Target"), armor), armor.Id, false);
+        await f.Services.Session.SaveProfileAsync(target, false, CancellationToken.None);
+        var mods = Page<ModsViewModel>(f, PageKind.Mods);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ModsView>());
+            var list = view.FindControl<ListBox>("ModsList")!;
+            ListBoxItem Row(string name) => list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ModListItem mod && mod.Name == name);
+            void Click(string name, MouseButton button = MouseButton.Left, RawInputModifiers modifiers = RawInputModifiers.None)
+            {
+                var row = Row(name); var point = row.TranslatePoint(new Point(240, row.Bounds.Height / 2), window)!.Value;
+                window.MouseMove(point); window.MouseDown(point, button, modifiers); window.MouseUp(point, button, modifiers);
+                Dispatcher.UIThread.RunJobs();
+            }
+            Click("Armor"); Click("Helmet", modifiers: RawInputModifiers.Control);
+            Assert.Equal(2, list.SelectedItems!.Count); Assert.Equal(2, mods.SelectedMods.Count);
+            Click("Helmet", MouseButton.Right);
+            Assert.Equal(2, list.SelectedItems.Count);
+            var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
+            Assert.Equal(new[] { "Add to", "Remove from library", "Export repatched ZIP", "Mod details" },
+                menu.Items.OfType<MenuItem>().Select(item => item.Header));
+            Assert.IsType<Separator>(menu.Items[2]);
+            Assert.False(Assert.IsType<MenuItem>(menu.Items[3]).Command!.CanExecute(null));
+            Assert.False(Assert.IsType<MenuItem>(menu.Items[4]).IsEnabled);
+            var addTo = Assert.IsType<MenuItem>(menu.Items[0]);
+            var addTarget = addTo.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Target"));
+            await Assert.IsType<AsyncCommand>(addTarget.Command).ExecuteAsync(); menu.Close();
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(2, mods.SelectedMods.Count); Assert.Equal(2, list.SelectedItems.Count);
+            var entries = f.Services.Session.State.Profiles.Single(profile => profile.Id == target.Id).Entries;
+            Assert.Equal(2, entries.Count); Assert.Equal(armor.Id, entries[0].ModId); Assert.False(entries[0].Enabled);
+            menu.Open(list); Dispatcher.UIThread.RunJobs();
+            addTarget = addTo.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Target"));
+            Assert.False(addTarget.Command!.CanExecute(null)); menu.Close();
+            mods.Search = "hel"; window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal("Helmet", Assert.Single(mods.SelectedMods).Name);
+            mods.Search = ""; window.CaptureRenderedFrame()?.Dispose();
+            Click("Armor"); Click("Helmet", modifiers: RawInputModifiers.Shift);
+            Assert.Equal(3, mods.SelectedMods.Count);
+            Click("Cape", MouseButton.Right); Assert.Equal(3, mods.SelectedMods.Count);
+            menu.Close(); f.Dialogs.Confirmations.Clear(); f.Dialogs.Confirm = false;
+            await mods.RemoveCommand.ExecuteAsync(); Assert.Equal(3, mods.Mods.Count);
+            Assert.Contains("Armor", Assert.Single(f.Dialogs.Confirmations).Message);
+            Assert.Contains("Helmet", f.Dialogs.Confirmations[0].Message);
+            f.Dialogs.Confirm = true; await mods.RemoveCommand.ExecuteAsync();
+            Assert.Empty(mods.Mods); Assert.Empty(mods.SelectedMods);
+            Assert.All(f.Services.Session.State.Profiles, profile => Assert.Empty(profile.Entries));
+            Assert.Empty(Directory.GetDirectories(Path.Combine(f.Data, "library")));
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task DraggingSelectionMovesNonAdjacentModsTogetherAndKeepsSelection()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -749,17 +811,17 @@ public class GuiTests
             window.MouseMove(point); window.MouseDown(point, Avalonia.Input.MouseButton.Right); window.MouseUp(point, Avalonia.Input.MouseButton.Right);
             Dispatcher.UIThread.RunJobs(); Assert.Equal("Cape", mods.SelectedMod!.Name);
             var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
-            var details = Assert.IsType<MenuItem>(menu.Items[0]);
+            var details = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Mod details"));
             details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
             window.CaptureRenderedFrame()?.Dispose();
             var dialog = Assert.Single(window.GetVisualDescendants().OfType<ModDetailsDialog>());
             Assert.Equal("Cape", Assert.IsType<ModDetailsViewModel>(dialog.DataContext).Name);
             Assert.Empty(window.OwnedWindows); dialog.Cancel(); Dispatcher.UIThread.RunJobs();
             menu.Open(list); Dispatcher.UIThread.RunJobs();
-            await Assert.IsType<AsyncCommand>(Assert.IsType<MenuItem>(menu.Items[1]).Command).ExecuteAsync(); menu.Close();
+            await Assert.IsType<AsyncCommand>(menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Export repatched ZIP")).Command).ExecuteAsync(); menu.Close();
             Assert.Equal("Cape-repatched.zip", f.Dialogs.SuggestedSaveName);
             f.Dialogs.Confirm = false; menu.Open(list); Dispatcher.UIThread.RunJobs();
-            var remove = Assert.IsType<MenuItem>(menu.Items[3]);
+            var remove = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Remove from library"));
             await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); Assert.Equal(2, mods.Mods.Count);
             f.Dialogs.Confirm = true; await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); menu.Close();
             Assert.Equal("Armor", Assert.Single(mods.Mods).Name);

@@ -66,8 +66,10 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         return images;
     }
     public async Task AddModToProfileAsync(Guid modId, Guid profileId, CancellationToken ct)
+        => await AddModsToProfileAsync([modId], profileId, ct);
+    public async Task AddModsToProfileAsync(IReadOnlyCollection<Guid> modIds, Guid profileId, CancellationToken ct)
     {
-        await Task.Run(() => library.AddToProfileAsync(modId, profileId, ct), ct);
+        await Task.Run(() => library.AddToProfileAsync(modIds, profileId, ct), ct);
         await ReloadAsync(CancellationToken.None);
     }
     public async Task ImportAsync(string source, CancellationToken ct)
@@ -91,8 +93,10 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         finally { await ReloadAsync(CancellationToken.None); }
     }
     public async Task RemoveModAsync(Guid id, CancellationToken ct)
+        => await RemoveModsAsync([id], ct);
+    public async Task RemoveModsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
-        await Task.Run(() => library.RemoveAsync(id, ct), ct);
+        await Task.Run(() => library.RemoveAsync(ids, ct), ct);
         await ReloadAsync(CancellationToken.None);
     }
     public async Task SaveProfileAsync(Profile profile, bool active, CancellationToken ct)

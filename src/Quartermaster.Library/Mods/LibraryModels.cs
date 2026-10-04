@@ -22,3 +22,31 @@ public sealed record LibraryState(int SchemaVersion, IReadOnlyList<Mod> Mods,
 public sealed record SourceReference(string Provider, string ModId, string? FileId = null, string? InstalledVersion = null);
 public sealed record UpdateCheck(Guid ModId, string Provider, DateTimeOffset CheckedAt,
     string? AvailableVersion, string? AvailableFileId, string? Error = null);
+
+/// <summary>Import identity uses patch contents and options, independent of generated IDs and ZIP wrapper folders.</summary>
+internal static class ModIdentity
+{
+    public static string GetKey(Mod mod)
+    {
+        var folders = mod.PatchSets.Select(set => set.Folder.Split('/', StringSplitOptions.RemoveEmptyEntries)).ToArray();
+        var prefix = 0;
+        while (folders.Length > 0 && folders.All(folder => folder.Length > prefix) && folders.All(folder => folder[prefix] == folders[0][prefix])) prefix++;
+        var keys = mod.PatchSets.ToDictionary(set => set.Id, set => global::System.Text.Json.JsonSerializer.Serialize(new
+        {
+            Folder = string.Join('/', set.Folder.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(prefix)),
+            Archive = set.Archive.ToLowerInvariant(), set.OriginalSlot,
+            Files = set.Files.OrderBy(file => file.Kind).Select(file => new { file.Kind, file.Size, Hash = file.Sha256.ToUpperInvariant() })
+        }));
+        return global::System.Text.Json.JsonSerializer.Serialize(new
+        {
+            mod.ManifestId, mod.Version,
+            Patches = keys.Values.Order(StringComparer.Ordinal),
+            Options = mod.Options.Select(option => new
+            {
+                option.Name, option.Description,
+                Patches = option.PatchSetIds.Select(id => keys[id]),
+                Choices = option.Choices.Select(choice => new { choice.Name, Patches = choice.PatchSetIds.Select(id => keys[id]) })
+            })
+        });
+    }
+}

@@ -55,7 +55,9 @@ internal sealed class Fixture : IDisposable
     public string Source(string name, ulong resource = 1)
     {
         var folder = Path.Combine(Root, name); Directory.CreateDirectory(folder);
-        File.WriteAllBytes(Path.Combine(folder, Archive + ".patch_7"), Patch(resource));
+        // Distinct test mods may collide on the same resource without containing identical patch data.
+        File.WriteAllBytes(Path.Combine(folder, Archive + ".patch_7"), Patch(resource, 0x1122334455667788,
+            global::System.Security.Cryptography.SHA256.HashData(global::System.Text.Encoding.UTF8.GetBytes(name))));
         File.WriteAllBytes(Path.Combine(folder, Archive + ".patch_7.stream"), [1, 2, 3]);
         return folder;
     }

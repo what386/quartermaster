@@ -12,13 +12,13 @@
     </Border>
     <Grid Grid.Row="2" RowDefinitions="24,*">
       <Border Background="#25282C" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="56,0,0,0" /></Grid></Border>
-      <ListBox Grid.Row="1" x:Name="ModsList" Classes="modList" ItemsSource="{Binding Mods}" SelectedItem="{Binding SelectedMod, Mode=TwoWay}" DoubleTapped="OpenModDetails">
+      <ListBox Grid.Row="1" x:Name="ModsList" Focusable="True" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding Mods}" SelectedItems="{Binding SelectedMods}" DoubleTapped="OpenModDetails">
         <ListBox.ContextMenu><ContextMenu>
-          <MenuItem Header="Mod details" IsEnabled="{Binding HasSelection}" Click="OpenModDetails" />
-          <MenuItem Header="Export repatched ZIP" Command="{Binding ExportRepatchedCommand}" />
-          <Separator />
-          <MenuItem Header="Remove from library" Command="{Binding RemoveCommand}" />
           <MenuItem x:Name="AddToProfileMenuItem" Header="Add to" IsEnabled="{Binding HasSelection}" />
+          <MenuItem Header="Remove from library" Command="{Binding RemoveCommand}" />
+          <Separator />
+          <MenuItem Header="Export repatched ZIP" Command="{Binding ExportRepatchedCommand}" />
+          <MenuItem Header="Mod details" IsEnabled="{Binding HasSingleSelection}" Click="OpenModDetails" />
         </ContextMenu></ListBox.ContextMenu>
         <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ModListItem"><vm:ModRowView /></DataTemplate></ListBox.ItemTemplate>
       </ListBox>

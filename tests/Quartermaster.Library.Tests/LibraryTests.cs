@@ -55,16 +55,72 @@ public class LibraryTests
     }
 
     [Fact]
-    public async Task AddingLibraryModToProfilePreservesOtherProfilesAndRejectsDuplicates()
+    public async Task AddingLibraryModToProfilePreservesOtherProfilesAndIgnoresDuplicates()
     {
         using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("mod"));
         var active = ProfileEditor.Create("Active"); var target = ProfileEditor.Create("Target");
         await f.Library.SaveProfileAsync(active, makeActive: true); await f.Library.SaveProfileAsync(target);
         await f.Library.AddToProfileAsync(mod.Id, target.Id);
-        await Assert.ThrowsAsync<ArgumentException>(() => f.Library.AddToProfileAsync(mod.Id, target.Id));
+        await f.Library.AddToProfileAsync(mod.Id, target.Id);
         var state = await f.Library.LoadAsync(); Assert.Single(state.Mods);
         Assert.Equal(active.Id, state.ActiveProfileId); Assert.Empty(state.Profiles.Single(p => p.Id == active.Id).Entries);
         Assert.Equal(mod.Id, Assert.Single(state.Profiles.Single(p => p.Id == target.Id).Entries).ModId);
+    }
+
+    [Fact]
+    public async Task ReimportReusesStoredModAcrossFoldersAndZipsAndPreservesProfileSelections()
+    {
+        using var f = new Fixture(); var source = f.Source("Original");
+        var mod = await f.Library.ImportAsync(source, "Custom name");
+        var target = ProfileEditor.SetEnabled(ProfileEditor.Add(ProfileEditor.Create("Target"), mod), mod.Id, false);
+        await f.Library.SaveProfileAsync(target);
+        var wrapper = Path.Combine(f.Root, "wrapper"); Directory.CreateDirectory(wrapper);
+        Directory.Move(source, Path.Combine(wrapper, "renamed"));
+        var duplicate = await f.Library.ImportAsync(f.Zip(wrapper), profileId: target.Id);
+        Assert.Equal(mod.Id, duplicate.Id); Assert.Equal("Custom name", duplicate.Name);
+        Assert.Single((await f.Library.LoadAsync()).Mods);
+        Assert.False(Assert.Single((await f.Library.LoadAsync()).Profiles[0].Entries).Enabled);
+        Assert.Single(Directory.GetDirectories(Path.Combine(f.App, "library")));
+        var other = ProfileEditor.Create("Other"); await f.Library.SaveProfileAsync(other);
+        await f.Library.ImportAsync(wrapper, profileId: other.Id);
+        Assert.Equal(mod.Id, Assert.Single((await f.Library.LoadAsync()).Profiles.Single(p => p.Id == other.Id).Entries).ModId);
+    }
+
+    [Fact]
+    public async Task DifferentPatchContentsVersionsAndOptionsAreKeptAsSeparateMods()
+    {
+        using var f = new Fixture(); var source = f.Source("Mod");
+        var manifest = Path.Combine(source, "manifest.json");
+        await File.WriteAllTextAsync(manifest, """{"Guid":"86bc5845-f890-4685-9d46-9c213ff36ba8","ModVersion":"1"}""");
+        var original = await f.Library.ImportAsync(source);
+        Assert.Equal(original.Id, (await f.Library.ImportAsync(source)).Id);
+        await File.WriteAllTextAsync(manifest, """{"Guid":"86bc5845-f890-4685-9d46-9c213ff36ba8","ModVersion":"2"}""");
+        Assert.NotEqual(original.Id, (await f.Library.ImportAsync(source)).Id);
+        await File.WriteAllTextAsync(manifest, """{"Guid":"86bc5845-f890-4685-9d46-9c213ff36ba8","ModVersion":"2","Options":[{"Name":"Optional","Include":[""]}]}""");
+        await f.Library.ImportAsync(source);
+        File.WriteAllBytes(Path.Combine(source, Fixture.Archive + ".patch_7.stream"), [4, 5, 6]);
+        await f.Library.ImportAsync(source);
+        Assert.Equal(4, (await f.Library.LoadAsync()).Mods.Count);
+    }
+
+    [Fact]
+    public async Task BulkProfileAddSkipsExistingModsAndBulkRemoveCleansAllProfilesAndStorage()
+    {
+        using var f = new Fixture();
+        var a = await f.Library.ImportAsync(f.Source("A", 1)); var b = await f.Library.ImportAsync(f.Source("B", 2));
+        var c = await f.Library.ImportAsync(f.Source("C", 3));
+        var profile = ProfileEditor.SetEnabled(ProfileEditor.Add(ProfileEditor.Create("Target"), a), a.Id, false);
+        await f.Library.SaveProfileAsync(profile);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => f.Library.AddToProfileAsync([b.Id, Guid.NewGuid()], profile.Id));
+        Assert.Single((await f.Library.LoadAsync()).Profiles[0].Entries);
+        await f.Library.AddToProfileAsync([a.Id, b.Id, a.Id, c.Id], profile.Id);
+        var entries = (await f.Library.LoadAsync()).Profiles[0].Entries;
+        Assert.Equal(new[] { a.Id, b.Id, c.Id }, entries.Select(entry => entry.ModId)); Assert.False(entries[0].Enabled);
+        await f.Library.RecordUpdateCheckAsync(new(a.Id, "custom", DateTimeOffset.UtcNow, "2", null));
+        await f.Library.RemoveAsync([a.Id, b.Id]);
+        var state = await f.Library.LoadAsync(); Assert.Equal(c.Id, Assert.Single(state.Mods).Id);
+        Assert.Equal(c.Id, Assert.Single(state.Profiles[0].Entries).ModId); Assert.Empty(state.UpdateChecks);
+        Assert.False(Directory.Exists(f.Contents.GetModDirectory(a.Id))); Assert.False(Directory.Exists(f.Contents.GetModDirectory(b.Id)));
     }
 
     [Fact]
