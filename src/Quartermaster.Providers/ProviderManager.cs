@@ -41,6 +41,7 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
             ?? throw new NotSupportedException("No installed provider supports this mod link.");
     }
     public bool IsDownloadLink(string link) => FindProvider(link).IsDownloadLink(new Uri(link.Trim()));
+    public bool DownloadsDirectly(ProviderFile file) => GetProvider(file.Provider).DownloadsDirectly;
     public Task<ProviderMod> ResolveAsync(string link, CancellationToken ct = default) => FindProvider(link).ResolveAsync(link.Trim(), ct);
     public Task<ProviderMod> ResolveAsync(string provider, string link, CancellationToken ct = default) => GetProvider(provider).ResolveAsync(link, ct);
     public Task<IReadOnlyList<SearchResult>> SearchAsync(string provider, string query, CancellationToken ct = default) => GetProvider(provider).SearchAsync(query, ct: ct);
@@ -171,6 +172,7 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
     }
     private void Start(DownloadJob job, string? grant = null, string? archive = null, CancellationToken ct = default)
     {
+        if (grant is null && archive is null && DownloadsDirectly(job.File)) grant = job.File.DownloadPage.AbsoluteUri;
         var source = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, ct);
         workers[job.Id] = (source, Task.Run(() => RunAsync(job, grant, archive, source.Token)));
     }

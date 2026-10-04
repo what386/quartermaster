@@ -23,6 +23,48 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDownloadTests
 {
     [AvaloniaFact]
+    public async Task GitHubRepositoryImportAndUpdateDownloadDirectlyIntoProfile()
+    {
+        byte[] initial = []; byte[] updated = []; var latest = 1;
+        object ReleaseData() => new
+        {
+            tag_name = "v" + latest, body = "Reticle mod", draft = false, prerelease = false,
+            published_at = latest == 1 ? "2026-08-01T00:00:00Z" : "2026-09-01T00:00:00Z",
+            assets = new[] { new { id = latest * 10, name = "mod.zip", size = latest == 1 ? initial.Length : updated.Length,
+                browser_download_url = $"https://github.com/owner/mod/releases/download/v{latest}/mod.zip" } }
+        };
+        using var api = new HttpClient(new Handler(request => request.RequestUri!.AbsolutePath.EndsWith("/assets/10")
+            ? Json(new { id = 10, name = "mod.zip", created_at = "2026-08-01T00:00:00Z" }) : Json(ReleaseData())));
+        using var downloads = new HttpClient(new Handler(request => new(HttpStatusCode.OK)
+        { Content = new ByteArrayContent(request.RequestUri!.AbsolutePath.Contains("/v1/") ? initial : updated) }));
+        using var f = new Fixture(githubApi: api, githubDownloads: downloads, openBrowser: _ => throw new Exception("Unexpected browser launch"));
+        initial = File.ReadAllBytes(f.Zip("Initial", 1)); updated = File.ReadAllBytes(f.Zip("Updated", 2));
+        await f.Shell.InitializeAsync();
+        Assert.Contains(f.Services.Providers.AvailableProviders, provider => provider.Id == "github");
+        Assert.DoesNotContain(((SearchViewModel)Navigate(f, PageKind.Search)).Providers, provider => provider.Id == "github");
+        var profiles = (ProfilesViewModel)Navigate(f, PageKind.Profiles);
+        f.Dialogs.ModImport = new(ModImportKind.Link, "https://github.com/owner/mod");
+        await profiles.ImportModCommand.ExecuteAsync();
+        var job = Assert.Single(f.Services.Providers.State.Jobs);
+        await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(5));
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        Assert.False(f.Services.Operations.IsError); Assert.Equal(DownloadStatus.Complete, f.Services.Providers.State.Jobs[0].Status);
+        var original = Assert.Single(f.Services.Session.State.Mods);
+        Assert.Equal(original.Id, Assert.Single(f.Services.Session.ActiveProfile!.Entries).ModId);
+        latest = 2;
+        await profiles.CheckUpdatesCommand.ExecuteAsync();
+        var entry = Assert.Single(profiles.Entries); Assert.True(entry.HasUpdate);
+        await entry.UpdateCommand!.ExecuteAsync();
+        var upgrade = f.Services.Providers.State.Jobs.Single(item => item.ReplacesModId == original.Id);
+        await f.Services.Providers.WaitForJobAsync(upgrade.Id).WaitAsync(TimeSpan.FromSeconds(5));
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        var installed = Assert.Single(f.Services.Session.ActiveProfile!.Entries);
+        Assert.NotEqual(original.Id, installed.ModId);
+        Assert.Equal("20", Assert.Single(f.Services.Session.State.Mods.Single(mod => mod.Id == installed.ModId).Sources).FileId);
+        Assert.False(Assert.Single(profiles.Entries).HasUpdate);
+    }
+
+    [AvaloniaFact]
     public async Task AutomaticDownloadImportFailureShowsDismissibleFloatingError()
     {
         using var api = Api(); using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);

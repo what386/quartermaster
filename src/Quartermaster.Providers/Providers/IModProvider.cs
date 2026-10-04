@@ -5,7 +5,14 @@ namespace Quartermaster.Providers.Providers;
 
 public sealed record ProviderFile(string Provider, string ModId, string FileId, string Name, string FileName,
     string? Version, Uri DownloadPage, bool IsPrimary = false, long? Size = null, string? Sha256 = null, string? Md5 = null);
-public sealed record ProviderMod(string ModId, string Name, string Summary, string? Version, Uri Page, IReadOnlyList<ProviderFile> Files);
+public sealed record ProviderMod(string ModId, string Name, string Summary, string? Version, Uri Page, IReadOnlyList<ProviderFile> Files)
+{
+    public bool DownloadsDirectly { get; init; }
+    public string DownloadAction => DownloadsDirectly ? "Download" : "Open download page";
+    public string DownloadExplanation => DownloadsDirectly
+        ? "Quartermaster downloads the ZIP and adds it to your library automatically. You can track or cancel it in Downloads."
+        : "This opens the file's download page in your browser. Finish the download there; Quartermaster watches your configured download folder, verifies the ZIP, and adds it automatically. You can keep using the app while it waits.";
+}
 public sealed record SearchResult(string ModId, string Name, string Summary, string Version, Uri Page, Uri? Thumbnail = null);
 public enum UpdateStatus { Current, Available, Unknown }
 public sealed record ProviderUpdate(UpdateStatus Status, ProviderFile? File = null, string? Reason = null);
@@ -14,6 +21,8 @@ public interface IModProvider
 {
     string Id { get; }
     string DisplayName => Id;
+    bool SupportsSearch => true;
+    bool DownloadsDirectly => false;
     bool CanHandle(Uri link);
     bool IsDownloadLink(Uri link) => false;
     Task<ProviderMod> ResolveAsync(string link, CancellationToken ct = default);

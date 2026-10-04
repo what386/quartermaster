@@ -77,3 +77,18 @@ the user's browser. `ProviderManager` coordinates the persistent queue and
 library imports. Nexus routes and search follow the
 [official API client](https://github.com/Nexus-Mods/node-nexus-api) and
 [GraphQL documentation](https://graphql.nexusmods.com/).
+
+**Add mod** also accepts public GitHub repository links, release links, and
+release asset links. Repository links use the latest stable release. Choose an
+uploaded ZIP asset and Quartermaster downloads it directly into `temp/` and
+imports it through the Downloads queue. GitHub's generated source-code archives
+are excluded. No API key is required for public repositories; API rate-limit
+errors appear in the app. Download sizes and available SHA-256 digests are
+verified before import.
+
+GitHub update checks match the installed asset's filename in the latest stable
+release, or use its sole ZIP when the filename changed. Ambiguous replacements
+require choosing a ZIP from the repository. **Update** downloads and upgrades
+directly while preserving profiles. GitHub repository search is deferred.
+The implementation follows `../upstream-rs`'s release/asset mapping and the
+[GitHub releases API](https://docs.github.com/en/rest/releases/releases).

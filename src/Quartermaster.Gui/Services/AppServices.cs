@@ -15,6 +15,7 @@ public sealed class AppServices : IAsyncDisposable
     public Quartermaster.Providers.ProviderManager Providers { get; }
     public Quartermaster.Providers.ApiKeyStore Keys { get; }
     public Quartermaster.Providers.Providers.NexusMods.NexusClient Nexus { get; }
+    public Quartermaster.Providers.Providers.GitHub.GitHubProvider GitHub { get; }
     public Quartermaster.Library.Mods.LibraryService Library { get; }
     public string DataDirectory { get; }
     public LibrarySession Session { get; }
@@ -22,7 +23,7 @@ public sealed class AppServices : IAsyncDisposable
     public Action LaunchGame { get; }
     public Action<Uri> OpenBrowser { get; }
     public IDialogService Dialogs { get; }
-    public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null)
+    public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null)
     {
         DataDirectory = Path.GetFullPath(directory); Dialogs = dialogs;
         var log = new JsonEventLog(DataDirectory);
@@ -45,13 +46,14 @@ public sealed class AppServices : IAsyncDisposable
             using var client = new Quartermaster.Providers.Providers.NexusMods.NexusClient(_ => Task.FromResult<string?>(key), nexusApi);
             return await client.ValidateAsync(ct);
         };
-        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Providers.NexusMods.NexusAdapter(Nexus)], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
+        GitHub = new(githubApi, githubDownloads);
+        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Providers.NexusMods.NexusAdapter(Nexus), GitHub], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));
         Downloads = new(this);
     }
-    public async ValueTask DisposeAsync() { IsDisposed = true; await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); }
+    public async ValueTask DisposeAsync() { IsDisposed = true; await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
     public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster");
 }

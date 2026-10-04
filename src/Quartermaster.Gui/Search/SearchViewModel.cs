@@ -27,7 +27,7 @@ public sealed class SearchViewModel : SessionViewModel
     public AsyncCommand SearchCommand { get; }
     public SearchViewModel(AppServices services) : base(services)
     {
-        Providers = services.Providers.AvailableProviders.Select(provider => new SearchProvider(provider.Id, provider.DisplayName)).ToArray();
+        Providers = services.Providers.AvailableProviders.Where(provider => provider.SupportsSearch).Select(provider => new SearchProvider(provider.Id, provider.DisplayName)).ToArray();
         selectedProvider = Providers.FirstOrDefault(provider => provider.Id == "nexusmods") ?? Providers.FirstOrDefault();
         SearchCommand = Operations.CreateCommand("Searching mods", async ct =>
         {

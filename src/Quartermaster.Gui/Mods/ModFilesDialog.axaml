@@ -8,10 +8,10 @@
     <ComboBox x:Name="FileChoices" ItemsSource="{Binding Files}" HorizontalAlignment="Stretch" SelectionChanged="FileChanged">
       <ComboBox.ItemTemplate><DataTemplate x:DataType="p:ProviderFile"><StackPanel><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding FileName}" Classes="muted" FontSize="11" /></StackPanel></DataTemplate></ComboBox.ItemTemplate>
     </ComboBox>
-    <TextBlock Text="This opens the file's download page in your browser. Finish the download there; Quartermaster watches your configured download folder, verifies the ZIP, and adds it automatically. You can keep using the app while it waits." Classes="muted" TextWrapping="Wrap" />
+    <TextBlock Text="{Binding DownloadExplanation}" Classes="muted" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
       <Button Content="Cancel" Click="CancelInput" />
-      <Button x:Name="AcceptButton" Content="Open download page" Classes="primary" Click="AcceptInput" />
+      <Button x:Name="AcceptButton" Content="{Binding DownloadAction}" Classes="primary" Click="AcceptInput" />
     </StackPanel>
   </StackPanel>
 </UserControl>

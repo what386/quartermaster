@@ -57,10 +57,10 @@ internal sealed class Fixture : IDisposable
     public AppServices Services { get; }
     public MainWindowViewModel Shell { get; }
     public int Launches { get; private set; }
-    public Fixture(bool discoverGame = true, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null)
+    public Fixture(bool discoverGame = true, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null)
     {
         Directory.CreateDirectory(Game); File.WriteAllBytes(Path.Combine(Game, Archive), Patch(1));
-        Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++, openBrowser, nexusApi, nexusDownloads);
+        Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++, openBrowser, nexusApi, nexusDownloads, githubApi, githubDownloads);
         Shell = new(Services);
     }
     public string Source(string name, ulong resource = 1)

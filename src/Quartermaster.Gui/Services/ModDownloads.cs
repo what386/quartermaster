@@ -82,7 +82,7 @@ public sealed class ModDownloads : ViewModelBase
         if (file is null) return;
         ct.ThrowIfCancellationRequested();
         var job = await services.Providers.QueueAsync(file with { Name = mod.Name }, profileId, ct: ct);
-        services.Providers.OpenDownloadPage(job.Id);
+        if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
     }
     public async Task CheckUpdatesAsync(CancellationToken ct, IReadOnlyCollection<Guid>? modIds = null)
     {
@@ -101,20 +101,21 @@ public sealed class ModDownloads : ViewModelBase
         new AsyncCommand(() => services.Operations.RunAsync("Updating mod", async ct =>
         {
             var job = await services.Providers.QueueUpdateAsync(mod.Id, ct);
-            services.Providers.OpenDownloadPage(job.Id);
+            if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
         }), () => services.Operations.CanInteract && !services.Providers.State.Jobs.Any(job =>
             job.ReplacesModId == mod.Id && job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing), services.Operations.ReportError);
     public string? UpdateDescription(Mod mod) => AvailableUpdate(mod) is { } check
-        ? $"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Open the download page to upgrade." : null;
+        ? $"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Click Update to upgrade." : null;
 }
 
 public sealed class DownloadRow : ViewModelBase
 {
     private DownloadJob job;
+    private readonly bool downloadsDirectly;
     public string Name => job.File.Name + (job.File.Version is null ? "" : " · " + job.File.Version);
-    public bool IsWaiting => job.Status == DownloadStatus.Waiting;
+    public bool IsWaiting => job.Status == DownloadStatus.Waiting && !downloadsDirectly;
     public bool IsActive => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing;
-    public string Status => (IsWaiting ? "Waiting for your browser download" : job.Status.ToString()) + (job.Error is null ? "" : " · " + job.Error);
+    public string Status => (IsWaiting ? "Waiting for your browser download" : job.Status == DownloadStatus.Waiting ? "Queued" : job.Status.ToString()) + (job.Error is null ? "" : " · " + job.Error);
     public AsyncCommand OpenCommand { get; }
     public AsyncCommand RetryCommand { get; }
     public AsyncCommand CancelCommand { get; }
@@ -127,6 +128,7 @@ public sealed class DownloadRow : ViewModelBase
     public DownloadRow(DownloadJob job, AppServices services)
     {
         this.job = job;
+        downloadsDirectly = services.Providers.DownloadsDirectly(job.File);
         OpenCommand = services.Operations.CreateCommand("Opening download page", _ =>
         { services.Providers.OpenDownloadPage(job.Id); return Task.CompletedTask; });
         RetryCommand = services.Operations.CreateCommand("Retrying download", ct => services.Providers.RetryAsync(job.Id, ct),
