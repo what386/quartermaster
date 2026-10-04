@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Quartermaster.Library.Storage;
 using Quartermaster.Providers.Providers;
 
 namespace Quartermaster.Providers.Downloads;
@@ -26,7 +27,7 @@ public sealed class DownloadStore(string directory)
     public async Task SaveAsync(DownloadState state, CancellationToken ct = default)
     {
         Directory.CreateDirectory(directory);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var temporary = TemporaryStorage.PathFor(directory, "downloads-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
             await using (var stream = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))

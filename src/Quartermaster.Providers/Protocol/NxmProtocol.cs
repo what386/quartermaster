@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
+using Quartermaster.Library.Storage;
 using Quartermaster.Providers.Providers.NexusMods;
 
 namespace Quartermaster.Providers.Protocol;
@@ -56,12 +57,17 @@ public sealed class NxmInbox(string directory)
         Directory.CreateDirectory(inbox);
         if (new DirectoryInfo(inbox).LinkTarget is not null) throw new IOException("The nxm inbox cannot be a symbolic link.");
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(inbox, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        var path = Path.Combine(inbox, Guid.NewGuid().ToString("N") + ".tmp");
+        var id = Guid.NewGuid().ToString("N");
+        var path = TemporaryStorage.PathFor(directory, "nxm-" + id + ".tmp");
         var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };
         if (!OperatingSystem.IsWindows()) options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        using (var stream = new FileStream(path, options))
-        using (var writer = new StreamWriter(stream)) writer.Write(link);
-        File.Move(path, Path.ChangeExtension(path, ".nxm"));
+        try
+        {
+            using (var stream = new FileStream(path, options))
+            using (var writer = new StreamWriter(stream)) writer.Write(link);
+            File.Move(path, Path.Combine(inbox, id + ".nxm"));
+        }
+        finally { File.Delete(path); }
     }
     public IReadOnlyList<string> Pending => Directory.Exists(inbox) ? Directory.GetFiles(inbox, "*.nxm") : [];
     public string Read(string path)

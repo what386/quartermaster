@@ -1,3 +1,5 @@
+using Quartermaster.Library.Storage;
+
 namespace Quartermaster.Providers;
 
 /// <summary>Local credentials are separate from library metadata and profile exports.</summary>
@@ -25,7 +27,7 @@ public sealed class ApiKeyStore(string directory)
         if (key.Length > 4096 || key.Any(c => c < 33 || c > 126)) throw new ArgumentException("Invalid API key.");
         Directory.CreateDirectory(root);
         if (!OperatingSystem.IsWindows()) File.SetUnixFileMode(root, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var temporary = TemporaryStorage.PathFor(directory, "credential-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
             var options = new FileStreamOptions { Mode = FileMode.CreateNew, Access = FileAccess.Write, Share = FileShare.None };

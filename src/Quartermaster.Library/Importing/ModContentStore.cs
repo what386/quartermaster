@@ -12,9 +12,11 @@ public sealed class ModContentStore : IModContentStore
 {
     private readonly string root;
     private readonly ImportLimits limits;
+    public string ApplicationDirectory { get; }
     public ModContentStore(string applicationDirectory, ImportLimits? limits = null)
     {
-        root = Path.Combine(Path.GetFullPath(applicationDirectory), "library");
+        ApplicationDirectory = Path.GetFullPath(applicationDirectory);
+        root = Path.Combine(ApplicationDirectory, "library");
         this.limits = limits ?? new();
         if (this.limits.MaxFiles <= 0 || this.limits.MaxBytes <= 0) throw new ArgumentException("Import limits must be positive.");
     }
@@ -141,7 +143,8 @@ public sealed class ModContentStore : IModContentStore
         source = Path.GetFullPath(source);
         ManagedPaths.CheckLink(source);
         var id = Guid.NewGuid();
-        var temporary = ManagedPaths.Resolve(root, ".import-" + id.ToString("N"));
+        ManagedPaths.CheckLink(root); Directory.CreateDirectory(root);
+        var temporary = TemporaryStorage.PathFor(ApplicationDirectory, "import-" + id.ToString("N"));
         Directory.CreateDirectory(temporary);
         try
         {
@@ -169,6 +172,9 @@ public sealed class ModContentStore : IModContentStore
             }
             if (Directory.Exists(source))
             {
+                var relativeTemporary = Path.GetRelativePath(source, temporary);
+                if (relativeTemporary == "." || (!Path.IsPathRooted(relativeTemporary) && relativeTemporary != ".." && !relativeTemporary.StartsWith(".." + Path.DirectorySeparatorChar)))
+                    throw new ArgumentException("Cannot import an ancestor of temporary storage.");
                 var relativeRoot = Path.GetRelativePath(source, root);
                 if (relativeRoot == "." || (!Path.IsPathRooted(relativeRoot) && relativeRoot != ".." && !relativeRoot.StartsWith(".." + Path.DirectorySeparatorChar)))
                     throw new ArgumentException("Cannot import an ancestor of library storage.");

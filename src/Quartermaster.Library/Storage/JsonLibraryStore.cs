@@ -73,7 +73,7 @@ internal static class JsonFiles
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         ManagedPaths.CheckLink(path);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var temporary = TemporaryStorage.PathFor(Path.GetDirectoryName(path)!, Path.GetFileName(path) + "." + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
             await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))

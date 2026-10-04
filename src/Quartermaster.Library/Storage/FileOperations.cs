@@ -4,6 +4,18 @@ using global::System.Security.Cryptography;
 
 namespace Quartermaster.Library.Storage;
 
+/// <summary>Paths for application-owned transitional content, separate from the permanent mod library.</summary>
+public static class TemporaryStorage
+{
+    public static string DirectoryFor(string applicationDirectory) => ManagedPaths.Resolve(applicationDirectory, "temp");
+    public static string PathFor(string applicationDirectory, string relativeName)
+    {
+        var root = DirectoryFor(applicationDirectory);
+        Directory.CreateDirectory(root);
+        return ManagedPaths.Resolve(root, relativeName);
+    }
+}
+
 internal static class ManagedPaths
 {
     public static string CanonicalDirectory(string path)

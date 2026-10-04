@@ -16,6 +16,7 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
     public DownloadState State { get; private set; } = new([], []);
     public event EventHandler? Changed;
     public event EventHandler? LibraryChanged;
+    public event Action<DownloadJob>? DownloadFailed;
     public IReadOnlyList<IModProvider> AvailableProviders => providers.Values.ToArray();
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -215,6 +216,7 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
         catch (Exception ex)
         {
             await SetStatusAsync(job.Id, DownloadStatus.Failed, ex.Message);
+            DownloadFailed?.Invoke(State.Jobs.Single(j => j.Id == job.Id));
             LibraryChanged?.Invoke(this, EventArgs.Empty);
         }
         finally { if (File.Exists(path)) File.Delete(path); }

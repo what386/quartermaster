@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Quartermaster.Library.Storage;
 
 namespace Quartermaster.Gui.Services;
 
@@ -23,7 +24,7 @@ public sealed class SettingsStore(string directory)
     public async Task SaveAsync(ApplicationSettings settings, CancellationToken ct)
     {
         Directory.CreateDirectory(directory);
-        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var temporary = TemporaryStorage.PathFor(directory, "settings-" + Guid.NewGuid().ToString("N") + ".tmp");
         try
         {
             await using (var file = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))

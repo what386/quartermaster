@@ -61,7 +61,11 @@ automatically; original library files remain.
 `downloads.json` persists the queue and watched folders. Normal app exit clears
 unfinished requests; pending requests left by a crash can resume at startup.
 Browser files are left untouched. Signed nxm grants are not stored in the queue or library.
-`download-cache/` holds temporary import copies. Personal API keys live separately
+`temp/` holds transitional files: mod/profile extraction, deployment staging,
+download copies, and metadata writes. Completed or failed operations clean up
+their temporary files. Import errors appear in a floating notification that
+dismisses on click or after seven seconds; download failures also remain in the
+Downloads tab. Personal API keys live separately
 under `credentials/` (owner-only files on Unix), outside profile exports. Keys
 are local plaintext files, not an encrypted system keychain. A private
 `nxm-inbox/` briefly holds protocol links forwarded by another application

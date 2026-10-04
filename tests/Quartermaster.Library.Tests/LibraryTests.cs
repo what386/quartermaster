@@ -11,6 +11,34 @@ namespace Quartermaster.Library.Tests;
 
 public class LibraryTests
 {
+    [Fact]
+    public async Task ImportsCleanCentralTemporaryStorageOnSuccessAndFailure()
+    {
+        using var f = new Fixture();
+        var mod = await f.Library.ImportAsync(f.Source("valid"));
+        Assert.True(Directory.Exists(f.Contents.GetModDirectory(mod.Id)));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(f.App, "temp")));
+        var invalid = Path.Combine(f.Root, "invalid.zip"); await File.WriteAllBytesAsync(invalid, [1, 2, 3]);
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(invalid));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(f.App, "temp")));
+        Assert.Single(Directory.GetDirectories(Path.Combine(f.App, "library")));
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Library.ImportAsync(Path.Combine(f.App, "temp")));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(f.App, "temp")));
+    }
+
+    [Fact]
+    public async Task ImportsRejectRedirectedTemporaryStorage()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var f = new Fixture(); var source = f.Source("valid");
+        Directory.CreateDirectory(f.App);
+        var outside = Path.Combine(f.Root, "outside"); Directory.CreateDirectory(outside);
+        Directory.CreateSymbolicLink(Path.Combine(f.App, "temp"), outside);
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(source));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(outside));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(f.App, "library")));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

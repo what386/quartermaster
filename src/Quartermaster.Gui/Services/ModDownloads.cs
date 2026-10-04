@@ -36,6 +36,10 @@ public sealed class ModDownloads : ViewModelBase
     public ModDownloads(AppServices services)
     {
         this.services = services;
+        services.Providers.DownloadFailed += job => Dispatcher.UIThread.Post(() =>
+        {
+            if (!services.IsDisposed) services.Operations.ShowErrorNotification($"Could not import {job.File.Name}: {job.Error}");
+        });
         services.Providers.Changed += (_, _) => Dispatcher.UIThread.Post(Refresh);
         services.Providers.LibraryChanged += (_, _) => Dispatcher.UIThread.Post(async () =>
         {

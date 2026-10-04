@@ -57,16 +57,12 @@
         </Grid>
       </Border>
       <Border Grid.Column="1" Padding="12" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*">
-          <Border IsVisible="{Binding Operations.IsError}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
-            <TextBlock x:Name="OperationMessage" Text="{Binding Operations.Message}" Classes="error" TextWrapping="Wrap" />
-          </Border>
-          <ContentControl Grid.Row="1" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
-        </Grid>
+        <ContentControl x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
       </Border>
     </Grid>
     <shared:DialogHost x:Name="DialogOverlay" />
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24" MaxWidth="620" Spacing="8">
+    <shared:ErrorNotification x:Name="ErrorOverlay" DataContext="{Binding Operations}" />
     <Border x:Name="DownloadProgressOverlay" IsVisible="{Binding ShowDownloadProgress}"
             Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}"
             BorderThickness="1" CornerRadius="8" Padding="16,12">

@@ -123,7 +123,7 @@ public class DeploymentTests
         Assert.NotEqual(main.SourceSha256, main.Sha256);
         Assert.False(File.Exists(Path.Combine(f.App, "patches.json")));
         Assert.False(Directory.Exists(Path.Combine(f.App, "patched")));
-        Assert.Empty(Directory.EnumerateDirectories(f.App, ".staging-*"));
+        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App, "temp"), "deployment-*"));
 
         Assert.Equal(0xaa, File.ReadAllBytes(Path.Combine(f.Game, main.Name))[^1]);
         Assert.Equal(Fixture.Patch(), File.ReadAllBytes(f.Contents.GetFilePath(mod.Id, mod.PatchSets[0].Files[0])));

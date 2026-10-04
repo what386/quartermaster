@@ -30,7 +30,7 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
         Validate(document);
         destination = Path.GetFullPath(destination);
         destination = Path.Combine(ManagedPaths.CanonicalDirectory(Path.GetDirectoryName(destination)!), Path.GetFileName(destination));
-        var applicationDirectory = Path.GetDirectoryName(Path.GetDirectoryName(contents.GetModDirectory(Guid.Empty)))!;
+        var applicationDirectory = contents.ApplicationDirectory;
         var relative = Path.GetRelativePath(applicationDirectory, destination);
         if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
             throw new ArgumentException("Export outside the library storage directory.");
@@ -79,7 +79,7 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
         source = Path.GetFullPath(source); ManagedPaths.CheckLink(source);
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
-        var temporary = Path.Combine(Path.GetTempPath(), "quartermaster-profile-" + Guid.NewGuid().ToString("N"));
+        var temporary = TemporaryStorage.PathFor(contents.ApplicationDirectory, "profile-" + Guid.NewGuid().ToString("N"));
         var created = new List<Guid>();
         Directory.CreateDirectory(temporary);
         try

@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+             x:Class="Quartermaster.Gui.Shared.ErrorNotification" x:DataType="shared:OperationState"
+             IsVisible="{Binding IsErrorNotificationVisible}">
+  <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}"
+          BorderThickness="1" CornerRadius="8" Padding="16,12" PointerPressed="Dismiss"
+          ToolTip.Tip="Click to dismiss">
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <TextBlock x:Name="OperationMessage" Text="{Binding NotificationMessage}" Classes="error" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="×" Command="{Binding DismissErrorCommand}" AutomationProperties.Name="Dismiss error" />
+    </Grid>
+  </Border>
+</UserControl>

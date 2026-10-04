@@ -174,10 +174,12 @@ public sealed class DownloadTests
     {
         using var f = new Fixture(); byte[] bytes = [1, 2, 3]; var expected = Expected(bytes);
         await using var manager = new ProviderManager(f.Library, new(f.App), [new FakeProvider()], Path.Combine(f.App, "cache"));
+        var failures = new List<DownloadJob>(); manager.DownloadFailed += failures.Add;
         await manager.InitializeAsync(); await manager.SetDirectoriesAsync([f.Root]); var job = await manager.QueueAsync(expected);
         await File.WriteAllBytesAsync(Path.Combine(f.Root, "mod.zip"), bytes);
         await manager.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(5));
         Assert.Equal(DownloadStatus.Failed, Assert.Single(manager.State.Jobs).Status); Assert.Empty((await f.Library.LoadAsync()).Mods);
+        Assert.Equal(job.Id, Assert.Single(failures).Id); Assert.False(string.IsNullOrWhiteSpace(failures[0].Error));
     }
     [Fact]
     public async Task LinkDispatchUsesProviderCapabilitiesAndRejectsUnsupportedHosts()

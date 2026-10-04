@@ -45,7 +45,7 @@ public sealed class AppServices : IAsyncDisposable
             using var client = new Quartermaster.Providers.Providers.NexusMods.NexusClient(_ => Task.FromResult<string?>(key), nexusApi);
             return await client.ValidateAsync(ct);
         };
-        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Providers.NexusMods.NexusAdapter(Nexus)], Path.Combine(DataDirectory, "download-cache"), OpenBrowser);
+        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Providers.NexusMods.NexusAdapter(Nexus)], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));

@@ -1723,7 +1723,18 @@ public class GuiTests
         Assert.True(f.Services.Operations.IsError); Assert.Contains("Purge patches", f.Services.Operations.Message);
         Assert.Equal(new byte[] { 0xff }, File.ReadAllBytes(owned));
         var window = new MainWindow { DataContext = f.Shell }; window.Show();
-        try { window.CaptureRenderedFrame()?.Dispose(); Assert.Equal(f.Services.Operations.Message, window.FindControl<TextBlock>("OperationMessage")!.Text); }
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var overlay = window.FindControl<ErrorNotification>("ErrorOverlay")!;
+            Assert.Equal(f.Services.Operations.Message, overlay.FindControl<TextBlock>("OperationMessage")!.Text);
+            var bounds = window.FindControl<ContentControl>("PageHost")!.Bounds;
+            f.Services.Operations.DismissErrorCommand.Execute(null);
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.False(overlay.IsVisible);
+            Assert.True(f.Services.Operations.IsError);
+            Assert.Equal(bounds, window.FindControl<ContentControl>("PageHost")!.Bounds);
+        }
         finally { window.Close(); }
     }
 

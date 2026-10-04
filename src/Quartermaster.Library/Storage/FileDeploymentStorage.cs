@@ -26,7 +26,7 @@ public sealed class FileDeploymentStorage(string applicationDirectory, ModConten
     {
         public string TargetDirectory => target;
         public StringComparer PathComparer => comparer;
-        private readonly string staging = ManagedPaths.Resolve(storage, ".staging-" + Guid.NewGuid().ToString("N"));
+        private readonly string staging = TemporaryStorage.PathFor(storage, "deployment-" + Guid.NewGuid().ToString("N"));
         private string Manifest => ManagedPaths.Resolve(storage, "deployment.lock");
         private string FilePath(DeploymentArea area, string name) => ManagedPaths.Resolve(
             area == DeploymentArea.Target ? target : staging, name);
@@ -82,10 +82,17 @@ public sealed class FileDeploymentStorage(string applicationDirectory, ModConten
                 if (remainder.Length > 33 && Guid.TryParseExact(remainder[..32], "N", out _) && remainder[32] == '-' &&
                     PatchNames.TryParse(remainder[33..], out _, out _, out _)) DeleteTarget(name);
             }
-            if (Directory.Exists(storage)) foreach (var directory in Directory.EnumerateDirectories(storage, ".staging-*"))
+            ClearAbandonedStaging(storage, ".staging-");
+            ClearAbandonedStaging(TemporaryStorage.DirectoryFor(storage), "deployment-");
+        }
+        private static void ClearAbandonedStaging(string root, string prefix)
+        {
+            ManagedPaths.CheckLink(root);
+            if (!Directory.Exists(root)) return;
+            foreach (var directory in Directory.EnumerateDirectories(root, prefix + "*"))
             {
                 var name = Path.GetFileName(directory);
-                if (!Guid.TryParseExact(name[9..], "N", out _)) continue;
+                if (!Guid.TryParseExact(name[prefix.Length..], "N", out _)) continue;
                 _ = ManagedPaths.Enumerate(directory).ToArray();
                 Directory.Delete(directory, recursive: true);
             }

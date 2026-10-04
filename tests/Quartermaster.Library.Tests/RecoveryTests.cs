@@ -6,6 +6,19 @@ namespace Quartermaster.Library.Tests;
 
 public class RecoveryTests
 {
+    [Fact]
+    public async Task PurgeCleansAbandonedDeploymentStagingAndPreservesOtherTemporaryWork()
+    {
+        using var f = new Fixture();
+        var staging = TemporaryStorage.PathFor(f.App, "deployment-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(staging); File.WriteAllBytes(Path.Combine(staging, "partial"), [1]);
+        var download = TemporaryStorage.PathFor(f.App, "downloads/active.zip");
+        Directory.CreateDirectory(Path.GetDirectoryName(download)!); File.WriteAllBytes(download, [2]);
+        var service = new DeploymentService(new FileDeploymentStorage(f.App, f.Contents));
+        await service.PurgeAsync(f.Game);
+        Assert.False(Directory.Exists(staging)); Assert.Equal(new byte[] { 2 }, File.ReadAllBytes(download));
+    }
+
     [Theory]
     [InlineData("{broken")]
     [InlineData("{}")]

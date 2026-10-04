@@ -22,6 +22,59 @@ namespace Quartermaster.Gui.Tests;
 
 public sealed class ModDownloadTests
 {
+    [AvaloniaFact]
+    public async Task AutomaticDownloadImportFailureShowsDismissibleFloatingError()
+    {
+        using var api = Api(); using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        var mods = (ModsViewModel)Navigate(f, PageKind.Mods);
+        f.Dialogs.ModImport = new(ModImportKind.Link, "https://www.nexusmods.com/helldivers2/mods/123");
+        await mods.AddModCommand.ExecuteAsync();
+        var job = Assert.Single(f.Services.Providers.State.Jobs);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var bounds = window.FindControl<ContentControl>("PageHost")!.Bounds;
+            await File.WriteAllBytesAsync(Path.Combine(f.Services.Providers.State.Directories[0], "broken.zip"), [1, 2, 3]);
+            await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(10));
+            Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            var operations = f.Services.Operations;
+            Assert.True(operations.IsErrorNotificationVisible);
+            Assert.Contains("Example mod", operations.NotificationMessage);
+            Assert.Equal(DownloadStatus.Failed, Assert.Single(f.Services.Providers.State.Jobs).Status);
+            Assert.Empty(f.Services.Session.State.Mods);
+            Assert.Equal(bounds, window.FindControl<ContentControl>("PageHost")!.Bounds);
+            var overlay = window.FindControl<ErrorNotification>("ErrorOverlay")!;
+            var point = overlay.TranslatePoint(new Point(10, 10), window)!.Value;
+            window.MouseDown(point, MouseButton.Left); window.MouseUp(point, MouseButton.Left);
+            Assert.False(operations.IsErrorNotificationVisible);
+            Assert.False(string.IsNullOrWhiteSpace(Assert.Single(f.Services.Providers.State.Jobs).Error));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task FloatingErrorAutomaticallyDismissesWithoutClearingFailure()
+    {
+        var operations = new OperationState();
+        var overlay = new ErrorNotification { DataContext = operations, DismissAfter = TimeSpan.FromMilliseconds(30) };
+        var window = new Window { Content = overlay }; window.Show();
+        try
+        {
+            var dismissed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            operations.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(OperationState.IsErrorNotificationVisible) && !operations.IsErrorNotificationVisible) dismissed.TrySetResult();
+            };
+            operations.ReportError(new IOException("Invalid archive"));
+            await dismissed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.True(operations.IsError); Assert.Equal("Invalid archive", operations.Message);
+            operations.ShowErrorNotification("Another error"); Assert.True(operations.IsErrorNotificationVisible);
+            operations.DismissErrorCommand.Execute(null); Assert.False(operations.IsErrorNotificationVisible);
+        }
+        finally { window.Close(); }
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
     { protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => Task.FromResult(send(request)); }
     private static HttpResponseMessage Json(object value) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(value), Encoding.UTF8, "application/json") };
