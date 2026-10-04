@@ -1,97 +1,151 @@
-# quartermaster
+# Quartermaster
 
-A Helldivers 2 mod manager written in C# with Avalonia.
+Quartermaster is a Helldivers 2 mod manager written in C# with Avalonia.
 
-Run the desktop app with `just run` or
-`dotnet run --project src/Quartermaster.Gui/Quartermaster.Gui.csproj`.
+It imports mods from local ZIPs, folders, Nexus Mods, and GitHub releases,
+organizes them into profiles, and deploys their selected options to the game.
+Repatching uses a C# port of hd2_repatcher; original library files remain unchanged.
 
-Right-click a profile in the sidebar to **Export profile ZIP**. Right-click the
-**+** button to **Import profile ZIP**, choose **Choose from file…** in the
-create-profile dialog, or drop a profile ZIP anywhere in the sidebar.
-Import creates and selects a new profile,
-reusing matching mods already in the library.
+## Installation
 
-Profile archives contain `profile.json` and the original files under
-`mods/<id>/`. They preserve the profile name, load priority, mod order, enabled
-states, option selections and groups. Disabled mods, unused option variants,
-manifests and artwork are included. Importing a profile does not deploy it.
+### Release archives
 
-Open **Settings**, paste your personal Nexus API key, and choose **Save**.
-The same Save button applies your game settings, key changes, and browser download
-folder. To disconnect, select **Remove saved API key**, then Save.
+See [GitHub releases](https://github.com/what386/quartermaster/releases) for
+packaged builds. Extract the archive matching your operating system and
+architecture, then run `Quartermaster.Gui` (`Quartermaster.Gui.exe` on Windows).
+On Unix, make it executable with `chmod +x Quartermaster.Gui` if needed.
 
-In **Library**, choose **Add mod** to paste a mod link or import a local ZIP/folder.
-Quartermaster identifies the provider from the link; Nexus Mods is currently the
-only supported provider. For a Nexus mod page, select a file in the dialog.
-Quartermaster queues it and opens its download page in your default browser.
-Complete the download on Nexus; Quartermaster verifies the archive against
-Nexus's MD5 lookup and imports it automatically. Browser downloads are left in
-place. The sidebar's **Downloads** tab has **Open download page**, **Attach ZIP**,
-**Retry**, and **Cancel** actions. Only ZIP archives are currently supported.
-Use the dedicated **Search** page to find Helldivers 2 Nexus mods and add them
-through the same file-selection flow. Choose a provider from the dropdown (Nexus
-by default), then press Enter or click Search. The page reports loading, no
-matches, and search errors, including missing API-key configuration.
-Search results show provider thumbnails in larger cards. The file chooser's
-**Open download page** action explains the browser download flow before opening
-it. A floating activity spinner tracks pending downloads across pages; manage
-requests in the **Downloads** tab. **Attach ZIP** explicitly associates an
-existing archive with a request when recognition fails or you already have the
-file. It skips provider recognition and uses the normal mod import and profile
-upgrade flow. **Cancel** removes a pending request; **Remove** clears a completed
-or failed entry without removing imported mods.
+`bundled` archives include .NET. `runtime` archives require the .NET 10 runtime.
+Release builds target Linux, Windows, and macOS on x64 and ARM64.
 
-Choose **Register nxm links** in Settings to make Quartermaster your user account's
-`nxm://` handler on Linux or Windows. Nexus's **Download with manager** action can
-then send a signed download link directly to the running app. Free accounts need
-that signed, unexpired link; a plain mod URL does not authorize a direct download.
-You can also paste an nxm link into **Add mod**. Registration on macOS is not yet
-implemented. Registration is explicit and changes the default nxm handler.
+### Run from source
 
-Nexus imports retain their mod/file identity. **Check updates** in Library checks
-all tracked mods; the same button in a profile checks that profile's mods.
-Checks only report updates. An **Update** button appears on mods with available
-updates in both lists. Click it to open the replacement file's download page and
-start watching for its download. Verified updates replace references in profiles
-while preserving order, groups, enabled states, and compatible option selections.
-If selected options are no longer compatible, the new mod stays in the library
-and the request reports an error for manual configuration. Updates do not deploy
-automatically; original library files remain.
+Install the .NET 10 SDK, then run:
 
-`downloads.json` persists the queue and watched folders. Normal app exit clears
-unfinished requests; pending requests left by a crash can resume at startup.
-Browser files are left untouched. Signed nxm grants are not stored in the queue or library.
-`temp/` holds transitional files: mod/profile extraction, deployment staging,
-download copies, and metadata writes. Completed or failed operations clean up
-their temporary files. Import errors appear in a floating notification that
-dismisses on click or after seven seconds; download failures also remain in the
-Downloads tab. Personal API keys live separately
-under `credentials/` (owner-only files on Unix), outside profile exports. Keys
-are local plaintext files, not an encrypted system keychain. A private
-`nxm-inbox/` briefly holds protocol links forwarded by another application
-instance, and `app.lock` prevents opening a second GUI for the same data folder.
+```bash
+dotnet run --project src/Quartermaster.Gui
+```
 
-Provider implementations share `DownloadScanner`: override `IsCandidate` and
-`VerifyAsync` to recognize their downloads, and use `OpenDownloadPage` to open
-the user's browser. `ProviderManager` coordinates the persistent queue and
-library imports. Nexus routes and search follow the
-[official API client](https://github.com/Nexus-Mods/node-nexus-api) and
-[GraphQL documentation](https://graphql.nexusmods.com/).
+With [just](https://github.com/casey/just) installed, use `just run`.
 
-**Add mod** also accepts public GitHub repository links, release links, and
-release asset links. Repository links use the latest stable release. Choose an
-uploaded ZIP asset and Quartermaster downloads it directly into `temp/` and
-imports it through the Downloads queue. GitHub's generated source-code archives
-are excluded. Public repositories work without a token. Settings accepts an
-optional GitHub personal access token, validated before saving, to increase
-the API rate limit. Tokens are stored in `credentials/github.key`, outside
-settings and profile exports, and applied only to GitHub API requests. API rate-limit
-errors appear in the app. Download sizes and available SHA-256 digests are
-verified before import.
+## Common workflows
 
-GitHub update checks match the installed asset's filename in the latest stable
-release, or use its sole ZIP when the filename changed. Ambiguous replacements
-require choosing a ZIP from the repository. **Update** downloads and upgrades
-directly while preserving profiles. GitHub repository search is deferred.
-The implementation follows `../upstream-rs`'s release/asset mapping and the
-[GitHub releases API](https://docs.github.com/en/rest/releases/releases).
+### Add mods
+
+Choose **Add mod** in Library to import a ZIP, folder, or provider link.
+You can also drop ZIPs or folders into Library or a profile; dropping into a
+profile imports the mods and adds them to that profile.
+
+- **Nexus Mods:** paste a mod link and choose a file. Quartermaster opens its
+  download page, watches your configured browser download folder, verifies the
+  archive, and imports it. The **Search** page finds Helldivers 2 Nexus mods.
+- **GitHub:** paste a repository, release, or release asset link and choose an
+  uploaded ZIP. Repository links use the latest stable release. Quartermaster
+  downloads the asset directly; generated source-code archives are excluded.
+
+Provider imports currently support ZIP archives. Manage requests in
+**Downloads**: attach an existing ZIP when recognition is stuck, retry a failed
+request, or cancel it. Removing a completed entry keeps the imported mod.
+Browser files are left untouched. Import failures appear in a floating
+notification and failed requests retain their error details in Downloads.
+
+### Manage profiles
+
+Click **+** in the sidebar to create a named profile. Click a profile to open it,
+and right-click its icon to rename or delete it.
+
+Right-click mods in Library and use **Add to** to add them to a profile.
+Enable or disable mods, change their options with the sliders button, and drag
+them to change load order. Right-click to create collapsible groups or group
+selected mods. Load priority is configured in Settings.
+
+### Deploy and run
+
+Choose your Helldivers 2 game folder in Settings, or use **Find Steam installs**.
+Click **Deploy** in a profile to apply its enabled mods and options. You can also
+double-click its sidebar icon to open the deployment confirmation.
+
+Settings lets you choose whether to ask before repatching, repatch automatically,
+or never repatch. Repatching happens during deployment without modifying the
+originals. Use **Export repatched ZIP** from a mod's Library context menu to
+save a repaired copy separately.
+
+**Run** launches the game and warns about deployment mismatches. **Purge** removes
+the game's patches so you can redeploy. The deployed profile is marked green;
+yellow mod outlines indicate enabled mods or changed options that need deploying.
+
+### Check for updates
+
+**Check updates** in Library checks all tracked mods; in a profile it checks that
+profile's mods. Click a mod's **Update** button to upgrade it.
+
+Nexus updates use the browser download flow. GitHub updates download directly,
+matching the installed asset's filename or the latest release's sole ZIP.
+Ambiguous replacements require choosing a file yourself.
+
+Upgrades preserve profile order, groups, enabled states, and compatible option
+selections. Incompatible options report an error for manual configuration.
+Updates do not deploy automatically.
+
+### Import and export profiles
+
+Right-click a profile and choose **Export profile ZIP**. To import one,
+right-click **+**, choose **Choose from file…** in the create-profile dialog, or
+drop the archive into the sidebar.
+
+Archives contain the profile's settings, mod order, groups, option selections,
+and original mod files, including disabled mods and unused variants. Importing
+creates a new profile and reuses matching mods already in Library. It does not
+deploy the profile.
+
+## API tokens
+
+Configure provider credentials in **Settings** and use the shared **Save** button.
+
+- **Nexus Mods:** a personal API key is needed for search, update checks, and
+  browser download verification. Get it from Nexus account settings → API.
+- **GitHub:** a personal access token is optional and increases the API rate
+  limit. Create one under GitHub Settings → Developer settings → Personal
+  access tokens. New tokens are validated before saving.
+
+Credentials are stored separately under `credentials/` and are excluded from
+settings and profile exports. Select the provider's removal checkbox and Save
+to remove a credential. GitHub tokens are sent only to GitHub API requests.
+
+Choose **Register nxm links** in Settings to handle Nexus's **Download with
+manager** links on Linux or Windows. Free accounts can use signed, unexpired
+`nxm://` links; a plain mod URL does not authorize a direct download. You can
+also paste an nxm link into **Add mod**.
+
+## Data storage
+
+Quartermaster stores its data in your user's local application data directory
+under `Quartermaster`. Set `QUARTERMASTER_DATA_DIRECTORY` to use another location.
+
+- `library/`: original imported mod files.
+- `library.json` and `profiles.json`: mod metadata and profiles.
+- `settings.json`: application settings.
+- `deployment.lock`: the current deployment state.
+- `downloads.json`: download requests and watched folders.
+- `credentials/`: local plaintext provider credentials, with owner-only access on Unix.
+- `temp/`: transitional imports, downloads, and deployment staging.
+- `log.jsonl`: application events.
+
+Normal app exit clears unfinished download requests. Requests left by a crash
+can resume at startup. Temporary files are cleaned up when operations finish.
+
+## Development
+
+```bash
+just build
+just test
+just lint
+just package linux-x64
+```
+
+See the [repatcher documentation](src/Quartermaster.Repatcher/README.md) for
+patching details and the [changelog](CHANGELOG.md) for release changes.
+
+## License
+
+[MIT](LICENSE)
