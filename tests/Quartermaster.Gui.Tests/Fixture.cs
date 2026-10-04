@@ -26,6 +26,9 @@ internal sealed class FakeDialogs : IDialogService
     { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }
     public bool Confirm { get; set; } = true;
     public string? InputText { get; set; }
+    public bool CreateProfileFromFile { get; set; }
+    public Task<ProfileCreationRequest?> RequestProfileCreationAsync() => Task.FromResult(
+        CreateProfileFromFile ? new ProfileCreationRequest(FromFile: true) : InputText is null ? null : new ProfileCreationRequest(Name: InputText));
     public string? InitialInputText { get; private set; }
     public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null)
     { InitialInputText = initialValue; return Task.FromResult(InputText); }

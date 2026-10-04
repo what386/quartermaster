@@ -3,12 +3,15 @@ using Avalonia.Platform.Storage;
 
 namespace Quartermaster.Gui.Shared;
 
+public sealed record ProfileCreationRequest(string? Name = null, bool FromFile = false);
+
 public interface IDialogService
 {
     Task<string?> PickModZipAsync();
     Task<string?> SaveModZipAsync(string suggestedName);
     Task<string?> PickProfileZipAsync();
     Task<string?> SaveProfileZipAsync(string suggestedName);
+    Task<ProfileCreationRequest?> RequestProfileCreationAsync();
     Task<string?> PickFolderAsync(string title);
     Task<bool> ConfirmAsync(string title, string message, string acceptLabel);
     Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null);
@@ -16,6 +19,16 @@ public interface IDialogService
 
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
+    public async Task<ProfileCreationRequest?> RequestProfileCreationAsync()
+    {
+        var result = await owner().ShowDialogAsync<object?>(new TextInputDialog("Create profile", "Name your profile or import a profile ZIP", "Create", allowFileChoice: true));
+        return result switch
+        {
+            string name => new(Name: name),
+            TextInputAction.ChooseFile => new(FromFile: true),
+            _ => null
+        };
+    }
     public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null) =>
         owner().ShowDialogAsync<string?>(new TextInputDialog(title, prompt, acceptLabel, initialValue));
 

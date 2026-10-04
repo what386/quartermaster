@@ -12,6 +12,14 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
     private sealed record Document(int Version, Profile Profile, IReadOnlyList<Mod> Mods);
     private readonly ImportLimits limits = limits ?? new();
 
+    public static bool IsProfileArchive(string source)
+    {
+        if (Directory.Exists(source) || !Path.GetExtension(source).Equals(".zip", StringComparison.OrdinalIgnoreCase)) return false;
+        ManagedPaths.CheckLink(source);
+        using var zip = ZipFile.OpenRead(source);
+        return zip.GetEntry("profile.json") is not null;
+    }
+
     public async Task ExportAsync(Guid profileId, string destination, CancellationToken ct = default)
     {
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);

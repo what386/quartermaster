@@ -15,8 +15,10 @@ public partial class MainWindow
         DragDrop.SetAllowDrop(ShellContent, true);
         void UpdateDragEffects(object? sender, DragEventArgs e)
         {
+            var target = ResolveDropTarget(e);
+            var paths = DroppedPaths(e);
             e.DragEffects = DataContext is MainWindowViewModel { Operations.CanInteract: true } &&
-                !DialogOverlay.IsOpen && ResolveDropTarget(e).Accepted && DroppedPaths(e).Count > 0
+                !DialogOverlay.IsOpen && target.Accepted && paths.Count > 0 && (target.AcceptsMods || paths.All(path => !Directory.Exists(path)))
                 ? DragDropEffects.Copy : DragDropEffects.None;
             e.Handled = true;
         }
@@ -24,18 +26,19 @@ public partial class MainWindow
         ShellContent.AddHandler(DragDrop.DragOverEvent, UpdateDragEffects);
         ShellContent.AddHandler(DragDrop.DropEvent, ImportDroppedMods);
     }
-    private (bool Accepted, Guid? ProfileId) ResolveDropTarget(DragEventArgs e)
+    private (bool Accepted, Guid? ProfileId, bool Sidebar, bool AcceptsMods) ResolveDropTarget(DragEventArgs e)
     {
         // Native drag events target the allow-drop host; resolve the control under the cursor.
-        if (this.InputHitTest(e.GetPosition(this)) is not Visual visual) return (false, null);
+        if (this.InputHitTest(e.GetPosition(this)) is not Visual visual) return (false, null, false, false);
         foreach (var control in visual.GetVisualAncestors().Prepend(visual).OfType<Control>())
         {
-            if (control is Button { DataContext: SidebarProfile profile }) return (true, profile.Profile.Id);
-            if (control is Button { DataContext: NavigationItem { Page: PageKind.Mods } }) return (true, null);
-            if (control is ModsView) return (true, null);
-            if (control is ProfilesView { DataContext: ProfilesViewModel { SelectedProfile: { } selected } }) return (true, selected.Id);
+            if (control is Button { DataContext: SidebarProfile profile }) return (true, profile.Profile.Id, true, true);
+            if (control is Button { DataContext: NavigationItem { Page: PageKind.Mods } }) return (true, null, true, true);
+            if (control is ModsView) return (true, null, false, true);
+            if (control is ProfilesView { DataContext: ProfilesViewModel { SelectedProfile: { } selected } }) return (true, selected.Id, false, true);
+            if (control == Sidebar) return (true, null, true, false);
         }
-        return (false, null);
+        return (false, null, false, false);
     }
     private static IReadOnlyList<string> DroppedPaths(DragEventArgs e)
     {
@@ -50,9 +53,9 @@ public partial class MainWindow
         if (DataContext is not MainWindowViewModel { Operations.CanInteract: true } model || DialogOverlay.IsOpen) return;
         var target = ResolveDropTarget(e);
         var paths = DroppedPaths(e);
-        if (!target.Accepted || paths.Count == 0) { e.DragEffects = DragDropEffects.None; return; }
+        if (!target.Accepted || paths.Count == 0 || (!target.AcceptsMods && paths.Any(Directory.Exists))) { e.DragEffects = DragDropEffects.None; return; }
         e.Handled = true; e.DragEffects = DragDropEffects.Copy;
-        try { await model.ImportDropsAsync(paths, target.ProfileId); }
+        try { await model.ImportDropsAsync(paths, target.ProfileId, target.Sidebar, target.AcceptsMods); }
         catch (Exception ex) { model.Operations.ReportError(ex); }
     }
 }

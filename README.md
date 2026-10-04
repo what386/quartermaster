@@ -6,7 +6,9 @@ Run the desktop app with `just run` or
 `dotnet run --project src/Quartermaster.Gui/Quartermaster.Gui.csproj`.
 
 Right-click a profile in the sidebar to **Export profile ZIP**. Right-click the
-**+** button to **Import profile ZIP**. Import creates and selects a new profile,
+**+** button to **Import profile ZIP**, choose **Choose from file…** in the
+create-profile dialog, or drop a profile ZIP anywhere in the sidebar.
+Import creates and selects a new profile,
 reusing matching mods already in the library.
 
 Profile archives contain `profile.json` and the original files under

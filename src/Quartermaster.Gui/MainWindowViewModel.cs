@@ -57,10 +57,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         };
         AddProfileCommand = Operations.CreateCommand("Creating profile", async ct =>
         {
-            var name = await services.Dialogs.RequestTextAsync("Create profile", "Name your profile", "Create");
-            if (string.IsNullOrWhiteSpace(name)) return;
+            var request = await services.Dialogs.RequestProfileCreationAsync();
+            if (request is null) return;
             ct.ThrowIfCancellationRequested();
-            await services.Session.SaveProfileAsync(ProfileEditor.Create(name.Trim()), true, ct);
+            if (request.FromFile)
+            {
+                var path = await services.Dialogs.PickProfileZipAsync();
+                if (path is null) return;
+                await services.Session.ImportProfileAsync(path, ct);
+            }
+            else
+            {
+                if (string.IsNullOrWhiteSpace(request.Name)) return;
+                await services.Session.SaveProfileAsync(ProfileEditor.Create(request.Name.Trim()), true, ct);
+            }
             Navigate(PageKind.Profiles);
         });
         ImportProfileCommand = Operations.CreateCommand("Importing profile", async ct =>
@@ -124,12 +134,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             { IsDeployed = deployed });
         }
     }
-    public async Task ImportDropsAsync(IReadOnlyList<string> paths, Guid? profileId)
+    public async Task ImportDropsAsync(IReadOnlyList<string> paths, Guid? profileId, bool sidebar = false, bool acceptsMods = true)
     {
         if (!Operations.CanInteract || paths.Count == 0) return;
-        await Operations.RunAsync("Importing dropped mods", ct => services.Session.ImportDropsAsync(paths, profileId, ct));
+        Guid? importedProfileId = null;
+        await Operations.RunAsync("Importing dropped files", async ct =>
+            importedProfileId = await services.Session.ImportDropsAsync(paths, profileId, ct, sidebar, acceptsMods));
         if (Operations.IsError) return;
-        if (profileId is { } id && SidebarProfiles.FirstOrDefault(profile => profile.Profile.Id == id) is { } target)
+        if ((importedProfileId ?? profileId) is { } id && SidebarProfiles.FirstOrDefault(profile => profile.Profile.Id == id) is { } target)
             await target.SelectCommand.ExecuteAsync();
         else Navigate(PageKind.Mods);
     }

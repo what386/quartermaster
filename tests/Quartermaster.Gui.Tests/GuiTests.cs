@@ -22,6 +22,101 @@ public class GuiTests
     private static T Page<T>(Fixture fixture, PageKind page) where T : ViewModelBase
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
+    [AvaloniaTheory]
+    [InlineData("empty")]
+    [InlineData("profile")]
+    [InlineData("plus")]
+    [InlineData("library")]
+    public async Task ProfileArchiveDropsAnywhereInSidebarCreateAndSelectNewProfile(string target)
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Source("Armor"), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        var original = f.Services.Session.ActiveProfile!;
+        var path = Path.Combine(f.Root, "loadout.zip");
+        await f.Services.Session.ExportProfileAsync(original.Id, path, CancellationToken.None);
+        f.Shell.Navigate(PageKind.Settings);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var sidebar = window.FindControl<Border>("Sidebar")!;
+            Control control = target switch
+            {
+                "profile" => window.GetVisualDescendants().OfType<Button>().Single(button => button.DataContext is SidebarProfile),
+                "plus" => window.FindControl<Button>("AddProfileButton")!,
+                "library" => window.GetVisualDescendants().OfType<Button>().Single(button => button.DataContext is NavigationItem { Page: PageKind.Mods }),
+                _ => sidebar
+            };
+            var position = control.TranslatePoint(new Point(target == "empty" ? control.Bounds.Width - 4 : control.Bounds.Width / 2, control.Bounds.Height / 2), window)!.Value;
+            var file = await window.StorageProvider.TryGetFileFromPathAsync(new Uri(path));
+            var data = new DataTransfer(); data.Add(DataTransferItem.CreateFile(file!));
+            var over = new DragEventArgs(DragDrop.DragOverEvent, data, window, position, KeyModifiers.None);
+            window.FindControl<Grid>("ShellContent")!.RaiseEvent(over);
+            Assert.Equal(DragDropEffects.Copy, over.DragEffects);
+            window.DragDrop(position, Avalonia.Input.Raw.RawDragEventType.DragEnter, data, DragDropEffects.Copy, RawInputModifiers.None);
+            window.DragDrop(position, Avalonia.Input.Raw.RawDragEventType.Drop, data, DragDropEffects.Copy, RawInputModifiers.None);
+            await f.Services.Operations.WhenIdle; await f.Services.Operations.WhenIdle;
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Assert.Equal(2, f.Shell.SidebarProfiles.Count); Assert.Single(f.Services.Session.State.Mods);
+            Assert.NotEqual(original.Id, f.Services.Session.ActiveProfile!.Id);
+            Assert.Equal(original.Entries.Select(entry => (entry.ModId, entry.Enabled)), f.Services.Session.ActiveProfile.Entries.Select(entry => (entry.ModId, entry.Enabled)));
+            Assert.Equal(original.Entries.Select(entry => (entry.ModId, entry.Enabled)), f.Services.Session.State.Profiles.Single(profile => profile.Id == original.Id).Entries.Select(entry => (entry.ModId, entry.Enabled)));
+            Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
+            Assert.DoesNotContain(Directory.GetFiles(f.Game), filePath => filePath.Contains(".patch_"));
+            if (target == "empty")
+            {
+                var folder = await window.StorageProvider.TryGetFolderFromPathAsync(new Uri(f.Source("Folder")));
+                var folderData = new DataTransfer(); folderData.Add(DataTransferItem.CreateFile(folder!));
+                over = new DragEventArgs(DragDrop.DragOverEvent, folderData, window, position, KeyModifiers.None);
+                window.FindControl<Grid>("ShellContent")!.RaiseEvent(over);
+                Assert.Equal(DragDropEffects.None, over.DragEffects);
+            }
+        }
+        finally { await f.Services.Operations.WhenIdle; window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task CreateProfileDialogOffersFileChoiceWithoutANameAndRenameDoesNot()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var owner = new MainWindow { DataContext = f.Shell }; owner.Show();
+        try
+        {
+            var dialogs = new DialogService(() => owner);
+            var request = dialogs.RequestProfileCreationAsync(); owner.CaptureRenderedFrame()?.Dispose();
+            var dialog = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
+            Assert.False(dialog.FindControl<Button>("AcceptButton")!.IsEnabled);
+            var file = dialog.FindControl<Button>("ChooseFileButton")!;
+            Assert.True(file.IsEffectivelyVisible); Assert.True(file.IsEffectivelyEnabled);
+            file.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            Assert.True((await request)!.FromFile); Assert.False(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+            request = dialogs.RequestProfileCreationAsync(); owner.CaptureRenderedFrame()?.Dispose();
+            dialog = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
+            dialog.FindControl<TextBox>("NameInput")!.Text = "  Named  "; dialog.TryAccept();
+            Assert.Equal("Named", (await request)!.Name);
+            var rename = dialogs.RequestTextAsync("Rename profile", "Profile name", "Rename", "Named"); owner.CaptureRenderedFrame()?.Dispose();
+            dialog = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
+            Assert.False(dialog.FindControl<Button>("ChooseFileButton")!.IsVisible); dialog.Cancel(); Assert.Null(await rename);
+            Assert.Empty(owner.OwnedWindows);
+        }
+        finally { owner.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task CreateProfileFromFileImportsLoadoutAndCancellingPickerLeavesProfilesUnchanged()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var original = f.Services.Session.ActiveProfile!;
+        var path = Path.Combine(f.Root, "loadout.zip"); await f.Services.Session.ExportProfileAsync(original.Id, path, CancellationToken.None);
+        f.Dialogs.CreateProfileFromFile = true;
+        await f.Shell.AddProfileCommand.ExecuteAsync(); Assert.Single(f.Shell.SidebarProfiles);
+        f.Dialogs.ZipPath = path; await f.Shell.AddProfileCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        Assert.Equal(2, f.Shell.SidebarProfiles.Count); Assert.NotEqual(original.Id, f.Services.Session.ActiveProfile!.Id);
+        Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
+    }
+
     [AvaloniaFact]
     public async Task SidebarProfileArchivesExportClickedProfileAndImportSelectsNewProfileWithoutDuplicatingMods()
     {

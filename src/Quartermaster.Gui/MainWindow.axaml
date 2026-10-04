@@ -12,7 +12,7 @@
   </Window.DataTemplates>
   <Grid>
     <Grid x:Name="ShellContent" ColumnDefinitions="72,*" IsEnabled="{Binding !IsOpen, ElementName=DialogOverlay}">
-      <Border Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
+      <Border x:Name="Sidebar" Background="{DynamicResource SidebarBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,1,0">
         <Grid RowDefinitions="70,1,*,Auto">
           <ContentControl Content="{Binding LibraryNavigation}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
             <ContentControl.ContentTemplate><DataTemplate x:DataType="local:NavigationItem">

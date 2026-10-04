@@ -5,6 +5,7 @@
     <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
     <TextBlock x:Name="PromptText" Classes="muted" TextWrapping="Wrap" />
     <TextBox x:Name="NameInput" PlaceholderText="Profile name" TextChanged="NameChanged" />
+    <Button x:Name="ChooseFileButton" Content="Choose from file…" IsVisible="False" HorizontalAlignment="Left" Click="ChooseFile" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
       <Button Content="Cancel" Click="CancelInput" />
       <Button x:Name="AcceptButton" Classes="primary" IsEnabled="False" Click="AcceptInput" />

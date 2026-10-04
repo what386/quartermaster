@@ -93,8 +93,9 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         }
         return Task.Run(() => archives.ExportAsync(profileId, destination, ct), ct);
     }
-    public async Task ImportDropsAsync(IReadOnlyList<string> sources, Guid? profileId, CancellationToken ct)
+    public async Task<Guid?> ImportDropsAsync(IReadOnlyList<string> sources, Guid? profileId, CancellationToken ct, bool allowProfiles = false, bool allowMods = true)
     {
+        Guid? importedProfileId = null;
         try
         {
             await Task.Run(async () =>
@@ -102,11 +103,18 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
                 foreach (var source in sources)
                 {
                     ct.ThrowIfCancellationRequested();
-                    await library.ImportAsync(source, profileId: profileId, cancellationToken: ct);
+                    if (allowProfiles && (!allowMods || ProfileArchives.IsProfileArchive(source)))
+                    {
+                        var profile = await archives.ImportAsync(source, ct);
+                        await library.SaveProfileAsync(profile, true, CancellationToken.None);
+                        importedProfileId = profile.Id;
+                    }
+                    else await library.ImportAsync(source, profileId: profileId, cancellationToken: ct);
                 }
             }, ct);
         }
         finally { await ReloadAsync(CancellationToken.None); }
+        return importedProfileId;
     }
     public async Task RemoveModAsync(Guid id, CancellationToken ct)
         => await RemoveModsAsync([id], ct);
