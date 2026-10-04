@@ -27,7 +27,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     private ProfileModItem? selectedMod;
     private Mod? modToAdd;
     private string search = "";
-    private bool repair = true;
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
     public IReadOnlyList<ProfileModItem> Entries { get; private set; } = [];
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
@@ -58,7 +57,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     }
     public ModOptionsViewModel? Options { get; private set; }
     public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value)) AddCommand.Refresh(); } }
-    public bool Repair { get => repair; set => Set(ref repair, value); }
     public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
     public AsyncCommand MakeActiveCommand { get; }
     public AsyncCommand AddCommand { get; }
@@ -84,7 +82,7 @@ public sealed class ProfilesViewModel : SessionViewModel
         {
             var current = SelectedProfile!;
             if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout.", "Deploy"))
-                await Session.DeployAsync(current.Id, Repair, ct);
+                await Session.DeployAsync(current.Id, Services.Dialogs, ct);
         }, () => HasProfile && Session.GameDirectory != "");
         RunCommand = Operations.CreateCommand("Launching game", async ct =>
         {
@@ -95,7 +93,7 @@ public sealed class ProfilesViewModel : SessionViewModel
         }, () => HasProfile && Session.GameDirectory != "");
         PurgeCommand = Operations.CreateCommand("Purging patches", async ct =>
         {
-            if (await Services.Dialogs.ConfirmAsync("Purge patches", "Remove all mod patch files from the selected game folder? Imported originals, repaired copies and profiles will remain.", "Purge"))
+            if (await Services.Dialogs.ConfirmAsync("Purge patches", "Remove all mod patch files from the selected game folder? Imported originals and profiles will remain.", "Purge"))
                 await Session.PurgeAsync(ct);
         }, () => Session.GameDirectory != "");
         Operations.PropertyChanged += (_, e) =>
@@ -106,7 +104,8 @@ public sealed class ProfilesViewModel : SessionViewModel
     protected override void Refresh()
     {
         Profiles = Session.State.Profiles.ToArray(); Notify(nameof(Profiles));
-        SelectedProfile = Session.ActiveProfile ?? Profiles.FirstOrDefault();
+        // Session refreshes also replace mod metadata, so rebuild once even if the profile is unchanged.
+        Set(ref profile, Session.ActiveProfile ?? Profiles.FirstOrDefault(), nameof(SelectedProfile));
         RebuildEntries();
     }
     private void RebuildEntries()

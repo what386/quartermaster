@@ -2,7 +2,8 @@ using System.Text.Json;
 
 namespace Quartermaster.Gui.Services;
 
-public sealed record ApplicationSettings(string? GameDataDirectory = null);
+public enum RepatchMode { Ask, Automatic, Never }
+public sealed record ApplicationSettings(string? GameDataDirectory = null, RepatchMode Repatch = RepatchMode.Ask);
 
 public sealed class SettingsStore(string directory)
 {
@@ -11,7 +12,12 @@ public sealed class SettingsStore(string directory)
     {
         if (!File.Exists(path)) return new();
         await using var file = File.OpenRead(path);
-        try { return await JsonSerializer.DeserializeAsync<ApplicationSettings>(file, cancellationToken: ct) ?? new(); }
+        try
+        {
+            var settings = await JsonSerializer.DeserializeAsync<ApplicationSettings>(file, cancellationToken: ct) ?? new();
+            if (!Enum.IsDefined(settings.Repatch)) throw new InvalidDataException("Invalid repatch setting.");
+            return settings;
+        }
         catch (JsonException ex) { throw new InvalidDataException("Application settings are invalid.", ex); }
     }
     public async Task SaveAsync(ApplicationSettings settings, CancellationToken ct)

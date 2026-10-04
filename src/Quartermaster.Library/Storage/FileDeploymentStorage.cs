@@ -5,11 +5,7 @@ using Quartermaster.Library.Importing;
 
 namespace Quartermaster.Library.Storage;
 
-public sealed record StoredRepair(Guid Id, Guid ModId, string GameDirectory, DateTimeOffset CreatedAt,
-    string EngineVersion, string Directory, IReadOnlyList<OwnedFile> Files);
-public sealed record RepairCatalog(int SchemaVersion, IReadOnlyList<StoredRepair> Repairs);
-
-/// <summary>Stores the deployment manifest and repaired copies; temporary staging has no rollback backups.</summary>
+/// <summary>Stores the deployment manifest and stages files temporarily before publication.</summary>
 public sealed class FileDeploymentStorage(string applicationDirectory, ModContentStore contents) : IDeploymentStorage
 {
     private readonly string root = Path.GetFullPath(applicationDirectory);
@@ -30,7 +26,7 @@ public sealed class FileDeploymentStorage(string applicationDirectory, ModConten
     {
         public string TargetDirectory => target;
         public StringComparer PathComparer => comparer;
-        private readonly string staging = ManagedPaths.Resolve(storage, "patched/.staging-" + Guid.NewGuid().ToString("N"));
+        private readonly string staging = ManagedPaths.Resolve(storage, ".staging-" + Guid.NewGuid().ToString("N"));
         private string Manifest => ManagedPaths.Resolve(storage, "deployment.lock");
         private string FilePath(DeploymentArea area, string name) => ManagedPaths.Resolve(
             area == DeploymentArea.Target ? target : staging, name);
@@ -64,44 +60,6 @@ public sealed class FileDeploymentStorage(string applicationDirectory, ModConten
         }
         public Task<byte[]> ReadStagedAsync(string name, CancellationToken ct) => File.ReadAllBytesAsync(FilePath(DeploymentArea.Staged, name), ct);
         public Task WriteStagedAsync(string name, byte[] data, CancellationToken ct) => File.WriteAllBytesAsync(FilePath(DeploymentArea.Staged, name), data, ct);
-        public async Task StoreRepairsAsync(IReadOnlyList<OwnedFile> files, CancellationToken ct)
-        {
-            if (files.Count == 0) return;
-            var catalogPath = ManagedPaths.Resolve(storage, "patches.json");
-            var catalog = File.Exists(catalogPath) ? await JsonFiles.ReadAsync<RepairCatalog>(catalogPath, ct).ConfigureAwait(false) : new(1, []);
-            if (catalog.SchemaVersion != 1 || catalog.Repairs is null) throw new InvalidDataException("Invalid repair catalog.");
-            var added = new List<StoredRepair>();
-            var saved = false;
-            try
-            {
-                foreach (var group in files.GroupBy(f => f.SourceId))
-                {
-                    var id = Guid.NewGuid();
-                    var relative = $"patched/{group.Key:N}/{id:N}";
-                    var directory = ManagedPaths.Resolve(storage, relative);
-                    var entry = new StoredRepair(id, group.Key, target, DateTimeOffset.UtcNow,
-                        typeof(global::Quartermaster.Repatcher.Repatcher).Assembly.GetName().Version?.ToString() ?? "unknown", relative, group.ToArray());
-                    added.Add(entry);
-                    Directory.CreateDirectory(directory);
-                    foreach (var file in group)
-                    {
-                        var destination = ManagedPaths.Resolve(directory, file.Name);
-                        await CopyAsync(FilePath(DeploymentArea.Staged, file.Name), destination, ct).ConfigureAwait(false);
-                        await FileIntegrity.VerifyAsync(destination, file.Size, file.Sha256, ct).ConfigureAwait(false);
-                    }
-                }
-                await JsonFiles.WriteAsync(catalogPath, catalog with { Repairs = [.. catalog.Repairs, .. added] }, ct).ConfigureAwait(false);
-                saved = true;
-            }
-            finally
-            {
-                if (!saved) foreach (var entry in added)
-                {
-                    var directory = ManagedPaths.Resolve(storage, entry.Directory);
-                    if (Directory.Exists(directory)) Directory.Delete(directory, recursive: true);
-                }
-            }
-        }
         public Task VerifyAsync(DeploymentArea area, OwnedFile file, CancellationToken ct) => FileIntegrity.VerifyAsync(FilePath(area, file.Name), file.Size, file.Sha256, ct);
         public void DeleteTarget(string name) => File.Delete(FilePath(DeploymentArea.Target, name));
         public async Task PublishAsync(string name, Guid operationId, CancellationToken ct)
@@ -124,8 +82,7 @@ public sealed class FileDeploymentStorage(string applicationDirectory, ModConten
                 if (remainder.Length > 33 && Guid.TryParseExact(remainder[..32], "N", out _) && remainder[32] == '-' &&
                     PatchNames.TryParse(remainder[33..], out _, out _, out _)) DeleteTarget(name);
             }
-            var repaired = ManagedPaths.Resolve(storage, "patched");
-            if (Directory.Exists(repaired)) foreach (var directory in Directory.EnumerateDirectories(repaired, ".staging-*"))
+            if (Directory.Exists(storage)) foreach (var directory in Directory.EnumerateDirectories(storage, ".staging-*"))
             {
                 var name = Path.GetFileName(directory);
                 if (!Guid.TryParseExact(name[9..], "N", out _)) continue;

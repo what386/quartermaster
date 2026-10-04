@@ -4,13 +4,15 @@ namespace Quartermaster.Gui.Shared;
 public sealed class OperationState : ViewModelBase
 {
     private bool busy;
+    private bool showProgress;
     private string message = "Ready";
     private bool error;
     private CancellationTokenSource? cancellation;
     private TaskCompletionSource? completion;
     public Task WhenIdle => completion?.Task ?? Task.CompletedTask;
-    public bool IsBusy { get => busy; private set { if (Set(ref busy, value)) Notify(nameof(CanInteract)); } }
+    public bool IsBusy { get => busy; private set { if (Set(ref busy, value)) { Notify(nameof(CanInteract)); Notify(nameof(IsProgressVisible)); } } }
     public bool CanInteract => !IsBusy;
+    public bool IsProgressVisible => IsBusy && showProgress;
     public string Message { get => message; private set => Set(ref message, value); }
     public bool IsError { get => error; private set => Set(ref error, value); }
     public Command CancelCommand { get; }
@@ -28,13 +30,14 @@ public sealed class OperationState : ViewModelBase
         return command;
     }
 
-    public async Task RunAsync(string label, Func<CancellationToken, Task> action)
+    public async Task RunAsync(string label, Func<CancellationToken, Task> action, bool showProgress = true)
     {
         if (IsBusy) return;
         using var source = new CancellationTokenSource();
         cancellation = source;
         var operationCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         completion = operationCompletion;
+        this.showProgress = showProgress;
         IsError = false; Message = label; IsBusy = true; CancelCommand.Refresh();
         try
         {

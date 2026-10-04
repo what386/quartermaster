@@ -25,7 +25,10 @@
     </Grid>
     <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
       <TextBlock Text="Imported originals are kept in your local library." Classes="muted" FontSize="11" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Content="Remove selected mod" Classes="danger" Command="{Binding RemoveCommand}" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Content="Export repatched ZIP" Command="{Binding ExportRepatchedCommand}" />
+        <Button Content="Remove selected mod" Classes="danger" Command="{Binding RemoveCommand}" />
+      </StackPanel>
     </Grid>
   </Grid>
 </UserControl>

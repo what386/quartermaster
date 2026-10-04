@@ -1,4 +1,5 @@
 using Quartermaster.Core.Patching;
+using Quartermaster.Core.Deployment;
 using global::System.IO.Compression;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Storage;
@@ -19,6 +20,74 @@ public sealed class ModContentStore : IModContentStore
     }
     public string GetModDirectory(Guid id) => ManagedPaths.Resolve(root, id.ToString("N"));
     public string GetFilePath(Guid id, PatchFile file) => ManagedPaths.Resolve(GetModDirectory(id), file.RelativePath);
+
+    public async Task<byte[]> ReadVerifiedAsync(Guid modId, PatchFile file, CancellationToken ct)
+    {
+        var path = GetFilePath(modId, file);
+        ManagedPaths.CheckLink(path);
+        var bytes = await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false);
+        if (bytes.LongLength != file.Size || !Convert.ToHexString(global::System.Security.Cryptography.SHA256.HashData(bytes)).Equals(file.Sha256, StringComparison.OrdinalIgnoreCase))
+            throw new IOException("Source file changed while reading.");
+        return bytes;
+    }
+
+    /// <summary>Exports every variant and its metadata, replacing only main patches in the ZIP.</summary>
+    public async Task ExportRepatchedAsync(Mod mod, string destination, IPatchRepairer repairer, CancellationToken ct = default)
+    {
+        destination = Path.GetFullPath(destination);
+        var parent = ManagedPaths.CanonicalDirectory(Path.GetDirectoryName(destination)!);
+        destination = Path.Combine(parent, Path.GetFileName(destination));
+        var relative = Path.GetRelativePath(Path.GetDirectoryName(root)!, destination);
+        if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
+            throw new ArgumentException("Export outside the library storage directory.");
+        ManagedPaths.CheckLink(destination);
+        var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        var patchFiles = mod.PatchSets.SelectMany(p => p.Files).ToDictionary(f => f.RelativePath, StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                using (var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
+                {
+                    foreach (var path in ManagedPaths.Enumerate(GetModDirectory(mod.Id)))
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var name = Path.GetRelativePath(GetModDirectory(mod.Id), path).Replace('\\', '/');
+                        var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
+                        await using var stream = entry.Open();
+                        if (patchFiles.TryGetValue(name, out var file))
+                        {
+                            seen.Add(name);
+                            if (file.Kind == PatchFileKind.Main)
+                            {
+                                var original = await ReadVerifiedAsync(mod.Id, file, ct).ConfigureAwait(false);
+                                var result = repairer.Repair(original, ct);
+                                if (result.RemovedUnits > 0) throw new InvalidDataException("Repatching would remove missing units. Use an updated mod.");
+                                await stream.WriteAsync(result.Data, ct).ConfigureAwait(false);
+                            }
+                            else
+                            {
+                                await FileIntegrity.VerifyAsync(path, file.Size, file.Sha256, ct).ConfigureAwait(false);
+                                await using var input = File.OpenRead(path);
+                                await input.CopyToAsync(stream, ct).ConfigureAwait(false);
+                            }
+                        }
+                        else
+                        {
+                            await using var input = File.OpenRead(path);
+                            await input.CopyToAsync(stream, ct).ConfigureAwait(false);
+                        }
+                    }
+                }
+                if (seen.Count != patchFiles.Count) throw new IOException("Mod files are missing from library storage.");
+                await output.FlushAsync(ct).ConfigureAwait(false); output.Flush(true);
+            }
+            ct.ThrowIfCancellationRequested();
+            File.Move(temporary, destination, overwrite: true);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
+    }
 
     public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default)
     {

@@ -112,7 +112,7 @@ public class DeploymentTests
     }
 
     [Fact]
-    public async Task OptionalRepairPersistsSeparateCopiesAndRecordsSourceHashes()
+    public async Task OptionalRepairUsesTemporaryStagingAndRecordsSourceHashes()
     {
         using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("source"));
         var profile = ProfileEditor.Add(ProfileEditor.Create("Test"), mod); await f.Library.SaveProfileAsync(profile);
@@ -121,12 +121,9 @@ public class DeploymentTests
         var ledger = await service.DeployAsync(state, profile.Id, f.Game, new(Repatch: true));
         var main = ledger.Files.Single(file => file.Kind == PatchFileKind.Main);
         Assert.NotEqual(main.SourceSha256, main.Sha256);
-        var catalog = global::System.Text.Json.JsonSerializer.Deserialize<RepairCatalog>(
-            await File.ReadAllTextAsync(Path.Combine(f.App, "patches.json")), new global::System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new global::System.Text.Json.Serialization.JsonStringEnumConverter() } })!;
-        var repair = Assert.Single(catalog.Repairs);
-        Assert.Equal(mod.Id, repair.ModId);
-        Assert.Equal(0xaa, File.ReadAllBytes(Path.Combine(f.App, repair.Directory, main.Name))[^1]);
-        Assert.Equal(2, Directory.GetFiles(Path.Combine(f.App, repair.Directory)).Length);
+        Assert.False(File.Exists(Path.Combine(f.App, "patches.json")));
+        Assert.False(Directory.Exists(Path.Combine(f.App, "patched")));
+        Assert.Empty(Directory.EnumerateDirectories(f.App, ".staging-*"));
 
         Assert.Equal(0xaa, File.ReadAllBytes(Path.Combine(f.Game, main.Name))[^1]);
         Assert.Equal(Fixture.Patch(), File.ReadAllBytes(f.Contents.GetFilePath(mod.Id, mod.PatchSets[0].Files[0])));
@@ -135,6 +132,43 @@ public class DeploymentTests
         service = new(new DeploymentService(new FileDeploymentStorage(f.App, f.Contents), new FakeRepair(1)));
         await Assert.ThrowsAsync<InvalidDataException>(() => service.DeployAsync(state, profile.Id, f.Game, new(Repatch: true)));
         Assert.Equal(ledger.Signature, (await service.InspectAsync(f.Game)).Ledger.Signature);
+    }
+
+    [Fact]
+    public async Task RepatchExportPreservesAllVariantsAndMetadataWithoutChangingLibrary()
+    {
+        using var f = new Fixture();
+        var source = f.Source("Variants"); f.Source("Variants/alternate", 2);
+        File.WriteAllText(Path.Combine(source, "readme.txt"), "Original metadata");
+        var mod = await f.Library.ImportAsync(source);
+        var destination = Path.Combine(f.Root, "repatched.zip");
+        await f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair());
+        var exported = await f.Library.ImportAsync(destination);
+        Assert.Equal(2, exported.PatchSets.Count);
+        foreach (var patch in exported.PatchSets)
+        {
+            var main = patch.Files.Single(file => file.Kind == PatchFileKind.Main);
+            Assert.Equal(0xaa, File.ReadAllBytes(f.Contents.GetFilePath(exported.Id, main))[^1]);
+            Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(f.Contents.GetFilePath(exported.Id, patch.Files.Single(file => file.Kind == PatchFileKind.Stream))));
+        }
+        Assert.Equal("Original metadata", File.ReadAllText(Path.Combine(f.Contents.GetModDirectory(exported.Id), "readme.txt")));
+        Assert.Equal(Fixture.Patch(), File.ReadAllBytes(f.Contents.GetFilePath(mod.Id, mod.PatchSets.Single(p => p.Folder == "").Files.Single(file => file.Kind == PatchFileKind.Main))));
+        Assert.Single(Directory.EnumerateFiles(f.Game)); Assert.False(File.Exists(Path.Combine(f.App, "deployment.lock")));
+    }
+
+    [Fact]
+    public async Task FailedOrCancelledExportPreservesExistingDestinationAndRemovesTemporaryFiles()
+    {
+        using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("source"));
+        var destination = Path.Combine(f.Root, "existing.zip"); await File.WriteAllBytesAsync(destination, [9, 8, 7]);
+        await Assert.ThrowsAsync<InvalidDataException>(() => f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair(1)));
+        using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair(), cancellation.Token));
+        File.Delete(f.Contents.GetFilePath(mod.Id, mod.PatchSets[0].Files.Single(file => file.Kind == PatchFileKind.Stream)));
+        await Assert.ThrowsAsync<IOException>(() => f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair()));
+        Assert.Equal(new byte[] { 9, 8, 7 }, await File.ReadAllBytesAsync(destination));
+        Assert.Empty(Directory.EnumerateFiles(f.Root, "*.tmp"));
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Contents.ExportRepatchedAsync(mod, Path.Combine(f.Contents.GetModDirectory(mod.Id), "export.zip"), new FakeRepair()));
     }
 
     private sealed class FakeRepair(int removed = 0) : IPatchRepairer

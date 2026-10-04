@@ -41,6 +41,21 @@
   <Style Selector="ListBox.modList ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="#2B2723" /><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2,0,0,0" /></Style>
   <Style Selector="Button.profileButton"><Setter Property="Width" Value="48" /><Setter Property="Height" Value="48" /><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Background" Value="#202327" /><Setter Property="BorderBrush" Value="#454B52" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="14" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
   <Style Selector="Button.profileButton.active"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="Background" Value="#30261F" /></Style>
+  <Style Selector="Button.profileButton.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Button.profileButton.active:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Button.profileButton.deployed">
+    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" /><Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Button.profileButton.deployed:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" /><Setter Property="BorderThickness" Value="2" />
+  </Style>
+  <Style Selector="Button.profileButton.deployed:pressed /template/ ContentPresenter#PART_ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" /><Setter Property="BorderThickness" Value="2" />
+  </Style>
   <Style Selector="TextBox"><Setter Property="MinHeight" Value="32" /><Setter Property="CornerRadius" Value="2" /><Setter Property="Background" Value="#141619" /></Style>
   <Style Selector="ComboBox"><Setter Property="MinHeight" Value="32" /><Setter Property="CornerRadius" Value="2" /></Style>
   <Style Selector="Border.modTile"><Setter Property="Width" Value="44" /><Setter Property="Height" Value="44" /><Setter Property="BorderThickness" Value="2" /><Setter Property="BorderBrush" Value="#5C6269" /><Setter Property="CornerRadius" Value="7" /><Setter Property="Background" Value="#24272B" /></Style>

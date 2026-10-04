@@ -41,7 +41,7 @@ public class LibraryTests
         Assert.False(library.RootElement.TryGetProperty("profiles", out _));
         Assert.True(profiles.RootElement.TryGetProperty("profiles", out _));
         Assert.False(profiles.RootElement.TryGetProperty("mods", out _));
-        Assert.True(File.Exists(Path.Combine(f.App, "patches.json")));
+        Assert.False(File.Exists(Path.Combine(f.App, "patches.json")));
     }
 
     [Theory]

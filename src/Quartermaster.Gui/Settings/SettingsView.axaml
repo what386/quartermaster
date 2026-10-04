@@ -16,6 +16,12 @@
       <TextBlock Text="Choose which entries in this profile take precedence when mods overlap." Classes="muted" TextWrapping="Wrap" />
       <Button Content="{Binding PriorityLabel}" Command="{Binding PriorityCommand}" HorizontalAlignment="Left" />
     </StackPanel></Border>
+    <Border Classes="card"><StackPanel Spacing="12">
+      <TextBlock Text="Repatching" Classes="sectionTitle" />
+      <TextBlock Text="Check selected mods against the installed game before deployment. Repatched files are prepared temporarily; library originals remain unchanged." Classes="muted" TextWrapping="Wrap" />
+      <ComboBox ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" HorizontalAlignment="Stretch" />
+      <Button Content="Save repatch setting" Command="{Binding SaveRepatchCommand}" HorizontalAlignment="Left" />
+    </StackPanel></Border>
     <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Deployment health" Classes="sectionTitle" /><TextBlock Text="{Binding DeploymentStatus}" TextWrapping="Wrap" /><Button Content="Purge patches" Command="{Binding PurgeCommand}" HorizontalAlignment="Left" /></StackPanel></Border>
     <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Library storage" Classes="sectionTitle" /><TextBlock Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" /><TextBlock Text="Imported originals, profiles and deployment records are stored here." Classes="muted" TextWrapping="Wrap" /></StackPanel></Border>
   </StackPanel></ScrollViewer>

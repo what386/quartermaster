@@ -20,6 +20,8 @@ internal sealed class FakeDialogs : IDialogService
 {
     public string? ZipPath { get; set; }
     public string? FolderPath { get; set; }
+    public string? SavePath { get; set; }
+    public Task<string?> SaveModZipAsync(string suggestedName) => Task.FromResult(SavePath);
     public bool Confirm { get; set; } = true;
     public string? InputText { get; set; }
     public string? InitialInputText { get; private set; }
@@ -44,7 +46,7 @@ internal sealed class Fixture : IDisposable
     public int Launches { get; private set; }
     public Fixture(bool discoverGame = true)
     {
-        Directory.CreateDirectory(Game); File.WriteAllBytes(Path.Combine(Game, Archive), []);
+        Directory.CreateDirectory(Game); File.WriteAllBytes(Path.Combine(Game, Archive), Patch(1));
         Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++);
         Shell = new(Services);
     }
@@ -75,13 +77,31 @@ internal sealed class Fixture : IDisposable
             """);
         return folder;
     }
-    private static byte[] Patch(ulong resource)
+    public string UnitSource(string name, bool compatible = false, bool missing = false)
     {
-        var data = new byte[196];
+        const ulong unitType = 16187218042980615487;
+        byte[] Unit(int lodSize)
+        {
+            var unit = new byte[0x80 + lodSize + 16];
+            BinaryPrimitives.WriteUInt32LittleEndian(unit.AsSpan(0x2c), 0xA4CD36);
+            BinaryPrimitives.WriteUInt32LittleEndian(unit.AsSpan(0x30), 0x80);
+            BinaryPrimitives.WriteUInt32LittleEndian(unit.AsSpan(0x34), (uint)(0x80 + lodSize));
+            unit.AsSpan(0x80, lodSize).Fill(0xdd);
+            return unit;
+        }
+        File.WriteAllBytes(Path.Combine(Game, Archive), Patch(1, unitType, Unit(16)));
+        var folder = Source(name);
+        File.WriteAllBytes(Path.Combine(folder, Archive + ".patch_7"), Patch(missing ? 2UL : 1UL, unitType, Unit(compatible ? 16 : 8)));
+        return folder;
+    }
+    private static byte[] Patch(ulong resource) => Patch(resource, 0x1122334455667788, [(byte)resource, 0, 0, 0]);
+    private static byte[] Patch(ulong resource, ulong type, byte[] payload)
+    {
+        var data = new byte[192 + payload.Length];
         void U32(int at, uint value) => BinaryPrimitives.WriteUInt32LittleEndian(data.AsSpan(at), value);
         void U64(int at, ulong value) => BinaryPrimitives.WriteUInt64LittleEndian(data.AsSpan(at), value);
-        U32(0, 4026531857); U32(4, 1); U32(8, 1); U64(80, 0x1122334455667788); U64(88, 1);
-        U64(104, resource); U64(112, 0x1122334455667788); U64(120, 192); U32(160, 4); data[192] = (byte)resource;
+        U32(0, 4026531857); U32(4, 1); U32(8, 1); U64(80, type); U64(88, 1);
+        U64(104, resource); U64(112, type); U64(120, 192); U32(160, (uint)payload.Length); payload.CopyTo(data, 192);
         return data;
     }
     public void Dispose() { if (Directory.Exists(Root)) Directory.Delete(Root, true); }

@@ -27,7 +27,7 @@
               <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding Operations.CanInteract}">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
-                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
+                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
                     <Button.ContextMenu><ContextMenu>
                       <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
                       <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
@@ -49,21 +49,24 @@
         </Grid>
       </Border>
       <Border Grid.Column="1" Padding="12" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,Auto,*">
-          <Border IsVisible="{Binding Operations.IsBusy}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
-            <Grid ColumnDefinitions="*,Auto,Auto">
-              <TextBlock Text="{Binding Operations.Message}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-              <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="110" Height="3" VerticalAlignment="Center" Margin="12,0" />
-              <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
-            </Grid>
-          </Border>
-          <Border Grid.Row="1" IsVisible="{Binding Operations.IsError}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
+        <Grid RowDefinitions="Auto,*">
+          <Border IsVisible="{Binding Operations.IsError}" Background="{DynamicResource CardBackground}" Padding="12,8" Margin="0,0,0,8">
             <TextBlock x:Name="OperationMessage" Text="{Binding Operations.Message}" Classes="error" TextWrapping="Wrap" />
           </Border>
-          <ContentControl Grid.Row="2" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+          <ContentControl Grid.Row="1" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
         </Grid>
       </Border>
     </Grid>
     <shared:DialogHost x:Name="DialogOverlay" />
+    <Border x:Name="ProgressOverlay" IsVisible="{Binding Operations.IsProgressVisible}"
+            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24" MinWidth="360" MaxWidth="620"
+            Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}"
+            BorderThickness="1" CornerRadius="8" Padding="16,12">
+      <Grid ColumnDefinitions="*,Auto,Auto">
+        <TextBlock Text="{Binding Operations.Message}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+        <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="90" Height="3" VerticalAlignment="Center" Margin="16,0" />
+        <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
+      </Grid>
+    </Border>
   </Grid>
 </Window>

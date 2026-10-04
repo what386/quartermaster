@@ -39,8 +39,6 @@ public sealed class JsonLibraryStore : ILibraryStore
     public async Task SaveAsync(LibraryState state, CancellationToken cancellationToken = default)
     {
         StateValidation.Validate(state);
-        var patches = ManagedPaths.Resolve(Root, "patches.json");
-        if (!File.Exists(patches)) await JsonFiles.WriteAsync(patches, new RepairCatalog(1, []), cancellationToken).ConfigureAwait(false);
         var legacy = ManagedPaths.Resolve(Root, "state.json");
         ManagedPaths.CheckLink(legacy);
         await JsonFiles.WriteAsync(ManagedPaths.Resolve(Root, "profiles.json"),

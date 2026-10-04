@@ -22,7 +22,7 @@ public sealed class AppServices
             new global::System.Diagnostics.ProcessStartInfo("steam://rungameid/553850") { UseShellExecute = true }));
         var content = new ModContentStore(DataDirectory);
         Session = new(new LibraryService(new JsonLibraryStore(DataDirectory), content),
-            new FileDeploymentStorage(DataDirectory, content), new SettingsStore(DataDirectory),
+            new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));
     }
     public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")

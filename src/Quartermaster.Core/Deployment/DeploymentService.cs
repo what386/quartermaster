@@ -97,7 +97,6 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                         staged.Size, staged.Sha256, source.Sha256));
                 }
             }
-            if (options.Repatch) await workspace.StoreRepairsAsync(files, ct).ConfigureAwait(false);
             var ledger = new DeploymentLedger(1, workspace.TargetDirectory, plan.SelectionId == Guid.Empty ? null : plan.SelectionId,
                 plan.Signature == "" ? null : plan.Signature, DateTimeOffset.UtcNow, files.ToArray())
             { SelectionName = plan.SelectionName };

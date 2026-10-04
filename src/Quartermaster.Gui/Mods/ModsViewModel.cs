@@ -49,7 +49,7 @@ public sealed class ModsViewModel : SessionViewModel
     public ModListItem? SelectedMod
     {
         get => selected;
-        set { if (Set(ref selected, value)) { Notify(nameof(Details)); Notify(nameof(HasSelection)); RemoveCommand.Refresh(); } }
+        set { if (Set(ref selected, value)) { Notify(nameof(Details)); Notify(nameof(HasSelection)); RemoveCommand.Refresh(); ExportRepatchedCommand.Refresh(); } }
     }
     public ModDetailsViewModel? Details => SelectedMod is { } item ? new(item.Mod) : null;
     public bool HasMods => Session.State.Mods.Count > 0;
@@ -58,6 +58,7 @@ public sealed class ModsViewModel : SessionViewModel
     public AsyncCommand ImportZipCommand { get; }
     public AsyncCommand ImportFolderCommand { get; }
     public AsyncCommand RemoveCommand { get; }
+    public AsyncCommand ExportRepatchedCommand { get; }
     public ModsViewModel(AppServices services) : base(services)
     {
         ImportZipCommand = Operations.CreateCommand("Importing mod", async ct =>
@@ -70,6 +71,13 @@ public sealed class ModsViewModel : SessionViewModel
             var path = await Services.Dialogs.PickFolderAsync("Import mod folder");
             if (path is not null) await Session.ImportAsync(path, ct);
         });
+        ExportRepatchedCommand = Operations.CreateCommand("Exporting repatched mod", async ct =>
+        {
+            var mod = SelectedMod!.Mod;
+            var name = string.Concat(mod.Name.Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == '/' || c == '\\' ? '_' : c));
+            var path = await Services.Dialogs.SaveModZipAsync(name + "-repatched.zip");
+            if (path is not null) await Session.ExportRepatchedAsync(mod, path, ct);
+        }, () => SelectedMod is not null && Session.GameDirectory != "");
         RemoveCommand = Operations.CreateCommand("Removing mod", async ct =>
         {
             var mod = SelectedMod!.Mod;
@@ -87,5 +95,6 @@ public sealed class ModsViewModel : SessionViewModel
             .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id))).ToArray();
         Notify(nameof(Mods)); Notify(nameof(CountLabel)); Notify(nameof(HasMods));
         SelectedMod = Mods.FirstOrDefault(m => m.Mod.Id == id) ?? Mods.FirstOrDefault();
+        ExportRepatchedCommand.Refresh();
     }
 }

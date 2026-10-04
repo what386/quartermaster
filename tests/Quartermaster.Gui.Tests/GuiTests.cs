@@ -74,6 +74,174 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task ProgressFloatsAtBottomCenterWithoutMovingPageAndCanCancel()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        var started = new TaskCompletionSource();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var host = window.FindControl<ContentControl>("PageHost")!;
+            var originalBounds = host.Bounds;
+            var operation = f.Services.Operations.RunAsync("Repatching mods", async ct =>
+            {
+                started.SetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+            });
+            await started.Task;
+            window.CaptureRenderedFrame()?.Dispose();
+            var overlay = window.FindControl<Border>("ProgressOverlay")!;
+            Assert.True(overlay.IsVisible); Assert.Equal(originalBounds, host.Bounds);
+            var origin = overlay.TranslatePoint(new Point(0, 0), window)!.Value;
+            Assert.Equal(window.Bounds.Width / 2, origin.X + overlay.Bounds.Width / 2, 1);
+            Assert.True(origin.Y > window.Bounds.Height / 2);
+            Assert.Equal(24, window.Bounds.Height - origin.Y - overlay.Bounds.Height, 1);
+            var cancel = Assert.Single(overlay.GetVisualDescendants().OfType<Button>());
+            Assert.Same(f.Services.Operations.CancelCommand, cancel.Command); cancel.Command!.Execute(null);
+            await operation; window.CaptureRenderedFrame()?.Dispose();
+            Assert.False(overlay.IsVisible); Assert.Equal(originalBounds, host.Bounds);
+        }
+        finally { f.Services.Operations.CancelCommand.Execute(null); await f.Services.Operations.WhenIdle; window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task DoubleClickingProfileUsesDeploymentConfirmationAndWaitsForSelection()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Source("Cape"), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
+        var target = Assert.Single(f.Shell.SidebarProfiles);
+        f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var button = Assert.Single(window.GetVisualDescendants().OfType<Button>(), b => ReferenceEquals(b.DataContext, target));
+            f.Dialogs.Confirmations.Clear(); f.Dialogs.Confirm = false;
+            await target.SelectCommand.ExecuteAsync(); window.CaptureRenderedFrame()?.Dispose();
+            var point = button.TranslatePoint(new Point(24, 24), window)!.Value;
+            window.MouseMove(point);
+            window.MouseDown(point, Avalonia.Input.MouseButton.Left); window.MouseUp(point, Avalonia.Input.MouseButton.Left);
+            window.MouseDown(point, Avalonia.Input.MouseButton.Left); window.MouseUp(point, Avalonia.Input.MouseButton.Left);
+            await f.Services.Operations.WhenIdle; Dispatcher.UIThread.RunJobs();
+            Assert.Equal(target.Profile.Id, f.Services.Session.ActiveProfile!.Id);
+            Assert.Contains(f.Dialogs.Confirmations, c => c.Title == "Deploy profile" && c.Message.Contains(target.Name));
+            Assert.False(File.Exists(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+            f.Dialogs.Confirm = true; f.Dialogs.Confirmations.Clear();
+            await f.Shell.SidebarProfiles.Single(p => p.Name == "Other").SelectCommand.ExecuteAsync();
+            var selection = target.SelectCommand.ExecuteAsync();
+            var deploy = f.Shell.DeployProfileAsync(target.Profile.Id);
+            await selection; await deploy;
+            Assert.Single(f.Dialogs.Confirmations, c => c.Title == "Deploy profile");
+            Assert.True(target.IsDeployed); Assert.False(f.Services.Operations.IsError);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task DeployedProfileHasGreenBorderUntilLoadoutChangesOrDeploymentIsDamaged()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Source("Cape"), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
+        var deployed = Assert.Single(f.Shell.SidebarProfiles);
+        Assert.False(deployed.IsDeployed);
+        await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        Assert.True(deployed.IsDeployed); Assert.Contains("Deployed", deployed.Summary);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var button = Assert.Single(window.GetVisualDescendants().OfType<Button>(), b => ReferenceEquals(b.DataContext, deployed));
+            Assert.Equal(Avalonia.Media.Color.Parse("#4AB98A"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(button.BorderBrush).Color);
+            window.MouseMove(button.TranslatePoint(new Point(24, 24), window)!.Value);
+            window.CaptureRenderedFrame()?.Dispose();
+            var presenter = Assert.Single(button.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>(), c => c.Name == "PART_ContentPresenter");
+            Assert.Equal(Avalonia.Media.Color.Parse("#4AB98A"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(presenter.BorderBrush).Color);
+            f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+            Assert.True(deployed.IsDeployed); Assert.False(deployed.IsActive);
+            Assert.False(f.Shell.SidebarProfiles.Single(p => p.Name == "Other").IsDeployed);
+            await deployed.SelectCommand.ExecuteAsync();
+            await profiles.ToggleCommand.ExecuteAsync(); Assert.False(deployed.IsDeployed);
+            await profiles.ToggleCommand.ExecuteAsync(); Assert.True(deployed.IsDeployed);
+            File.WriteAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0"), [0]);
+            await f.Services.Session.ReloadAsync(CancellationToken.None); Assert.False(deployed.IsDeployed);
+            await profiles.PurgeCommand.ExecuteAsync(); Assert.False(deployed.IsDeployed);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task SelectedProfileKeepsOrangeBorderOverHoverBackground()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var button = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
+                b => b.DataContext is SidebarProfile { IsActive: true });
+            var presenter = Assert.Single(button.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>(),
+                control => control.Name == "PART_ContentPresenter");
+            var idleBackground = presenter.Background;
+            window.MouseMove(button.TranslatePoint(new Point(24, 24), window)!.Value);
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.True(button.IsPointerOver);
+            Assert.Equal(Avalonia.Media.Color.Parse("#F27A22"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(presenter.BorderBrush).Color);
+            Assert.Equal(new Thickness(2), presenter.BorderThickness);
+            Assert.NotEqual(idleBackground, presenter.Background);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task SwitchingProfilesPreservesSidebarControlsAndPageLayout()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        f.Dialogs.InputText = "Alternate"; await f.Shell.AddProfileCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var originalButtons = window.GetVisualDescendants().OfType<Button>()
+                .Where(button => button.DataContext is SidebarProfile).ToArray();
+            var originalItems = f.Shell.SidebarProfiles.ToArray();
+            var page = Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>());
+            var host = window.FindControl<ContentControl>("PageHost")!;
+            var initialBounds = host.Bounds;
+            var observedSelection = false;
+            f.Services.Operations.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName != nameof(OperationState.IsBusy) || !f.Services.Operations.IsBusy) return;
+                observedSelection = true;
+                Assert.False(f.Services.Operations.IsProgressVisible);
+                window.CaptureRenderedFrame()?.Dispose();
+                Assert.Equal(initialBounds, host.Bounds);
+            };
+            await originalItems.Single(item => item.Name == "Default").SelectCommand.ExecuteAsync();
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.True(observedSelection);
+            Assert.Same(page, Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>()));
+            Assert.Equal(initialBounds, host.Bounds);
+            foreach (var button in originalButtons)
+            {
+                Assert.Contains(button, window.GetVisualDescendants().OfType<Button>());
+                Assert.Contains(Assert.IsType<SidebarProfile>(button.DataContext), f.Shell.SidebarProfiles);
+            }
+            var notifications = 0;
+            f.Shell.CurrentPage.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ProfilesViewModel.Entries)) notifications++; };
+            await originalItems.Single(item => item.Name == "Alternate").SelectCommand.ExecuteAsync();
+            Assert.Equal(1, notifications);
+            Assert.Same(originalItems[0], f.Shell.SidebarProfiles[0]);
+            Assert.Same(originalItems[1], f.Shell.SidebarProfiles[1]);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task SidebarSelectsPersistsAndOpensProfilesIncludingActiveProfile()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -282,7 +450,7 @@ public class GuiTests
         await profiles.ToggleCommand.ExecuteAsync(); Assert.Empty(profiles.Conflicts);
         await profiles.ToggleCommand.ExecuteAsync(); Assert.Single(profiles.Conflicts);
         await profiles.MakeActiveCommand.ExecuteAsync();
-        profiles.Repair = false;
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
         var foreign = Path.Combine(f.Game, Fixture.Archive + ".patch_8.stream");
         f.Dialogs.Confirm = false; await profiles.DeployCommand.ExecuteAsync();
         Assert.Null(f.Services.Session.Inspection!.Ledger.SelectionId);
@@ -333,6 +501,76 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task GlobalRepatchPolicyPromptsOnlyForChangedPatchesAndPersists()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var originalSource = f.UnitSource("Outdated armor");
+        await f.Services.Session.ImportAsync(originalSource, CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        var mod = Assert.Single(f.Services.Session.State.Mods);
+        var original = File.ReadAllBytes(Path.Combine(originalSource, Fixture.Archive + ".patch_7"));
+        Assert.Equal(RepatchMode.Ask, f.Services.Session.Settings.Repatch);
+        f.Dialogs.Confirm = false;
+        await f.Services.Session.DeployAsync(profiles.SelectedProfile!.Id, f.Dialogs, CancellationToken.None);
+        Assert.Contains(f.Dialogs.Confirmations, c => c.Title == "Repatch required" && c.Message.Contains(mod.Name));
+        Assert.False(File.Exists(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+        f.Dialogs.Confirm = true;
+        await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        Assert.NotEqual(original, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+        Assert.Equal(original, File.ReadAllBytes(Path.Combine(f.Data, "library", mod.Id.ToString("N"), Fixture.Archive + ".patch_7")));
+        Assert.False(Directory.Exists(Path.Combine(f.Data, "patched")));
+        Assert.False(File.Exists(Path.Combine(f.Data, "patches.json")));
+        var settings = Page<SettingsViewModel>(f, PageKind.Settings);
+        settings.RepatchChoice = (int)RepatchMode.Automatic; await settings.SaveRepatchCommand.ExecuteAsync();
+        f.Dialogs.Confirmations.Clear(); await profiles.DeployCommand.ExecuteAsync();
+        Assert.DoesNotContain(f.Dialogs.Confirmations, c => c.Title == "Repatch required");
+        Assert.False(f.Services.Operations.IsError);
+        var saved = await new SettingsStore(f.Data).LoadAsync(CancellationToken.None);
+        Assert.Equal(RepatchMode.Automatic, saved.Repatch);
+        settings.RepatchChoice = (int)RepatchMode.Never; await settings.SaveRepatchCommand.ExecuteAsync();
+        await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        Assert.Equal(original, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+    }
+
+    [AvaloniaFact]
+    public async Task CompatibleModsDoNotPromptAndMissingUnitsBlockAutomaticDeployment()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.UnitSource("Current armor", compatible: true), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        Assert.DoesNotContain(f.Dialogs.Confirmations, c => c.Title == "Repatch required");
+        var previous = File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0"));
+        await f.Services.Session.ImportAsync(f.UnitSource("Missing armor", missing: true), CancellationToken.None);
+        await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Automatic, CancellationToken.None);
+        await profiles.DeployCommand.ExecuteAsync();
+        Assert.True(f.Services.Operations.IsError); Assert.Contains("missing units", f.Services.Operations.Message);
+        Assert.Equal(previous, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+    }
+
+    [AvaloniaFact]
+    public async Task LibraryExportsRepatchedZipWithoutDeploymentAndHandlesSaveCancellation()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var source = f.UnitSource("Export armor");
+        File.WriteAllText(Path.Combine(source, "readme.txt"), "Keep the metadata");
+        await f.Services.Session.ImportAsync(source, CancellationToken.None);
+        var mods = Page<ModsViewModel>(f, PageKind.Mods);
+        await mods.ExportRepatchedCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        f.Dialogs.SavePath = Path.Combine(f.Root, "export.zip");
+        await mods.ExportRepatchedCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        using var zip = System.IO.Compression.ZipFile.OpenRead(f.Dialogs.SavePath);
+        using var stream = zip.GetEntry(Fixture.Archive + ".patch_7")!.Open();
+        using var bytes = new MemoryStream(); await stream.CopyToAsync(bytes);
+        Assert.NotEqual(File.ReadAllBytes(Path.Combine(source, Fixture.Archive + ".patch_7")), bytes.ToArray());
+        Assert.NotNull(zip.GetEntry("readme.txt")); Assert.NotNull(zip.GetEntry(Fixture.Archive + ".patch_7.stream"));
+        Assert.False(File.Exists(Path.Combine(f.Data, "deployment.lock")));
+        Assert.Single(Directory.EnumerateFiles(f.Game));
+        Assert.False(Directory.Exists(Path.Combine(f.Data, "patched")));
+    }
+
+    [AvaloniaFact]
     public async Task InvalidSettingsAreReportedAndValidSettingsPersist()
     {
         using var f = new Fixture(discoverGame: false); await f.Shell.InitializeAsync();
@@ -359,7 +597,7 @@ public class GuiTests
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         f.Dialogs.ZipPath = f.Zip("Cape"); await Page<ModsViewModel>(f, PageKind.Mods).ImportZipCommand.ExecuteAsync();
-        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync(); profiles.Repair = false;
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync(); await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
         await profiles.DeployCommand.ExecuteAsync();
         var owned = Path.Combine(f.Game, f.Services.Session.Inspection!.Ledger.Files[0].Name); File.WriteAllBytes(owned, [0xff]);
         await profiles.DeployCommand.ExecuteAsync();
@@ -377,7 +615,7 @@ public class GuiTests
         f.Dialogs.ZipPath = f.Zip("Cape");
         await Page<ModsViewModel>(f, PageKind.Mods).ImportZipCommand.ExecuteAsync();
         var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
-        await profiles.AddCommand.ExecuteAsync(); profiles.Repair = false;
+        await profiles.AddCommand.ExecuteAsync(); await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
         await profiles.DeployCommand.ExecuteAsync();
         f.Dialogs.Confirmations.Clear();
         await profiles.RunCommand.ExecuteAsync();

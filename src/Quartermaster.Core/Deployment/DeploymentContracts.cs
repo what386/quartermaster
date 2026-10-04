@@ -31,7 +31,6 @@ public interface IDeploymentWorkspace : IAsyncDisposable
     Task StageAsync(Guid sourceId, PatchFile file, string name, CancellationToken ct);
     Task<byte[]> ReadStagedAsync(string name, CancellationToken ct);
     Task WriteStagedAsync(string name, byte[] data, CancellationToken ct);
-    Task StoreRepairsAsync(IReadOnlyList<OwnedFile> files, CancellationToken ct);
     Task VerifyAsync(DeploymentArea area, OwnedFile file, CancellationToken ct);
     void DeleteTarget(string name);
     Task PublishAsync(string name, Guid operationId, CancellationToken ct);

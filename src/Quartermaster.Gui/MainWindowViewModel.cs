@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Quartermaster.Core.Deployment;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Mods;
@@ -38,7 +39,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public string SelectionSummary => $"{DisplayProfile?.Entries.Count(e => e.Enabled) ?? 0} selected for deployment";
     public string CollisionCount => DisplayProfile is { } profile
         ? ConflictAnalyzer.Analyze(ProfilePatches.Resolve(services.Session.State, profile)).Resources.Count.ToString() : "0";
-    public IReadOnlyList<SidebarProfile> SidebarProfiles { get; private set; } = [];
+    public ObservableCollection<SidebarProfile> SidebarProfiles { get; } = [];
     public AsyncCommand AddProfileCommand { get; }
     private readonly AppServices services;
     public MainWindowViewModel(AppServices services)
@@ -79,21 +80,62 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
     private void RefreshProfiles()
     {
-        SidebarProfiles = services.Session.State.Profiles.Select(profile => new SidebarProfile(profile,
-            profile.Id == services.Session.State.ActiveProfileId && SelectedNavigation.Page == PageKind.Profiles,
-            new AsyncCommand(async () =>
+        var profiles = services.Session.State.Profiles;
+        var ids = profiles.Select(profile => profile.Id).ToHashSet();
+        for (var index = SidebarProfiles.Count - 1; index >= 0; index--)
+            if (!ids.Contains(SidebarProfiles[index].Profile.Id)) SidebarProfiles.RemoveAt(index);
+        for (var index = 0; index < profiles.Count; index++)
+        {
+            var profile = profiles[index];
+            var active = profile.Id == services.Session.State.ActiveProfileId && SelectedNavigation.Page == PageKind.Profiles;
+            var deployed = services.Session.DeploymentProblem == "" && services.Session.Inspection is { NeedsPurge: false } inspection &&
+                inspection.Ledger.SelectionId == profile.Id &&
+                inspection.Ledger.Signature == DeploymentPlanner.Create(ProfilePatches.Resolve(services.Session.State, profile)).Signature;
+            var existing = SidebarProfiles.FirstOrDefault(item => item.Profile.Id == profile.Id);
+            if (existing is not null)
             {
-                if (profile.Id != services.Session.State.ActiveProfileId)
+                existing.Update(profile, active, deployed);
+                var oldIndex = SidebarProfiles.IndexOf(existing);
+                if (oldIndex != index) SidebarProfiles.Move(oldIndex, index);
+                continue;
+            }
+            SidebarProfiles.Insert(index, new SidebarProfile(profile, active,
+                new AsyncCommand(async () =>
                 {
-                    await Operations.RunAsync("Selecting profile", ct => services.Session.SaveProfileAsync(
-                        services.Session.State.Profiles.Single(p => p.Id == profile.Id), true, ct));
-                    if (Operations.IsError) return;
-                }
-                Navigate(PageKind.Profiles);
-            }, () => Operations.CanInteract, Operations.ReportError),
-            new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
-            new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))).ToArray();
-        Notify(nameof(SidebarProfiles));
+                    if (profile.Id != services.Session.State.ActiveProfileId)
+                    {
+                        await Operations.RunAsync("Selecting profile", ct => services.Session.SaveProfileAsync(
+                            services.Session.State.Profiles.Single(p => p.Id == profile.Id), true, ct), showProgress: false);
+                        if (Operations.IsError) return;
+                    }
+                    Navigate(PageKind.Profiles);
+                }, () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError)) { IsDeployed = deployed });
+        }
+    }
+    private bool deployingProfile;
+    public async Task DeployProfileAsync(Guid id)
+    {
+        if (deployingProfile) return;
+        deployingProfile = true;
+        try
+        {
+            // A double-click can arrive while its first click is still saving the selection.
+            if (Operations.IsBusy)
+            {
+                if (Operations.Message != "Selecting profile") return;
+                await Operations.WhenIdle;
+                if (Operations.IsError) return;
+            }
+            var profile = SidebarProfiles.FirstOrDefault(item => item.Profile.Id == id);
+            if (profile is null) return;
+            await profile.SelectCommand.ExecuteAsync();
+            if (Operations.IsError || services.Session.State.ActiveProfileId != id) return;
+            Navigate(PageKind.Profiles);
+            await ((ProfilesViewModel)pages[PageKind.Profiles]).DeployCommand.ExecuteAsync();
+        }
+        finally { deployingProfile = false; }
     }
     private void NotifyStatus()
     {

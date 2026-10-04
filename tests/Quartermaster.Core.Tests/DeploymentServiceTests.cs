@@ -96,7 +96,6 @@ public class DeploymentServiceTests
         { Staged.Add(name, Content[(modId, file.RelativePath)].ToArray()); return Task.CompletedTask; }
         public Task<byte[]> ReadStagedAsync(string name, CancellationToken ct) => Task.FromResult(Staged[name].ToArray());
         public Task WriteStagedAsync(string name, byte[] data, CancellationToken ct) { Staged[name] = data.ToArray(); return Task.CompletedTask; }
-        public Task StoreRepairsAsync(IReadOnlyList<OwnedFile> files, CancellationToken ct) => Task.CompletedTask;
         public Task VerifyAsync(DeploymentArea area, OwnedFile file, CancellationToken ct)
         {
             if (!Area(area).TryGetValue(file.Name, out var bytes) || bytes.Length != file.Size || Hash(bytes) != file.Sha256) throw new IOException("Changed file.");

@@ -1,10 +1,18 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 
 namespace Quartermaster.Gui;
 
 public partial class MainWindow : Window
 {
     public Task<T> ShowDialogAsync<T>(Control dialog) => DialogOverlay.ShowAsync<T>(dialog);
+    private async void DeployProfile(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Button { DataContext: SidebarProfile profile } || DataContext is not MainWindowViewModel model) return;
+        e.Handled = true;
+        try { await model.DeployProfileAsync(profile.Profile.Id); }
+        catch (Exception ex) { model.Operations.ReportError(ex); }
+    }
     private bool waitingForOperation;
     public MainWindow()
     {
