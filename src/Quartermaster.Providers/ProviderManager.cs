@@ -25,8 +25,11 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
         try
         {
             State = await store.LoadAsync(ct);
-            State = State with { Jobs = State.Jobs.Select(job => job.Status is DownloadStatus.Downloading or DownloadStatus.Importing
-                ? job with { Status = DownloadStatus.Waiting, Error = null } : job).ToArray() };
+            State = State with
+            {
+                Jobs = State.Jobs.Select(job => job.Status is DownloadStatus.Downloading or DownloadStatus.Importing
+                ? job with { Status = DownloadStatus.Waiting, Error = null } : job).ToArray()
+            };
             await store.SaveAsync(State, ct);
             foreach (var job in State.Jobs.Where(j => j.Status == DownloadStatus.Waiting)) Start(job);
         }
@@ -141,14 +144,14 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
     {
         var state = await library.LoadAsync(ct);
         foreach (var mod in state.Mods.Where(m => modIds is null || modIds.Contains(m.Id)))
-        foreach (var source in mod.Sources.Where(s => providers.ContainsKey(s.Provider)))
-        {
-            ProviderUpdate? update = null; string? error = null;
-            try { update = await GetProvider(source.Provider).CheckUpdateAsync(source, ct); }
-            catch (Exception ex) when (ex is not OperationCanceledException) { error = ex.Message; }
-            await library.RecordUpdateCheckAsync(new(mod.Id, source.Provider, DateTimeOffset.UtcNow,
-                update?.File?.Version, update?.File?.FileId, error ?? update?.Reason), ct);
-        }
+            foreach (var source in mod.Sources.Where(s => providers.ContainsKey(s.Provider)))
+            {
+                ProviderUpdate? update = null; string? error = null;
+                try { update = await GetProvider(source.Provider).CheckUpdateAsync(source, ct); }
+                catch (Exception ex) when (ex is not OperationCanceledException) { error = ex.Message; }
+                await library.RecordUpdateCheckAsync(new(mod.Id, source.Provider, DateTimeOffset.UtcNow,
+                    update?.File?.Version, update?.File?.FileId, error ?? update?.Reason), ct);
+            }
     }
     public async Task<DownloadJob> QueueUpdateAsync(Guid modId, CancellationToken ct = default)
     {
@@ -255,8 +258,11 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
         await Task.WhenAll(pending.Select(w => w.Task)).ConfigureAwait(false);
         foreach (var worker in pending) worker.Cancellation.Dispose();
         // Desktop exit waits synchronously on the UI thread; keep the final storage write off that context.
-        await Task.Run(() => MutateAsync(state => state with { Jobs = state.Jobs.Where(job =>
-            job.Status is not (DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing)).ToArray() }, CancellationToken.None)).ConfigureAwait(false);
+        await Task.Run(() => MutateAsync(state => state with
+        {
+            Jobs = state.Jobs.Where(job =>
+            job.Status is not (DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing)).ToArray()
+        }, CancellationToken.None)).ConfigureAwait(false);
         lifetime.Dispose();
     }
 }

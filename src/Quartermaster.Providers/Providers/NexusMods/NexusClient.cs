@@ -51,8 +51,12 @@ public sealed class NexusClient : IDisposable
         const string document = "query($filter: ModsFilter!, $offset: Int!) { mods(filter: $filter, offset: $offset, count: 20) { nodes { modId name summary version thumbnailUrl pictureUrl } } }";
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.nexusmods.com/v2/graphql")
         {
-            Content = JsonContent.Create(new { query = document, variables = new
-            { filter = new { gameDomainName = new[] { new { value = NexusLink.Game, op = "EQUALS" } }, nameStemmed = new[] { new { value = query.Trim(), op = "MATCHES" } } }, offset } })
+            Content = JsonContent.Create(new
+            {
+                query = document,
+                variables = new
+                { filter = new { gameDomainName = new[] { new { value = NexusLink.Game, op = "EQUALS" } }, nameStemmed = new[] { new { value = query.Trim(), op = "MATCHES" } } }, offset }
+            })
         };
         using var response = await SendAsync(request, ct);
         using var result = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);

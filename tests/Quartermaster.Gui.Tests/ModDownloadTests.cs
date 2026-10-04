@@ -82,7 +82,10 @@ public sealed class ModDownloadTests
         byte[] initial = []; byte[] updated = []; var latest = 1;
         object ReleaseData() => new
         {
-            tag_name = "v" + latest, body = "Reticle mod", draft = false, prerelease = false,
+            tag_name = "v" + latest,
+            body = "Reticle mod",
+            draft = false,
+            prerelease = false,
             published_at = latest == 1 ? "2026-08-01T00:00:00Z" : "2026-09-01T00:00:00Z",
             assets = new[] { new { id = latest * 10, name = "mod.zip", size = latest == 1 ? initial.Length : updated.Length,
                 browser_download_url = $"https://github.com/owner/mod/releases/download/v{latest}/mod.zip" } }
@@ -338,8 +341,13 @@ public sealed class ModDownloadTests
         var first = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "First", "first.zip", "1",
             new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
         var a = await f.Services.Providers.QueueAsync(first);
-        var b = await f.Services.Providers.QueueAsync(first with { FileId = "457", Name = "Second", FileName = "second.zip",
-            DownloadPage = new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=457") });
+        var b = await f.Services.Providers.QueueAsync(first with
+        {
+            FileId = "457",
+            Name = "Second",
+            FileName = "second.zip",
+            DownloadPage = new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=457")
+        });
         Dispatcher.UIThread.RunJobs();
         var window = new MainWindow { DataContext = f.Shell }; window.Show();
         try

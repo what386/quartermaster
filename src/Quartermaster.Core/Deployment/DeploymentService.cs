@@ -81,26 +81,27 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                 ct.ThrowIfCancellationRequested();
                 progress?.Report(new(DeploymentPhase.Preparing, ++current, mods.Length, mod.Key));
                 foreach (var patch in mod)
-                foreach (var source in patch.Files)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var name = PatchFiles.Name(patch.Archive, patch.Slot, source.Kind);
-                    await workspace.StageAsync(patch.SourceId, source, name, ct).ConfigureAwait(false);
-                    var staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
-                    if (!Matches(staged, source.Size, source.Sha256)) throw new IOException("Source file changed while staging.");
-                    if (options.Repatch && source.Kind == PatchFileKind.Main)
+                    foreach (var source in patch.Files)
                     {
-                        var bytes = await workspace.ReadStagedAsync(name, ct).ConfigureAwait(false);
-                        var result = await Task.Run(() => repairer!.Repair(bytes, ct), ct).ConfigureAwait(false);
-                        if (result.RemovedUnits > 0 && !options.AllowRemovedUnits)
-                            throw new InvalidDataException("Repair would remove missing units. Explicitly allow this or use an updated mod.");
-                        await workspace.WriteStagedAsync(name, result.Data, ct).ConfigureAwait(false);
-                        staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
+                        ct.ThrowIfCancellationRequested();
+                        var name = PatchFiles.Name(patch.Archive, patch.Slot, source.Kind);
+                        await workspace.StageAsync(patch.SourceId, source, name, ct).ConfigureAwait(false);
+                        var staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
+                        if (!Matches(staged, source.Size, source.Sha256)) throw new IOException("Source file changed while staging.");
+                        if (options.Repatch && source.Kind == PatchFileKind.Main)
+                        {
+                            var bytes = await workspace.ReadStagedAsync(name, ct).ConfigureAwait(false);
+                            var result = await Task.Run(() => repairer!.Repair(bytes, ct), ct).ConfigureAwait(false);
+                            if (result.RemovedUnits > 0 && !options.AllowRemovedUnits)
+                                throw new InvalidDataException("Repair would remove missing units. Explicitly allow this or use an updated mod.");
+                            await workspace.WriteStagedAsync(name, result.Data, ct).ConfigureAwait(false);
+                            staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
+                        }
+                        if (staged is null) throw new IOException("Staged file disappeared.");
+                        files.Add(new(name, patch.Archive, patch.Slot, patch.SourceId, patch.PatchSetId, source.Kind,
+                            staged.Size, staged.Sha256, source.Sha256)
+                        { SelectionHash = patch.SelectionHash });
                     }
-                    if (staged is null) throw new IOException("Staged file disappeared.");
-                    files.Add(new(name, patch.Archive, patch.Slot, patch.SourceId, patch.PatchSetId, source.Kind,
-                        staged.Size, staged.Sha256, source.Sha256) { SelectionHash = patch.SelectionHash });
-                }
             }
             var ledger = new DeploymentLedger(1, workspace.TargetDirectory, plan.SelectionId == Guid.Empty ? null : plan.SelectionId,
                 plan.Signature == "" ? null : plan.Signature, DateTimeOffset.UtcNow, files.ToArray())

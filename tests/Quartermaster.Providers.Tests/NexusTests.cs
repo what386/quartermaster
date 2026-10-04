@@ -104,9 +104,18 @@ public sealed class NexusTests
     [InlineData("file:///tmp/image.png", "https://images.nexusmods.com/full.jpg", "https://images.nexusmods.com/full.jpg")]
     public async Task SearchHandlesMissingOrInvalidThumbnails(string? thumbnail, string? picture, string? expected)
     {
-        using var api = Http(_ => Json(new { data = new { mods = new { nodes = new[] {
+        using var api = Http(_ => Json(new
+        {
+            data = new
+            {
+                mods = new
+                {
+                    nodes = new[] {
             new { modId = 123, name = "Example", summary = "Description", version = "1", thumbnailUrl = thumbnail, pictureUrl = picture }
-        } } } }));
+        }
+                }
+            }
+        }));
         using var client = Client(api);
         Assert.Equal(expected, Assert.Single(await client.SearchAsync("example")).Thumbnail?.AbsoluteUri);
     }

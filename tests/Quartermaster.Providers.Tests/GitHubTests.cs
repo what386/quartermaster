@@ -58,8 +58,11 @@ public sealed class GitHubTests
     private static HttpResponseMessage Json(object body) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json") };
     private static object Asset(long id = 20, string name = "mod.zip", string tag = "v2", byte[]? bytes = null) => new
     {
-        id, name, browser_download_url = $"https://github.com/owner/mod/releases/download/{tag}/{name}",
-        size = bytes?.Length ?? 3, digest = bytes is null ? null : "sha256:" + Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
+        id,
+        name,
+        browser_download_url = $"https://github.com/owner/mod/releases/download/{tag}/{name}",
+        size = bytes?.Length ?? 3,
+        digest = bytes is null ? null : "sha256:" + Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(),
         created_at = id == 10 ? "2026-08-01T00:00:00Z" : "2026-09-01T00:00:00Z"
     };
     private static object Release(params object[] assets) => new

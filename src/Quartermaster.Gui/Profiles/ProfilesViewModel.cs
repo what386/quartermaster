@@ -160,7 +160,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         Entries = SelectedProfile?.Entries.Select((e, index) => new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !e.Enabled), ct)),
                 () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e))
-            { UpdateCommand = Services.Downloads.CreateUpdateCommand(mods[e.ModId]), UpdateDescription = Services.Downloads.UpdateDescription(mods[e.ModId]) }).ToArray() ?? [];
+        { UpdateCommand = Services.Downloads.CreateUpdateCommand(mods[e.ModId]), UpdateDescription = Services.Downloads.UpdateDescription(mods[e.ModId]) }).ToArray() ?? [];
         AvailableMods = Session.State.Mods.Where(m => Entries.All(e => e.Mod.Id != m.Id)).ToArray();
         Notify(nameof(Entries)); Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
         RebuildVisibleItems();

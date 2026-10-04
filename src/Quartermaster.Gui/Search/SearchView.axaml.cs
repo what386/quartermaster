@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 namespace Quartermaster.Gui.Search;
+
 public partial class SearchView : UserControl
 {
     public SearchView() => InitializeComponent();

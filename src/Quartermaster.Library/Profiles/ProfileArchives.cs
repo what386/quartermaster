@@ -154,7 +154,8 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                     var options = original.Options.Select((option, index) => (option.Id, NewId: mod.Options[index].Id)).ToDictionary(option => option.Id, option => option.NewId);
                     return entry with
                     {
-                        ModId = mod.Id, GroupId = entry.GroupId is { } groupId ? groups[groupId] : null,
+                        ModId = mod.Id,
+                        GroupId = entry.GroupId is { } groupId ? groups[groupId] : null,
                         Options = entry.Options.Select(option => option with { OptionId = options[option.OptionId] }).ToArray()
                     };
                 }).ToArray()

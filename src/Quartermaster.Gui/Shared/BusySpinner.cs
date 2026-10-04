@@ -17,8 +17,10 @@ public sealed class BusySpinner : UserControl
         Width = 24; Height = 24;
         var arc = new Avalonia.Controls.Shapes.Path
         {
-            Data = StreamGeometry.Parse("M 12,2 A 10,10 0 1 1 2,12"), StrokeThickness = 2.5,
-            Stretch = Stretch.Uniform, RenderTransform = rotation,
+            Data = StreamGeometry.Parse("M 12,2 A 10,10 0 1 1 2,12"),
+            StrokeThickness = 2.5,
+            Stretch = Stretch.Uniform,
+            RenderTransform = rotation,
             RenderTransformOrigin = RelativePoint.Center
         };
         arc.Bind(Avalonia.Controls.Shapes.Shape.StrokeProperty, new Binding(nameof(Foreground)) { Source = this });

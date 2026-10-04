@@ -34,16 +34,19 @@ internal static class ModIdentity
         var keys = mod.PatchSets.ToDictionary(set => set.Id, set => global::System.Text.Json.JsonSerializer.Serialize(new
         {
             Folder = string.Join('/', set.Folder.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(prefix)),
-            Archive = set.Archive.ToLowerInvariant(), set.OriginalSlot,
+            Archive = set.Archive.ToLowerInvariant(),
+            set.OriginalSlot,
             Files = set.Files.OrderBy(file => file.Kind).Select(file => new { file.Kind, file.Size, Hash = file.Sha256.ToUpperInvariant() })
         }));
         return global::System.Text.Json.JsonSerializer.Serialize(new
         {
-            mod.ManifestId, mod.Version,
+            mod.ManifestId,
+            mod.Version,
             Patches = keys.Values.Order(StringComparer.Ordinal),
             Options = mod.Options.Select(option => new
             {
-                option.Name, option.Description,
+                option.Name,
+                option.Description,
                 Patches = option.PatchSetIds.Select(id => keys[id]),
                 Choices = option.Choices.Select(choice => new { choice.Name, Patches = choice.PatchSetIds.Select(id => keys[id]) })
             })
