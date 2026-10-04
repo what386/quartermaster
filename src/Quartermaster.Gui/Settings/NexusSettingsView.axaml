@@ -1,0 +1,16 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.NexusSettingsView" x:DataType="vm:SettingsViewModel">
+  <Grid ColumnDefinitions="180,*">
+    <StackPanel Spacing="4"><TextBlock Text="Nexus Mods" FontWeight="SemiBold" /><TextBlock Text="{Binding NexusAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
+    <StackPanel Grid.Column="1" Spacing="8">
+      <TextBox Text="{Binding NexusApiKey}" PasswordChar="●" IsEnabled="{Binding !RemoveNexusKey}" PlaceholderText="Paste your personal API key, then Save" />
+      <CheckBox Content="Remove saved API key" IsChecked="{Binding RemoveNexusKey}" IsVisible="{Binding HasSavedNexusKey}" />
+      <TextBlock Text="Get your personal key from Nexus account settings → API. Your saved key is kept separately from profile exports." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+        <TextBox Text="{Binding DownloadFolder}" PlaceholderText="Browser download folder" />
+        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDownloadsCommand}" />
+      </Grid>
+      <Button Content="Register nxm links" Command="{Binding RegisterNxmCommand}" HorizontalAlignment="Left" />
+    </StackPanel>
+  </Grid>
+</UserControl>

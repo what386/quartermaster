@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <AvaloniaResource Include="Assets/**" />
+    <ProjectReference Include="../Quartermaster.Providers/Quartermaster.Providers.csproj" />
     <ProjectReference Include="../Quartermaster.Library/Quartermaster.Library.csproj" />
     <PackageReference Include="Avalonia" Version="12.1.0" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.0" />

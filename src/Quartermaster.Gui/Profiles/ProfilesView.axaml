@@ -17,7 +17,7 @@
     <DataTemplate DataType="{x:Type vm:ProfileGroupItem}"><vm:ProfileGroupView /></DataTemplate>
   </UserControl.DataTemplates>
   <Grid Background="Transparent" RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
-    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBlock x:Name="ProfileTitle" Text="{Binding SelectedProfile.Name}" Classes="pageTitle" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedProfile.Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
       <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search mods in this profile…" Margin="0,0,8,0" />
       <Button Grid.Column="2" Content="Add mod" IsEnabled="{Binding HasProfile}" Margin="0,0,8,0">
@@ -27,11 +27,14 @@
             <ComboBox.ItemTemplate><DataTemplate x:DataType="model:Mod"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
           </ComboBox>
           <Button Content="Add to profile" Command="{Binding AddCommand}" Classes="primary" />
+          <Separator />
+          <Button Content="Add from link or local files…" Command="{Binding ImportModCommand}" />
         </StackPanel></Flyout></Button.Flyout>
       </Button>
-      <Button Grid.Column="3" Content="Purge" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="4" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="5" Content="▶  Run" Command="{Binding RunCommand}" />
+      <Button Grid.Column="3" Content="Check updates" Command="{Binding CheckUpdatesCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="4" Content="Purge" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="5" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="6" Content="▶  Run" Command="{Binding RunCommand}" />
     </Grid>
     <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4">
       <Grid ColumnDefinitions="*,Auto,Auto"><TextBlock Text="LOADOUT" FontWeight="SemiBold" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="{Binding EntrySummary}" VerticalAlignment="Center" />

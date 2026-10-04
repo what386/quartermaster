@@ -1,13 +1,13 @@
 <Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:Quartermaster.Gui" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
         xmlns:mods="clr-namespace:Quartermaster.Gui.Mods" xmlns:profiles="clr-namespace:Quartermaster.Gui.Profiles"
-        xmlns:providers="clr-namespace:Quartermaster.Gui.Providers" xmlns:settings="clr-namespace:Quartermaster.Gui.Settings"
+        xmlns:search="clr-namespace:Quartermaster.Gui.Search" xmlns:settings="clr-namespace:Quartermaster.Gui.Settings"
         x:Class="Quartermaster.Gui.MainWindow" x:DataType="local:MainWindowViewModel"
         Title="Quartermaster" Width="1320" Height="850" MinWidth="1040" MinHeight="680">
   <Window.DataTemplates>
     <DataTemplate DataType="{x:Type mods:ModsViewModel}"><mods:ModsView /></DataTemplate>
     <DataTemplate DataType="{x:Type profiles:ProfilesViewModel}"><profiles:ProfilesView /></DataTemplate>
-    <DataTemplate DataType="{x:Type providers:ProvidersViewModel}"><providers:ProvidersView /></DataTemplate>
+    <DataTemplate DataType="{x:Type search:SearchViewModel}"><search:SearchView /></DataTemplate>
     <DataTemplate DataType="{x:Type settings:SettingsViewModel}"><settings:SettingsView /></DataTemplate>
   </Window.DataTemplates>
   <Grid>

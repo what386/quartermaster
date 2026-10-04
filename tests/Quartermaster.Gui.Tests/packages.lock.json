@@ -393,13 +393,20 @@
           "Avalonia.Desktop": "[12.1.0, )",
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
-          "Quartermaster.Library": "[1.0.0, )"
+          "Quartermaster.Library": "[1.0.0, )",
+          "Quartermaster.Providers": "[1.0.0, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
           "Quartermaster.Core": "[1.0.0, )"
+        }
+      },
+      "quartermaster.providers": {
+        "type": "Project",
+        "dependencies": {
+          "Quartermaster.Library": "[1.0.0, )"
         }
       },
       "quartermaster.repatcher": {

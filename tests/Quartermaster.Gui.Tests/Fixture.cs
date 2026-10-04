@@ -18,6 +18,11 @@ public static class TestAppBuilder
 
 internal sealed class FakeDialogs : IDialogService
 {
+    public Quartermaster.Gui.Mods.ModImportRequest? ModImport { get; set; }
+    public Quartermaster.Providers.Providers.ProviderFile? ModFile { get; set; }
+    public bool CancelModFile { get; set; }
+    public Task<Quartermaster.Gui.Mods.ModImportRequest?> RequestModImportAsync() => Task.FromResult(ModImport);
+    public Task<Quartermaster.Providers.Providers.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Providers.ProviderMod mod) => Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault());
     public string? ZipPath { get; set; }
     public string? FolderPath { get; set; }
     public string? SavePath { get; set; }
@@ -52,10 +57,10 @@ internal sealed class Fixture : IDisposable
     public AppServices Services { get; }
     public MainWindowViewModel Shell { get; }
     public int Launches { get; private set; }
-    public Fixture(bool discoverGame = true)
+    public Fixture(bool discoverGame = true, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null)
     {
         Directory.CreateDirectory(Game); File.WriteAllBytes(Path.Combine(Game, Archive), Patch(1));
-        Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++);
+        Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++, openBrowser, nexusApi, nexusDownloads);
         Shell = new(Services);
     }
     public string Source(string name, ulong resource = 1)
@@ -114,5 +119,5 @@ internal sealed class Fixture : IDisposable
         U64(104, resource); U64(112, type); U64(120, 192); U32(160, (uint)payload.Length); payload.CopyTo(data, 192);
         return data;
     }
-    public void Dispose() { if (Directory.Exists(Root)) Directory.Delete(Root, true); }
+    public void Dispose() { Services.DisposeAsync().AsTask().GetAwaiter().GetResult(); if (Directory.Exists(Root)) Directory.Delete(Root, true); }
 }

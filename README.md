@@ -15,3 +15,50 @@ Profile archives contain `profile.json` and the original files under
 `mods/<id>/`. They preserve the profile name, load priority, mod order, enabled
 states, option selections and groups. Disabled mods, unused option variants,
 manifests and artwork are included. Importing a profile does not deploy it.
+
+Open **Settings**, paste your personal Nexus API key, and choose **Save**.
+The same Save button applies your game settings, key changes, and browser download
+folder. To disconnect, select **Remove saved API key**, then Save.
+
+In **Library**, choose **Add mod** to paste a mod link or import a local ZIP/folder.
+Quartermaster identifies the provider from the link; Nexus Mods is currently the
+only supported provider. For a Nexus mod page, select a file in the dialog.
+Quartermaster queues it and opens its download page in your default browser.
+Complete the download on Nexus; Quartermaster verifies the archive against
+Nexus's MD5 lookup and imports it automatically. Browser downloads are left in
+place. The Library's **Downloads** popup has **Open download page**, **Retry**,
+and **Cancel** actions. Only ZIP archives are currently supported.
+Use the dedicated **Search** page to find Helldivers 2 Nexus mods and add them
+through the same file-selection flow.
+
+Choose **Register nxm links** in Settings to make Quartermaster your user account's
+`nxm://` handler on Linux or Windows. Nexus's **Download with manager** action can
+then send a signed download link directly to the running app. Free accounts need
+that signed, unexpired link; a plain mod URL does not authorize a direct download.
+You can also paste an nxm link into **Add mod**. Registration on macOS is not yet
+implemented. Registration is explicit and changes the default nxm handler.
+
+Nexus imports retain their mod/file identity. **Check updates** in Library checks
+all tracked mods; the same button in a profile checks that profile's mods.
+Checks only report updates. An **Update** button appears on mods with available
+updates in both lists. Click it to open the replacement file's download page and
+start watching for its download. Verified updates replace references in profiles
+while preserving order, groups, enabled states, and compatible option selections.
+If selected options are no longer compatible, the new mod stays in the library
+and the request reports an error for manual configuration. Updates do not deploy
+automatically; original library files remain.
+
+`downloads.json` persists the queue and watched folders. Pending browser requests
+resume at startup; signed nxm grants are not stored in the queue or library.
+`download-cache/` holds temporary import copies. Personal API keys live separately
+under `credentials/` (owner-only files on Unix), outside profile exports. Keys
+are local plaintext files, not an encrypted system keychain. A private
+`nxm-inbox/` briefly holds protocol links forwarded by another application
+instance, and `app.lock` prevents opening a second GUI for the same data folder.
+
+Provider implementations share `DownloadScanner`: override `IsCandidate` and
+`VerifyAsync` to recognize their downloads, and use `OpenDownloadPage` to open
+the user's browser. `ProviderManager` coordinates the persistent queue and
+library imports. Nexus routes and search follow the
+[official API client](https://github.com/Nexus-Mods/node-nexus-api) and
+[GraphQL documentation](https://graphql.nexusmods.com/).

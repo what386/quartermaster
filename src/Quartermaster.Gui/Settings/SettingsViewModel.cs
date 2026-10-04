@@ -6,7 +6,7 @@ using Quartermaster.Gui.Shared;
 
 namespace Quartermaster.Gui.Settings;
 
-public sealed class SettingsViewModel : SessionViewModel
+public sealed partial class SettingsViewModel : SessionViewModel
 {
     private string gamePath = "";
     private string? selectedInstallation;
@@ -33,7 +33,7 @@ public sealed class SettingsViewModel : SessionViewModel
         {
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
-                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(HasMatches) }) Notify(name);
+                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(HasMatches) }) Notify(name);
         }
     }
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || keywords.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -47,7 +47,7 @@ public sealed class SettingsViewModel : SessionViewModel
     public bool ShowLogs => Matches("Log file diagnostics troubleshooting " + LogFilePath);
     public bool ShowConfiguration => Matches("Settings configuration file " + ConfigurationFilePath);
     public bool HasMatches => ShowInstallation || ShowPriority || ShowRepatch || ShowStorage ||
-        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
+        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration || ShowNexus;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;
@@ -67,11 +67,13 @@ public sealed class SettingsViewModel : SessionViewModel
     {
         SaveCommand = Operations.CreateCommand("Saving settings", async ct =>
         {
+            var account = await ValidateProviderDraftAsync(ct);
             await Session.SaveSettingsAsync(GamePath.Trim(), (RepatchMode)RepatchChoice, profileId, (PriorityDirection)PriorityChoice, ct);
+            await SaveProviderDraftAsync(account, ct);
             LoadDrafts();
         }, () => RepatchChoice >= 0 && RepatchChoice < RepatchChoices.Count && PriorityChoice >= 0 && PriorityChoice < PriorityChoices.Count &&
             (GamePath.Trim() != Session.GameDirectory || RepatchChoice != (int)Session.Settings.Repatch ||
-             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority));
+             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged));
         ResetCommand = new(() =>
         {
             var defaults = new ApplicationSettings();
@@ -79,6 +81,7 @@ public sealed class SettingsViewModel : SessionViewModel
             GamePath = defaults.GameDataDirectory ?? "";
             RepatchChoice = (int)defaults.Repatch;
             PriorityChoice = (int)PriorityDirection.LastWins;
+            ResetProviderDraft();
         }, () => Operations.CanInteract);
         BrowseCommand = Operations.CreateCommand("Selecting game folder", async _ =>
         {
@@ -91,6 +94,7 @@ public sealed class SettingsViewModel : SessionViewModel
             Installations = await Session.DiscoverAsync(ct); Notify(nameof(Installations)); Notify(nameof(HasInstallations));
             SelectedInstallation = Installations.FirstOrDefault();
         });
+        InitializeProviderCommands();
         WatchSession();
     }
     private void LoadDrafts()

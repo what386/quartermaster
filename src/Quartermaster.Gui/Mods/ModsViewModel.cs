@@ -7,6 +7,9 @@ namespace Quartermaster.Gui.Mods;
 
 public sealed record ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null) : IModRow
 {
+    public AsyncCommand? UpdateCommand { get; init; }
+    public string? UpdateDescription { get; init; }
+    public bool HasUpdate => UpdateCommand is not null;
     public string Name => Mod.Name;
     public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
@@ -26,6 +29,9 @@ public sealed record ModListItem(Mod Mod, int Index, bool HasConflict, string? I
 
 public interface IModRow
 {
+    bool HasUpdate { get; }
+    string? UpdateDescription { get; }
+    AsyncCommand? UpdateCommand { get; }
     string Name { get; }
     string Number { get; }
     string Description { get; }
@@ -74,16 +80,23 @@ public sealed class ModsViewModel : SessionViewModel
     public ModDetailsViewModel? Details => SelectedMods.Count == 1 ? new(SelectedMods[0].Mod) : null;
     public bool HasMods => Session.State.Mods.Count > 0;
     public bool HasVisibleMods => Mods.Count > 0;
-    public string EmptyMessage => HasMods ? "No mods match your search." : "Import a ZIP or folder to add mods to your library.";
+    public string EmptyMessage => HasMods ? "No mods match your search." : "Add a mod link, ZIP or folder to your library.";
     public bool HasSelection => SelectedMods.Count > 0;
     public bool HasSingleSelection => SelectedMods.Count == 1;
     public string CountLabel => $"{Mods.Count} mods";
+    public ModDownloads Downloads => Services.Downloads;
+    public AsyncCommand AddModCommand { get; }
+    public AsyncCommand CheckUpdatesCommand { get; }
     public AsyncCommand ImportZipCommand { get; }
     public AsyncCommand ImportFolderCommand { get; }
     public AsyncCommand RemoveCommand { get; }
     public AsyncCommand ExportRepatchedCommand { get; }
     public ModsViewModel(AppServices services) : base(services)
     {
+        AddModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct));
+        CheckUpdatesCommand = Operations.CreateCommand("Checking mod updates", ct => Services.Downloads.CheckUpdatesAsync(ct));
+        Services.Downloads.Changed += (_, _) => { foreach (var row in Mods) row.UpdateCommand?.Refresh(); };
+        Operations.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OperationState.IsBusy)) foreach (var row in Mods) row.UpdateCommand?.Refresh(); };
         ImportZipCommand = Operations.CreateCommand("Importing mod", async ct =>
         {
             var path = await Services.Dialogs.PickModZipAsync();
@@ -132,7 +145,8 @@ public sealed class ModsViewModel : SessionViewModel
         var collisions = Session.ActiveProfile is { } active ? Quartermaster.Core.Deployment.ConflictAnalyzer.Analyze(
             Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)).Resources.SelectMany(c => c.SourceIds).ToHashSet() : [];
         Mods = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m))).ToArray();
+            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m))
+            { UpdateCommand = Services.Downloads.CreateUpdateCommand(m), UpdateDescription = Services.Downloads.UpdateDescription(m) }).ToArray();
         Notify(nameof(Mods)); Notify(nameof(CountLabel)); Notify(nameof(HasMods)); Notify(nameof(HasVisibleMods)); Notify(nameof(EmptyMessage));
         SelectedMods.Clear();
         foreach (var item in Mods.Where(item => ids.Contains(item.Mod.Id))) SelectedMods.Add(item);

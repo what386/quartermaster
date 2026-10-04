@@ -7,6 +7,18 @@
         "resolved": "1.3.8",
         "contentHash": "LhwlPa7c1zs1OV2XadMtAWdImjLIsqFJPoRcIWAadSRn0Ri1DepK65UbWLPmt4riLqx2d40xjXRk0ogpqNtK7g=="
       },
+      "quartermaster.core": {
+        "type": "Project",
+        "dependencies": {
+          "Quartermaster.Repatcher": "[1.0.0, )"
+        }
+      },
+      "quartermaster.library": {
+        "type": "Project",
+        "dependencies": {
+          "Quartermaster.Core": "[1.0.0, )"
+        }
+      },
       "quartermaster.repatcher": {
         "type": "Project",
         "dependencies": {

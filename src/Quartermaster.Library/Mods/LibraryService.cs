@@ -98,6 +98,37 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         await store.SaveAsync(state with { Mods = state.Mods.Select(m => m.Id == modId ? m with { Sources = sources.ToArray() } : m).ToArray() }, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>Updates profile references while preserving order, groups and compatible option selections.</summary>
+    public async Task ReplaceInProfilesAsync(Guid oldId, Guid newId, CancellationToken cancellationToken = default)
+    {
+        if (oldId == newId) return;
+        await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
+        var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var oldMod = state.Mods.Single(m => m.Id == oldId);
+        var newMod = state.Mods.Single(m => m.Id == newId);
+        ProfileEntry Replace(ProfileEntry entry)
+        {
+            var options = entry.Options.Select(selection =>
+            {
+                var oldOption = oldMod.Options.Single(o => o.Id == selection.OptionId);
+                var option = newMod.Options.SingleOrDefault(o => o.Name == oldOption.Name)
+                    ?? throw new InvalidOperationException("Updated mod options changed. Configure the new mod before replacing it in profiles.");
+                var choice = oldOption.Choices.Count == 0 ? 0 : option.Choices.ToList().FindIndex(c => c.Name == oldOption.Choices[selection.ChoiceIndex].Name);
+                if (choice < 0) throw new InvalidOperationException("An updated mod option no longer offers the selected choice.");
+                return new OptionSelection(option.Id, selection.Enabled, choice);
+            }).ToArray();
+            var replacement = entry with { ModId = newId, Options = options };
+            PatchSelection.Select(newMod, replacement);
+            return replacement;
+        }
+        await store.SaveAsync(state with
+        {
+            Profiles = state.Profiles.Select(profile => profile.Entries.Any(e => e.ModId == oldId)
+                ? profile with { Entries = profile.Entries.Where(e => e.ModId != newId).Select(e => e.ModId == oldId ? Replace(e) : e).ToArray() }
+                : profile).ToArray()
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task RecordUpdateCheckAsync(UpdateCheck check, CancellationToken cancellationToken = default)
     {
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);

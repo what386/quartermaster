@@ -1,7 +1,0 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Quartermaster.Gui.Providers" x:Class="Quartermaster.Gui.Providers.ProvidersView" x:DataType="vm:ProvidersViewModel">
-  <StackPanel Margin="12" Spacing="18">
-    <TextBlock Text="{Binding Title}" Classes="pageTitle" />
-    <Border Classes="card"><StackPanel Spacing="14"><TextBlock Text="Local library, for now" Classes="sectionTitle" /><TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" /><TextBlock Text="You can import ZIP archives and folders from the Mods page." TextWrapping="Wrap" /></StackPanel></Border>
-  </StackPanel>
-</UserControl>

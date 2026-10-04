@@ -72,9 +72,9 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         await Task.Run(() => library.AddToProfileAsync(modIds, profileId, ct), ct);
         await ReloadAsync(CancellationToken.None);
     }
-    public async Task ImportAsync(string source, CancellationToken ct)
+    public async Task ImportAsync(string source, CancellationToken ct, Guid? profileId = null)
     {
-        await Task.Run(() => library.ImportAsync(source, cancellationToken: ct), ct);
+        await Task.Run(() => library.ImportAsync(source, cancellationToken: ct, profileId: profileId), ct);
         await ReloadAsync(CancellationToken.None);
     }
     public async Task ImportProfileAsync(string source, CancellationToken ct)

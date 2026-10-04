@@ -3,7 +3,7 @@ using Quartermaster.Core.Deployment;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Mods;
 using Quartermaster.Gui.Profiles;
-using Quartermaster.Gui.Providers;
+using Quartermaster.Gui.Search;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Settings;
 using Quartermaster.Gui.Shared;
@@ -17,10 +17,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     public IReadOnlyList<NavigationItem> NavigationItems { get; } =
         [new(PageKind.Mods, "Library", "library.svg"),
          new(PageKind.Profiles, "Profiles", "sliders.svg"),
-         new(PageKind.Providers, "Providers", "link.svg"),
+         new(PageKind.Search, "Search", "search.svg"),
          new(PageKind.Settings, "Settings", "gear.svg")];
     public NavigationItem LibraryNavigation => NavigationItems.Single(item => item.Page == PageKind.Mods);
-    public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Providers or PageKind.Settings).ToArray();
+    public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Settings).ToArray();
     public OperationState Operations { get; }
     public NavigationItem SelectedNavigation
     {
@@ -52,7 +52,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             [PageKind.Mods] = new ModsViewModel(services),
             [PageKind.Profiles] = new ProfilesViewModel(services),
-            [PageKind.Providers] = new ProvidersViewModel(),
+            [PageKind.Search] = new SearchViewModel(services),
             [PageKind.Settings] = new SettingsViewModel(services)
         };
         AddProfileCommand = Operations.CreateCommand("Creating profile", async ct =>
@@ -193,5 +193,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (path is not null) await services.Session.ExportProfileAsync(id, path, ct);
     });
     public void Navigate(PageKind page) => SelectedNavigation = NavigationItems.Single(n => n.Page == page);
-    public Task InitializeAsync() => Operations.RunAsync("Loading library", services.Session.InitializeAsync);
+    public Task InitializeAsync() => Operations.RunAsync("Loading library", async ct =>
+    {
+        await services.Session.InitializeAsync(ct);
+        await services.Providers.InitializeAsync(ct);
+        await ((SettingsViewModel)pages[PageKind.Settings]).InitializeProviderSettingsAsync(ct);
+    });
 }

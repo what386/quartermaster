@@ -29,6 +29,7 @@
           <StackPanel Spacing="4"><TextBlock Text="Repatching" FontWeight="SemiBold" /><TextBlock Text="Before deployment" Classes="muted" FontSize="11" /></StackPanel>
           <ComboBox Grid.Column="1" ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
         </Grid>
+        <vm:NexusSettingsView IsVisible="{Binding ShowNexus}" />
         <Grid x:Name="StorageSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowStorage}">
           <TextBlock Text="Library storage" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" />

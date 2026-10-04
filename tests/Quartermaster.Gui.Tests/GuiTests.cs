@@ -8,7 +8,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Quartermaster.Gui.Mods;
 using Quartermaster.Gui.Profiles;
-using Quartermaster.Gui.Providers;
+using Quartermaster.Gui.Search;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Settings;
 using Quartermaster.Gui.Shared;
@@ -21,6 +21,35 @@ public class GuiTests
 {
     private static T Page<T>(Fixture fixture, PageKind page) where T : ViewModelBase
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
+
+    [AvaloniaFact]
+    public async Task LibraryDownloadPopupExposesBrowserCancelAndRetryWithoutBlockingTheApp()
+    {
+        Uri? opened = null;
+        using var f = new Fixture(openBrowser: uri => opened = uri); await f.Shell.InitializeAsync();
+        var mods = Page<ModsViewModel>(f, PageKind.Mods);
+        var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        await f.Services.Providers.SetDirectoriesAsync([folder]);
+        var file = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "Test mod", "mod.zip", "1",
+            new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
+        var job = await f.Services.Providers.QueueAsync(file); Dispatcher.UIThread.RunJobs();
+        Assert.False(f.Services.Operations.IsBusy); var row = Assert.Single(mods.Downloads.Jobs);
+        var window = new MainWindow { DataContext = f.Shell, Width = 1100, Height = 1000 }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ModsView>());
+            var button = Assert.Single(view.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "Downloads"));
+            button.Flyout!.ShowAt(button); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            await row.OpenCommand.ExecuteAsync(); Assert.Equal(file.DownloadPage, opened);
+            Assert.True(row.CancelCommand.CanExecute(null)); Assert.False(row.RetryCommand.CanExecute(null));
+            await row.CancelCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+            Assert.Same(row, Assert.Single(mods.Downloads.Jobs)); Assert.True(row.RetryCommand.CanExecute(null));
+            Assert.False(row.CancelCommand.CanExecute(null)); Assert.StartsWith("Cancelled", row.Status);
+            button.Flyout.Hide();
+        }
+        finally { window.Close(); }
+    }
 
     [AvaloniaTheory]
     [InlineData("empty")]
@@ -869,7 +898,7 @@ public class GuiTests
             var routes = new (PageKind Page, Type View)[]
             {
                 (PageKind.Mods, typeof(ModsView)), (PageKind.Profiles, typeof(ProfilesView)),
-                (PageKind.Providers, typeof(ProvidersView)), (PageKind.Settings, typeof(SettingsView))
+                (PageKind.Search, typeof(SearchView)), (PageKind.Settings, typeof(SettingsView))
             };
             foreach (var (page, view) in routes)
             {

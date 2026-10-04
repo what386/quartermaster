@@ -11,6 +11,9 @@ public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
 public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : IModRow, IProfileListItem
 {
+    public AsyncCommand? UpdateCommand { get; init; }
+    public string? UpdateDescription { get; init; }
+    public bool HasUpdate => UpdateCommand is not null;
     public string Name => Mod.Name;
     public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
@@ -83,9 +86,14 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public AsyncCommand DeployCommand { get; }
     public AsyncCommand RunCommand { get; }
     public AsyncCommand PurgeCommand { get; }
+    public AsyncCommand CheckUpdatesCommand { get; }
+    public AsyncCommand ImportModCommand { get; }
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
+        CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, Entries.Select(row => row.Mod.Id).ToArray()), () => HasProfile);
+        ImportModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct, SelectedProfile!.Id), () => HasProfile);
+        Services.Downloads.Changed += (_, _) => { foreach (var row in Entries) row.UpdateCommand?.Refresh(); };
         AddGroupCommand = Operations.CreateCommand("Adding group", AddGroupAsync, () => HasProfile);
         MakeActiveCommand = Operations.CreateCommand("Selecting active profile", ct => Session.SaveProfileAsync(SelectedProfile!, true, ct), () => HasProfile);
         AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Save(ProfileEditor.Add(SelectedProfile!, ModToAdd!), ct), () => HasProfile && ModToAdd is not null);
@@ -113,7 +121,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         Operations.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName != nameof(OperationState.IsBusy)) return;
-            foreach (var row in Entries) row.EnableCommand.Refresh();
+            foreach (var row in Entries) { row.EnableCommand.Refresh(); row.UpdateCommand?.Refresh(); }
             foreach (var group in VisibleItems.OfType<ProfileGroupItem>())
             { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); }
         };
@@ -146,7 +154,8 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
         Entries = SelectedProfile?.Entries.Select((e, index) => new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !e.Enabled), ct)),
-                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e))).ToArray() ?? [];
+                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e))
+            { UpdateCommand = Services.Downloads.CreateUpdateCommand(mods[e.ModId]), UpdateDescription = Services.Downloads.UpdateDescription(mods[e.ModId]) }).ToArray() ?? [];
         AvailableMods = Session.State.Mods.Where(m => Entries.All(e => e.Mod.Id != m.Id)).ToArray();
         Notify(nameof(Entries)); Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
         RebuildVisibleItems();
@@ -179,6 +188,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     private void RefreshCommands()
     {
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand }) command.Refresh();
     }
 }

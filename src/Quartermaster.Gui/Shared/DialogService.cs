@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
+using Quartermaster.Gui.Mods;
+using Quartermaster.Providers.Providers;
 
 namespace Quartermaster.Gui.Shared;
 
@@ -7,6 +9,8 @@ public sealed record ProfileCreationRequest(string? Name = null, bool FromFile =
 
 public interface IDialogService
 {
+    Task<ModImportRequest?> RequestModImportAsync();
+    Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod);
     Task<string?> PickModZipAsync();
     Task<string?> SaveModZipAsync(string suggestedName);
     Task<string?> PickProfileZipAsync();
@@ -19,6 +23,8 @@ public interface IDialogService
 
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
+    public Task<ModImportRequest?> RequestModImportAsync() => owner().ShowDialogAsync<ModImportRequest?>(new AddModDialog());
+    public Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod) => owner().ShowDialogAsync<ProviderFile?>(new ModFilesDialog(mod));
     public async Task<ProfileCreationRequest?> RequestProfileCreationAsync()
     {
         var result = await owner().ShowDialogAsync<object?>(new TextInputDialog("Create profile", "Name your profile or import a profile ZIP", "Create", allowFileChoice: true));

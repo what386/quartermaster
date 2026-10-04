@@ -1,0 +1,24 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Search" x:Class="Quartermaster.Gui.Search.SearchView" x:DataType="vm:SearchViewModel">
+  <Grid RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,8">
+      <TextBlock Text="Search" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox Text="{Binding Query}" Grid.Column="1" PlaceholderText="Search Helldivers 2 mods on Nexus…" />
+      <Button Grid.Column="2" Content="Search" Classes="primary" Command="{Binding SearchCommand}" Margin="8,0,0,0" />
+    </Grid>
+    <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="NEXUS MODS" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding ResultSummary}" /></Grid></Border>
+    <ScrollViewer Grid.Row="2">
+      <ItemsControl ItemsSource="{Binding Results}">
+        <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:SearchModItem">
+          <Border Classes="card" Margin="0,0,0,8">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
+              <StackPanel Spacing="2"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+              <Button Grid.Column="1" Content="Open page" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Content="Add mod" Command="{Binding AddCommand}" Classes="primary" VerticalAlignment="Center" />
+            </Grid>
+          </Border>
+        </DataTemplate></ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </Grid>
+</UserControl>
