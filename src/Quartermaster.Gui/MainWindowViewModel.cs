@@ -111,7 +111,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                     Navigate(PageKind.Profiles);
                 }, () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
-                new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError)) { IsDeployed = deployed });
+                new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
+            { IsDeployed = deployed });
         }
     }
     private bool deployingProfile;

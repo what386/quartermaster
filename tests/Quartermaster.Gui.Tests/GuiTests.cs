@@ -106,6 +106,76 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task ProfileContextMenuTargetsClickedModAndDragDropPersistsOrder()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        foreach (var name in new[] { "Armor", "Cape", "Helmet" })
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<Button>(), b => b.Content is "Move up" or "Move down" or "Mod details" or "Remove from profile" or "Purge patches");
+            Assert.Contains(window.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "Purge"));
+            var list = Assert.Single(window.GetVisualDescendants().OfType<ListBox>(), box => box.Name == "ProfileModsList");
+            ListBoxItem Row(string name) => Assert.Single(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.DataContext is ProfileModItem item && item.Name == name);
+            Point Position(ListBoxItem row, double y) => row.TranslatePoint(new Point(240, y), window)!.Value;
+            var cape = Row("Cape"); var point = Position(cape, cape.Bounds.Height / 2);
+            window.MouseMove(point); window.MouseDown(point, Avalonia.Input.MouseButton.Right); window.MouseUp(point, Avalonia.Input.MouseButton.Right);
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Cape", profiles.SelectedMod!.Name);
+            var menu = list.ContextMenu!;
+            if (!menu.IsOpen) menu.Open(list);
+            var toggle = Assert.IsType<MenuItem>(menu.Items[1]);
+            await Assert.IsType<AsyncCommand>(toggle.Command).ExecuteAsync(); menu.Close();
+            Assert.False(profiles.Entries.Single(row => row.Name == "Cape").IsEnabled);
+            window.CaptureRenderedFrame()?.Dispose();
+            var armor = Row("Armor"); var helmet = Row("Helmet");
+            var from = Position(armor, armor.Bounds.Height / 2); var to = Position(helmet, helmet.Bounds.Height - 4);
+            window.MouseMove(from); window.MouseDown(from, Avalonia.Input.MouseButton.Left);
+            window.MouseMove(to); window.CaptureRenderedFrame()?.Dispose();
+            Assert.Contains("dropAfter", helmet.Classes);
+            window.MouseUp(to, Avalonia.Input.MouseButton.Left);
+            await f.Services.Operations.WhenIdle; Dispatcher.UIThread.RunJobs();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Assert.Equal(new[] { "Cape", "Helmet", "Armor" }, profiles.Entries.Select(row => row.Name));
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            Assert.Equal(profiles.Entries.Select(row => row.Mod.Id), persisted.Profiles.Single().Entries.Select(entry => entry.ModId));
+            profiles.Search = "e"; window.CaptureRenderedFrame()?.Dispose();
+            cape = Row("Cape"); helmet = Row("Helmet");
+            from = Position(cape, cape.Bounds.Height / 2); to = Position(helmet, helmet.Bounds.Height - 4);
+            window.MouseMove(from); window.MouseDown(from, Avalonia.Input.MouseButton.Left); window.MouseMove(to);
+            window.MouseUp(to, Avalonia.Input.MouseButton.Left); await f.Services.Operations.WhenIdle;
+            Assert.Equal(new[] { "Helmet", "Cape", "Armor" }, profiles.Entries.Select(row => row.Name));
+            window.CaptureRenderedFrame()?.Dispose();
+            cape = Row("Cape"); helmet = Row("Helmet");
+            from = Position(cape, cape.Bounds.Height / 2); to = Position(helmet, 4);
+            window.MouseMove(from); window.MouseDown(from, Avalonia.Input.MouseButton.Left); window.MouseMove(to);
+            list.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Escape });
+            window.MouseUp(to, Avalonia.Input.MouseButton.Left);
+            Assert.Equal(new[] { "Helmet", "Cape", "Armor" }, profiles.Entries.Select(row => row.Name));
+            Assert.DoesNotContain(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.Classes.Contains("dropBefore") || row.Classes.Contains("dropAfter"));
+            profiles.Search = "Armor"; window.CaptureRenderedFrame()?.Dispose();
+            var original = profiles.Entries.Select(row => row.Mod.Id).ToArray();
+            // Dropping on the same row is a no-op, including in a filtered view.
+            await profiles.MoveModAsync(original[2], original[2], after: false);
+            Assert.Equal(original, profiles.Entries.Select(row => row.Mod.Id));
+            profiles.Search = "";
+            await profiles.MoveModAsync(original[2], original[0], after: false);
+            await profiles.MoveModAsync(original[1], original[0], after: false);
+            Assert.Equal(new[] { "Armor", "Cape", "Helmet" }, profiles.Entries.Select(row => row.Name));
+            profiles.SelectedMod = profiles.Entries.Single(row => row.Name == "Helmet");
+            menu.Open(list); Dispatcher.UIThread.RunJobs();
+            var remove = Assert.IsType<MenuItem>(menu.Items[3]);
+            await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); menu.Close();
+            Assert.DoesNotContain(profiles.Entries, row => row.Name == "Helmet");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task DoubleClickingProfileUsesDeploymentConfirmationAndWaitsForSelection()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -445,7 +515,7 @@ public class GuiTests
         var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
         await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
         Assert.Equal(2, profiles.Entries.Count); Assert.Single(profiles.Conflicts);
-        profiles.SelectedMod = profiles.Entries[1]; await profiles.MoveUpCommand.ExecuteAsync();
+        profiles.SelectedMod = profiles.Entries[1]; await profiles.MoveModAsync(profiles.SelectedMod!.Mod.Id, profiles.Entries[0].Mod.Id, after: false);
         Assert.Equal("Armor", profiles.Entries[0].Name);
         await profiles.ToggleCommand.ExecuteAsync(); Assert.Empty(profiles.Conflicts);
         await profiles.ToggleCommand.ExecuteAsync(); Assert.Single(profiles.Conflicts);
@@ -480,8 +550,10 @@ public class GuiTests
             window.CaptureRenderedFrame()?.Dispose();
             var option = Assert.Single(profiles.Options!.Options);
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<ComboBox>(), c => c.DataContext == option);
-            var details = window.GetVisualDescendants().OfType<Button>().Single(button => button.Name == "ModDetailsButton");
-            details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+            var list = Assert.Single(window.GetVisualDescendants().OfType<ListBox>(), box => box.Name == "ProfileModsList");
+            var menu = list.ContextMenu!; menu.Open(list); Dispatcher.UIThread.RunJobs();
+            var details = Assert.IsType<MenuItem>(menu.Items[0]);
+            details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
             Dispatcher.UIThread.RunJobs();
             var popup = Assert.Single(window.GetVisualDescendants().OfType<ModSettingsDialog>());
             window.CaptureRenderedFrame()?.Dispose();

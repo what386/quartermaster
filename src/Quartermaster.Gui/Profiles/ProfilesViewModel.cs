@@ -62,8 +62,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     public AsyncCommand AddCommand { get; }
     public AsyncCommand RemoveCommand { get; }
     public AsyncCommand ToggleCommand { get; }
-    public AsyncCommand MoveUpCommand { get; }
-    public AsyncCommand MoveDownCommand { get; }
     public AsyncCommand ApplyOptionsCommand { get; }
     public AsyncCommand DeployCommand { get; }
     public AsyncCommand RunCommand { get; }
@@ -75,8 +73,6 @@ public sealed class ProfilesViewModel : SessionViewModel
         AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Save(ProfileEditor.Add(SelectedProfile!, ModToAdd!), ct), () => HasProfile && ModToAdd is not null);
         RemoveCommand = Operations.CreateCommand("Removing mod from profile", ct => Save(ProfileEditor.Remove(SelectedProfile!, SelectedMod!.Mod.Id), ct), () => SelectedMod is not null);
         ToggleCommand = Operations.CreateCommand("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, SelectedMod!.Mod.Id, !SelectedMod.Entry.Enabled), ct), () => SelectedMod is not null);
-        MoveUpCommand = Operations.CreateCommand("Moving mod", ct => Save(ProfileEditor.Move(SelectedProfile!, SelectedMod!.Mod.Id, SelectedMod.Index - 1), ct), () => SelectedMod?.Index > 0);
-        MoveDownCommand = Operations.CreateCommand("Moving mod", ct => Save(ProfileEditor.Move(SelectedProfile!, SelectedMod!.Mod.Id, SelectedMod.Index + 1), ct), () => SelectedMod is not null && SelectedMod.Index < Entries.Count - 1);
         ApplyOptionsCommand = Operations.CreateCommand("Saving mod options", ct => Save(ProfileEditor.SetOptions(SelectedProfile!, SelectedMod!.Mod, Options!.Selections()), ct), () => Options?.HasOptions == true);
         DeployCommand = Operations.CreateCommand("Deploying profile", async ct =>
         {
@@ -101,6 +97,20 @@ public sealed class ProfilesViewModel : SessionViewModel
         WatchSession();
     }
     private Task Save(Profile value, CancellationToken ct) => Session.SaveProfileAsync(value, false, ct);
+    public Task MoveModAsync(Guid modId, Guid targetModId, bool after)
+    {
+        if (!Operations.CanInteract || SelectedProfile is null || modId == targetModId) return Task.CompletedTask;
+        var entries = SelectedProfile.Entries;
+        var from = entries.ToList().FindIndex(e => e.ModId == modId);
+        var target = entries.ToList().FindIndex(e => e.ModId == targetModId);
+        if (from < 0 || target < 0) return Task.CompletedTask;
+        var destination = target + (after ? 1 : 0);
+        if (from < destination) destination--;
+        if (from == destination) return Task.CompletedTask;
+        SelectedMod = Entries.Single(e => e.Mod.Id == modId);
+        var moved = ProfileEditor.Move(SelectedProfile, modId, destination);
+        return Operations.RunAsync("Reordering mods", ct => Save(moved, ct));
+    }
     protected override void Refresh()
     {
         Profiles = Session.State.Profiles.ToArray(); Notify(nameof(Profiles));
@@ -130,6 +140,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     private void RefreshCommands()
     {
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, MoveUpCommand, MoveDownCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand }) command.Refresh();
     }
 }

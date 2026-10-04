@@ -2,8 +2,8 @@
              xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
              xmlns:model="clr-namespace:Quartermaster.Library.Mods;assembly=Quartermaster.Library"
              x:Class="Quartermaster.Gui.Profiles.ProfilesView" x:DataType="vm:ProfilesViewModel">
-  <Grid RowDefinitions="Auto,Auto,*,Auto" IsEnabled="{Binding Operations.CanInteract}">
-    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,0,0,8">
+  <Grid RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBlock x:Name="ProfileTitle" Text="{Binding SelectedProfile.Name}" Classes="pageTitle" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedProfile.Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
       <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search mods in this profile…" Margin="0,0,8,0" />
       <Button Grid.Column="2" Content="Add mod" IsEnabled="{Binding HasProfile}" Margin="0,0,8,0">
@@ -16,7 +16,8 @@
         </StackPanel></Flyout></Button.Flyout>
       </Button>
       <Button Grid.Column="3" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="4" Content="▶  Run" Command="{Binding RunCommand}" />
+      <Button Grid.Column="4" Content="▶  Run" Command="{Binding RunCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="5" Content="Purge" Classes="danger" Command="{Binding PurgeCommand}" />
     </Grid>
     <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4">
       <Grid ColumnDefinitions="*,Auto"><TextBlock Text="LOADOUT" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding EntrySummary}" /></Grid>
@@ -24,12 +25,14 @@
     <Grid Grid.Row="2" RowDefinitions="24,*">
       <Border Background="#25282C" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="106,0,0,0" /></Grid></Border>
       <ListBox Grid.Row="1" x:Name="ProfileModsList" Classes="modList" ItemsSource="{Binding VisibleEntries}" SelectedItem="{Binding SelectedMod, Mode=TwoWay}" DoubleTapped="OpenModDetails">
+        <ListBox.ContextMenu><ContextMenu>
+          <MenuItem x:Name="ModDetailsMenuItem" Header="Mod details" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
+          <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" />
+          <Separator />
+          <MenuItem Header="Remove from profile" Command="{Binding RemoveCommand}" />
+        </ContextMenu></ListBox.ContextMenu>
         <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileModItem"><mods:ModRowView /></DataTemplate></ListBox.ItemTemplate>
       </ListBox>
-    </Grid>
-    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="0,10">
-      <StackPanel Orientation="Horizontal" Spacing="8"><Button x:Name="ModDetailsButton" Content="Mod details" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" /><Button Content="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" /><Button Content="Move up" Command="{Binding MoveUpCommand}" /><Button Content="Move down" Command="{Binding MoveDownCommand}" /><Button Content="Remove from profile" Command="{Binding RemoveCommand}" /></StackPanel>
-      <Button Grid.Column="1" Content="Purge patches" Classes="danger" Command="{Binding PurgeCommand}" />
     </Grid>
   </Grid>
 </UserControl>

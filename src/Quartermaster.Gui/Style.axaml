@@ -39,6 +39,12 @@
   <Style Selector="ListBox.modList ListBoxItem:nth-child(2n)"><Setter Property="Background" Value="#17191C" /></Style>
   <Style Selector="ListBox.modList ListBoxItem:selected"><Setter Property="Background" Value="#34291F" /></Style>
   <Style Selector="ListBox.modList ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="#2B2723" /><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2,0,0,0" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem.dropBefore /template/ ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="ListBox.modList ListBoxItem.dropAfter /template/ ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="0,0,0,2" />
+  </Style>
   <Style Selector="Button.profileButton"><Setter Property="Width" Value="48" /><Setter Property="Height" Value="48" /><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Background" Value="#202327" /><Setter Property="BorderBrush" Value="#454B52" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="14" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
   <Style Selector="Button.profileButton.active"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="Background" Value="#30261F" /></Style>
   <Style Selector="Button.profileButton.active:pointerover /template/ ContentPresenter#PART_ContentPresenter">
