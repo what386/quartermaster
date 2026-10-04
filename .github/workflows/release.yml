@@ -96,6 +96,10 @@ jobs:
           dotnet restore
           "src/Quartermaster.Gui/Quartermaster.Gui.csproj"
           --runtime ${{ matrix.rid }}
+          -p:SelfContained=${{ matrix.self_contained }}
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: Publish
         run: >
@@ -106,6 +110,9 @@ jobs:
           --self-contained ${{ matrix.self_contained }}
           --no-restore
           --output publish
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None
           -p:DebugSymbols=false
 
