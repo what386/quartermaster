@@ -21,6 +21,18 @@ namespace Quartermaster.Gui.Tests;
 
 public class GuiTests
 {
+    [AvaloniaFact]
+    public async Task TestServicesRecordExternalLaunchesIncludingReopenedServices()
+    {
+        using var f = new Fixture();
+        var page = new Uri("https://www.nexusmods.com/helldivers2/mods/123");
+        f.Services.OpenBrowser(page); f.Services.LaunchGame();
+        await using var reopened = f.ReopenServices();
+        reopened.OpenBrowser(page); reopened.LaunchGame();
+        Assert.Equal(new[] { page, page }, f.BrowserRequests);
+        Assert.Equal(2, f.Launches);
+    }
+
     private static T Page<T>(Fixture fixture, PageKind page) where T : ViewModelBase
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
@@ -1283,7 +1295,7 @@ public class GuiTests
             Assert.Equal("1 selected for deployment", f.Shell.SelectionSummary);
             Assert.Equal("Default", Assert.Single(f.Shell.SidebarProfiles, item => item.IsActive).Name);
             Assert.Empty(f.Services.Session.Inspection!.Ledger.Files);
-            var reopened = new AppServices(f.Data, f.Dialogs, () => []);
+            var reopened = f.ReopenServices();
             await reopened.Session.InitializeAsync(CancellationToken.None);
             Assert.Equal("Default", reopened.Session.ActiveProfile!.Name);
             // Opening the active profile must work after visiting the library too.
@@ -1308,7 +1320,7 @@ public class GuiTests
             f.Dialogs.InputText = "Second loadout";
             await f.Shell.AddProfileCommand.ExecuteAsync();
             Assert.Equal("Second loadout", profiles.SelectedProfile!.Name);
-            var persisted = new AppServices(f.Data, f.Dialogs, () => []);
+            var persisted = f.ReopenServices();
             await persisted.Session.InitializeAsync(CancellationToken.None);
             Assert.Equal("Second loadout", persisted.Session.ActiveProfile!.Name);
             Assert.Equal(4, persisted.Session.State.Profiles.Count);
@@ -1473,7 +1485,7 @@ public class GuiTests
         await profiles.DeployCommand.ExecuteAsync();
         Assert.Equal(4, f.Services.Session.Inspection!.Ledger.Files.Count);
         Assert.All(f.Services.Session.Inspection.Ledger.Files, file => Assert.InRange(file.Slot, 0, 1));
-        var reopened = new AppServices(f.Data, f.Dialogs, () => []); await reopened.Session.InitializeAsync(CancellationToken.None);
+        var reopened = f.ReopenServices(); await reopened.Session.InitializeAsync(CancellationToken.None);
         Assert.Equal(2, reopened.Session.State.Mods.Count); Assert.Equal(2, reopened.Session.ActiveProfile!.Entries.Count);
         Assert.Equal(f.Game, reopened.Session.GameDirectory); Assert.Equal(4, reopened.Session.Inspection!.Ledger.Files.Count);
         f.Dialogs.Confirm = false; await profiles.PurgeCommand.ExecuteAsync(); Assert.True(File.Exists(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
@@ -1557,7 +1569,7 @@ public class GuiTests
             var entry = profiles.SelectedProfile!.Entries.Single(e => e.ModId == mod.Id);
             Assert.Equal(order, profiles.SelectedProfile.Entries.Select(e => e.ModId));
             Assert.Equal(new[] { "common", "red" }, PatchSelection.Select(mod, entry).Select(p => p.Folder));
-            var reopened = new AppServices(f.Data, f.Dialogs, () => []); await reopened.Session.InitializeAsync(CancellationToken.None);
+            var reopened = f.ReopenServices(); await reopened.Session.InitializeAsync(CancellationToken.None);
             Assert.Equal(1, Assert.Single(reopened.Session.ActiveProfile!.Entries.Single(e => e.ModId == mod.Id).Options).ChoiceIndex);
             popup.Cancel(); Dispatcher.UIThread.RunJobs();
             f.Shell.Navigate(PageKind.Mods); window.CaptureRenderedFrame()?.Dispose();
@@ -1795,7 +1807,7 @@ public class GuiTests
             Assert.False(profiles.Entries[0].IsEnabled);
             Assert.All(profiles.Entries, entry => Assert.False(entry.HasConflict));
             Assert.Equal("0", f.Shell.CollisionCount);
-            var reopened = new AppServices(f.Data, f.Dialogs, () => []);
+            var reopened = f.ReopenServices();
             await reopened.Session.InitializeAsync(CancellationToken.None);
             Assert.False(reopened.Session.ActiveProfile!.Entries[0].Enabled);
         }
