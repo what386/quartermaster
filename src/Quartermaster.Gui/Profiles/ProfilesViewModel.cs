@@ -9,7 +9,7 @@ namespace Quartermaster.Gui.Profiles;
 
 public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
-public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : IModRow
+public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : IModRow, IProfileListItem
 {
     public string Name => Mod.Name;
     public string Title => ModPresentation.Title(Mod);
@@ -29,13 +29,14 @@ public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Asyn
     };
     public bool HasOptions => Mod.Options.Count > 0;
     public bool HasToggle => true;
+    public bool IsGrouped => Entry.GroupId is not null;
     public bool IsEnabled => Entry.Enabled;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Entry.Enabled ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
     public string ToggleDescription => (Entry.Enabled ? "Disable " : "Enable ") + Name;
     public string Status => Entry.Enabled ? "Enabled" : "Disabled";
 }
 
-public sealed class ProfilesViewModel : SessionViewModel
+public sealed partial class ProfilesViewModel : SessionViewModel
 {
     private Profile? profile;
     private ProfileModItem? selectedMod;
@@ -47,7 +48,7 @@ public sealed class ProfilesViewModel : SessionViewModel
     public IReadOnlyList<string> Conflicts { get; private set; } = [];
     public string ArchiveSummary { get; private set; } = "";
     public IReadOnlyList<ProfileModItem> VisibleEntries => Entries.Where(e => e.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
-    public string Search { get => search; set { if (Set(ref search, value)) Notify(nameof(VisibleEntries)); } }
+    public string Search { get => search; set { if (Set(ref search, value)) Notify(nameof(VisibleEntries)); RebuildVisibleItems(); } }
     public string EntrySummary => $"{Entries.Count} mods · {Entries.Count(e => e.Entry.Enabled)} on";
     public string SelectedModName => SelectedMod?.Name ?? "Select a mod";
     public bool HasSelectedMod => SelectedMod is not null;
@@ -65,6 +66,8 @@ public sealed class ProfilesViewModel : SessionViewModel
         set
         {
             if (!Set(ref selectedMod, value)) return;
+            if (value is not null || selectedListItem is ProfileModItem)
+            { selectedListItem = value; Notify(nameof(SelectedListItem)); }
             Options = value is null ? null : new(value.Mod, value.Entry.Options, Session.GetOptionImages(value.Mod));
             Notify(nameof(Options)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
         }
@@ -83,6 +86,7 @@ public sealed class ProfilesViewModel : SessionViewModel
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
+        AddGroupCommand = Operations.CreateCommand("Adding group", AddGroupAsync, () => HasProfile);
         MakeActiveCommand = Operations.CreateCommand("Selecting active profile", ct => Session.SaveProfileAsync(SelectedProfile!, true, ct), () => HasProfile);
         AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Save(ProfileEditor.Add(SelectedProfile!, ModToAdd!), ct), () => HasProfile && ModToAdd is not null);
         RemoveCommand = Operations.CreateCommand("Removing mod from profile", ct => Save(ProfileEditor.Remove(SelectedProfile!, SelectedMod!.Mod.Id), ct), () => SelectedMod is not null);
@@ -107,7 +111,12 @@ public sealed class ProfilesViewModel : SessionViewModel
                 await Session.PurgeAsync(ct);
         }, () => Session.GameDirectory != "");
         Operations.PropertyChanged += (_, e) =>
-        { if (e.PropertyName == nameof(OperationState.IsBusy)) foreach (var row in Entries) row.EnableCommand.Refresh(); };
+        {
+            if (e.PropertyName != nameof(OperationState.IsBusy)) return;
+            foreach (var row in Entries) row.EnableCommand.Refresh();
+            foreach (var group in VisibleItems.OfType<ProfileGroupItem>())
+            { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); }
+        };
         WatchSession();
     }
     private Task Save(Profile value, CancellationToken ct) => Session.SaveProfileAsync(value, false, ct);
@@ -120,9 +129,9 @@ public sealed class ProfilesViewModel : SessionViewModel
         if (from < 0 || target < 0) return Task.CompletedTask;
         var destination = target + (after ? 1 : 0);
         if (from < destination) destination--;
-        if (from == destination) return Task.CompletedTask;
+        if (from == destination && entries[from].GroupId == entries[target].GroupId) return Task.CompletedTask;
         SelectedMod = Entries.Single(e => e.Mod.Id == modId);
-        var moved = ProfileEditor.Move(SelectedProfile, modId, destination);
+        var moved = ProfileEditor.Move(SelectedProfile, modId, destination, entries[target].GroupId);
         return Operations.RunAsync("Reordering mods", ct => Save(moved, ct));
     }
     protected override void Refresh()
@@ -143,7 +152,8 @@ public sealed class ProfilesViewModel : SessionViewModel
                 () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e))).ToArray() ?? [];
         AvailableMods = Session.State.Mods.Where(m => Entries.All(e => e.Mod.Id != m.Id)).ToArray();
         Notify(nameof(Entries)); Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
-        SelectedMod = Entries.FirstOrDefault(e => e.Mod.Id == id) ?? Entries.FirstOrDefault();
+        RebuildVisibleItems();
+        SelectedMod = VisibleItems.OfType<ProfileModItem>().FirstOrDefault(e => e.Mod.Id == id) ?? VisibleItems.OfType<ProfileModItem>().FirstOrDefault();
         ModToAdd = AvailableMods.FirstOrDefault();
         Conflicts = report.Resources.Select(c => $"{c.Archive} · {c.Resource.Id:x16}/{c.Resource.Type:x16} · {mods[c.WinningSourceId].Name} wins").ToArray();
         ArchiveSummary = $"{ModPresentation.Count(report.Archives.Count, "shared archive")} · {ModPresentation.Count(Conflicts.Count, "overlapping resource")}";
@@ -172,6 +182,6 @@ public sealed class ProfilesViewModel : SessionViewModel
     private void RefreshCommands()
     {
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand }) command.Refresh();
     }
 }

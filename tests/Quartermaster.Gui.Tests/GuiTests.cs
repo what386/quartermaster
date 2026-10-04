@@ -23,6 +23,155 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task RightClickCreatesGroupsFromMultipleSingleOrNoSelectedMods()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        foreach (var name in new[] { "Armor", "Cape", "Helmet" }) await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>());
+            var list = view.FindControl<ListBox>("ProfileModsList")!;
+            ListBoxItem Row(string name) => list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileModItem mod && mod.Name == name);
+            void Click(string name, MouseButton button, RawInputModifiers modifiers = RawInputModifiers.None)
+            {
+                var row = Row(name); var point = row.TranslatePoint(new Point(240, row.Bounds.Height / 2), window)!.Value;
+                window.MouseMove(point); window.MouseDown(point, button, modifiers); window.MouseUp(point, button, modifiers);
+            }
+            async Task Create(string name)
+            {
+                f.Dialogs.InputText = name;
+                view.FindControl<MenuItem>("CreateGroupMenuItem")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+                await f.Services.Operations.WhenIdle; window.CaptureRenderedFrame()?.Dispose();
+                Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            }
+            Click("Armor", MouseButton.Left); Click("Cape", MouseButton.Left, RawInputModifiers.Control);
+            Assert.Equal(2, list.SelectedItems!.Count);
+            Click("Helmet", MouseButton.Right); Assert.Single(list.SelectedItems); list.ContextMenu!.Close();
+            Click("Armor", MouseButton.Left); Click("Cape", MouseButton.Left, RawInputModifiers.Shift);
+            Assert.Equal(2, list.SelectedItems.Count);
+            Click("Armor", MouseButton.Right); Assert.Equal(2, list.SelectedItems.Count);
+            await Create("Equipment");
+            var groupId = Assert.Single(profiles.Groups).Id;
+            Assert.All(profiles.Entries.Where(mod => mod.Name != "Helmet"), mod => Assert.Equal(groupId, mod.Entry.GroupId));
+            Assert.Null(profiles.Entries.Single(mod => mod.Name == "Helmet").Entry.GroupId);
+            var grouped = Row("Armor").GetVisualDescendants().OfType<Border>().Single(border => border.Name == "GroupIndent");
+            var ungrouped = Row("Helmet").GetVisualDescendants().OfType<Border>().Single(border => border.Name == "GroupIndent");
+            Assert.True(grouped.IsVisible); Assert.Equal(24, grouped.Bounds.Width); Assert.False(ungrouped.IsVisible);
+            list.SelectedItems.Clear(); window.CaptureRenderedFrame()?.Dispose();
+            var guidePosition = grouped.TranslatePoint(default, list)!.Value;
+            var modRow = Row("Armor").GetVisualDescendants().OfType<ModRowView>().Single();
+            var modPosition = modRow.TranslatePoint(default, list)!.Value;
+            var modSize = modRow.Bounds.Size;
+            list.SelectedItem = Row("Armor").DataContext; window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(guidePosition, grouped.TranslatePoint(default, list)!.Value);
+            Assert.Equal(modPosition, modRow.TranslatePoint(default, list)!.Value); Assert.Equal(modSize, modRow.Bounds.Size);
+            var selectionMarker = Row("Armor").GetVisualDescendants().OfType<Border>().Single(border => border.Name == "RowIndicator");
+            Assert.Equal(new Thickness(2, 0, 0, 0), selectionMarker.BorderThickness);
+            foreach (var marker in new[] { "dropBefore", "dropAfter", "dropInto" })
+            {
+                Row("Armor").Classes.Add(marker); window.CaptureRenderedFrame()?.Dispose();
+                Assert.Equal(guidePosition, grouped.TranslatePoint(default, list)!.Value);
+                Assert.Equal(modPosition, modRow.TranslatePoint(default, list)!.Value); Assert.Equal(modSize, modRow.Bounds.Size);
+                Row("Armor").Classes.Remove(marker);
+            }
+            Click("Helmet", MouseButton.Right); Assert.Single(list.SelectedItems);
+            await Create("Helmet only");
+            Assert.Equal(profiles.Groups[1].Id, profiles.Entries.Single(mod => mod.Name == "Helmet").Entry.GroupId);
+            var blank = list.TranslatePoint(new Point(240, list.Bounds.Height - 20), window)!.Value;
+            window.MouseMove(blank); window.MouseDown(blank, MouseButton.Right); window.MouseUp(blank, MouseButton.Right);
+            Assert.Empty(list.SelectedItems); await Create("Empty");
+            Assert.DoesNotContain(profiles.Entries, mod => mod.Entry.GroupId == profiles.Groups[2].Id);
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            Assert.Equal(3, Assert.Single(persisted.Profiles).Groups.Count);
+            f.Dialogs.InputText = null;
+            await profiles.CreateGroupFromModsAsync(profiles.Entries.Select(mod => mod.Mod.Id).ToArray());
+            Assert.Equal(3, profiles.Groups.Count);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ProfileGroupsCanBeCreatedAssignedCollapsedSearchedRenamedAndRemoved()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        foreach (var name in new[] { "Armor", "Cape", "Helmet" }) await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
+        f.Dialogs.InputText = "Equipment"; await profiles.AddGroupCommand.ExecuteAsync();
+        var groupId = Assert.Single(profiles.Groups).Id;
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>());
+            var list = view.FindControl<ListBox>("ProfileModsList")!;
+            ListBoxItem Row(string name) => list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileModItem mod && mod.Name == name);
+            ListBoxItem Header() => list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileGroupItem group && group.Id == groupId);
+            list.SelectedItem = profiles.VisibleItems.OfType<ProfileGroupItem>().Single();
+            Assert.Null(profiles.SelectedMod); Assert.False(profiles.RemoveCommand.CanExecute(null));
+            Assert.IsType<ProfileGroupItem>(profiles.SelectedListItem);
+            var cape = Row("Cape"); var point = cape.TranslatePoint(new Point(240, cape.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(point); window.MouseDown(point, MouseButton.Right); window.MouseUp(point, MouseButton.Right);
+            Dispatcher.UIThread.RunJobs(); Assert.Equal("Cape", profiles.SelectedMod!.Name);
+            var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
+            var move = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Move to group"));
+            var equipment = move.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Equipment"));
+            await Assert.IsType<AsyncCommand>(equipment.Command).ExecuteAsync(); menu.Close();
+            Assert.Equal(groupId, profiles.Entries.Single(row => row.Name == "Cape").Entry.GroupId);
+            window.CaptureRenderedFrame()?.Dispose();
+            var helmet = Row("Helmet"); var header = Header();
+            var from = helmet.TranslatePoint(new Point(240, helmet.Bounds.Height / 2), window)!.Value;
+            var to = header.TranslatePoint(new Point(240, header.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(from); window.MouseDown(from, MouseButton.Left); window.MouseMove(to);
+            Assert.Contains(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.Classes.Contains("dropInto"));
+            window.MouseUp(to, MouseButton.Left); await f.Services.Operations.WhenIdle;
+            Assert.Equal(new[] { "Armor", "Cape", "Helmet" }, profiles.Entries.Select(row => row.Name));
+            Assert.Equal(groupId, profiles.Entries.Single(row => row.Name == "Helmet").Entry.GroupId);
+            var group = profiles.VisibleItems.OfType<ProfileGroupItem>().Single();
+            Assert.Equal("2 mods · 2 on", group.Summary);
+            if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } screenshotDirectory)
+            {
+                window.CaptureRenderedFrame()?.Dispose(); Directory.CreateDirectory(screenshotDirectory);
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(screenshotDirectory, "Groups.png"));
+            }
+            window.CaptureRenderedFrame()?.Dispose();
+            var groupView = Assert.Single(window.GetVisualDescendants().OfType<ProfileGroupView>());
+            var groupButton = Assert.Single(groupView.GetVisualDescendants().OfType<Button>());
+            Assert.True(groupButton.IsEnabled); Assert.Equal(list.Bounds.Width, groupButton.Bounds.Width, 1);
+            var collapsePoint = groupButton.TranslatePoint(new Point(120, groupButton.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(collapsePoint); window.MouseDown(collapsePoint, MouseButton.Left); window.MouseUp(collapsePoint, MouseButton.Left);
+            await f.Services.Operations.WhenIdle; window.CaptureRenderedFrame()?.Dispose();
+            Assert.False(Assert.Single(profiles.Groups).IsExpanded);
+            Assert.DoesNotContain(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.DataContext is ProfileModItem { Name: "Cape" or "Helmet" });
+            Assert.Contains(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.DataContext is ProfileModItem { Name: "Armor" });
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            Assert.False(Assert.Single(Assert.Single(persisted.Profiles).Groups).IsExpanded);
+            profiles.Search = "Cape"; window.CaptureRenderedFrame()?.Dispose();
+            Assert.Contains(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.DataContext is ProfileModItem { Name: "Cape" });
+            Assert.False(Assert.Single(profiles.Groups).IsExpanded);
+            profiles.Search = "";
+            group = profiles.VisibleItems.OfType<ProfileGroupItem>().Single();
+            f.Dialogs.InputText = "Renamed"; await group.RenameCommand.ExecuteAsync();
+            Assert.Equal("Equipment", f.Dialogs.InitialInputText); Assert.Equal("Renamed", Assert.Single(profiles.Groups).Name);
+            group = profiles.VisibleItems.OfType<ProfileGroupItem>().Single();
+            await group.ToggleCommand.ExecuteAsync();
+            await profiles.MoveModAsync(profiles.Entries.Single(row => row.Name == "Armor").Mod.Id,
+                profiles.Entries.Single(row => row.Name == "Cape").Mod.Id, after: false);
+            Assert.All(profiles.Entries, row => Assert.Equal(groupId, row.Entry.GroupId));
+            Assert.Equal(new[] { "Armor", "Cape", "Helmet" }, profiles.Entries.Select(row => row.Name));
+            await profiles.VisibleItems.OfType<ProfileGroupItem>().Single().RemoveCommand.ExecuteAsync();
+            Assert.Empty(profiles.Groups); Assert.Equal(3, profiles.Entries.Count);
+            Assert.All(profiles.Entries, row => Assert.Null(row.Entry.GroupId));
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task OptionPreviewsFollowSelectionAndAppearInDropdown()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync(); var source = f.OptionsSource();

@@ -36,15 +36,35 @@
   <Style Selector="Button.rowSwitch"><Setter Property="Width" Value="36" /><Setter Property="Height" Value="20" /><Setter Property="MinHeight" Value="20" /><Setter Property="Padding" Value="3" /><Setter Property="CornerRadius" Value="10" /><Setter Property="Background" Value="#41464D" /></Style>
   <Style Selector="Button.rowSwitch.active"><Setter Property="Background" Value="{DynamicResource AccentBrush}" /></Style>
   <Style Selector="ListBox.modList"><Setter Property="Background" Value="#17191C" /><Setter Property="BorderThickness" Value="0" /></Style>
-  <Style Selector="ListBox.modList ListBoxItem"><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Background" Value="#1D1F23" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem">
+    <Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Background" Value="#1D1F23" />
+    <Setter Property="Template">
+      <ControlTemplate>
+        <Grid>
+          <ContentPresenter x:Name="PART_ContentPresenter" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                            Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}"
+                            HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}" VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+          <Border x:Name="RowIndicator" IsHitTestVisible="False" BorderThickness="0" />
+        </Grid>
+      </ControlTemplate>
+    </Setter>
+  </Style>
   <Style Selector="ListBox.modList ListBoxItem:nth-child(2n)"><Setter Property="Background" Value="#17191C" /></Style>
   <Style Selector="ListBox.modList ListBoxItem:selected"><Setter Property="Background" Value="#34291F" /></Style>
-  <Style Selector="ListBox.modList ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="#2B2723" /><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2,0,0,0" /></Style>
-  <Style Selector="ListBox.modList ListBoxItem.dropBefore /template/ ContentPresenter">
+  <Style Selector="ListBox.modList ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="#2B2723" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem:selected /template/ Border#RowIndicator"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2,0,0,0" /></Style>
+  <Style Selector="ListBox.modList ListBoxItem.dropBefore /template/ Border#RowIndicator">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="0,2,0,0" />
   </Style>
-  <Style Selector="ListBox.modList ListBoxItem.dropAfter /template/ ContentPresenter">
+  <Style Selector="ListBox.modList ListBoxItem.dropAfter /template/ Border#RowIndicator">
     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="0,0,0,2" />
+  </Style>
+  <Style Selector="Button.loadoutGroup">
+    <Setter Property="Background" Value="{DynamicResource AccentBrush}" /><Setter Property="Foreground" Value="#17191C" />
+    <Setter Property="CornerRadius" Value="0" /><Setter Property="Padding" Value="12,6" /><Setter Property="BorderThickness" Value="0" />
+  </Style>
+  <Style Selector="ListBox.modList ListBoxItem.dropInto /template/ Border#RowIndicator">
+    <Setter Property="BorderBrush" Value="{DynamicResource ClashBrush}" /><Setter Property="BorderThickness" Value="2" />
   </Style>
   <Style Selector="Button.profileButton"><Setter Property="Width" Value="48" /><Setter Property="Height" Value="48" /><Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Center" /><Setter Property="VerticalContentAlignment" Value="Center" /><Setter Property="Background" Value="#202327" /><Setter Property="BorderBrush" Value="#454B52" /><Setter Property="BorderThickness" Value="1" /><Setter Property="CornerRadius" Value="14" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
   <Style Selector="Button.profileButton.active"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /><Setter Property="Background" Value="#30261F" /></Style>

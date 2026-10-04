@@ -4,8 +4,15 @@ using Quartermaster.Library.Mods;
 namespace Quartermaster.Library.Profiles;
 
 public enum PriorityDirection { LastWins, FirstWins }
-public sealed record ProfileEntry(Guid ModId, bool Enabled, IReadOnlyList<OptionSelection> Options);
-public sealed record Profile(Guid Id, string Name, PriorityDirection Priority, IReadOnlyList<ProfileEntry> Entries);
+public sealed record ProfileEntry(Guid ModId, bool Enabled, IReadOnlyList<OptionSelection> Options)
+{
+    public Guid? GroupId { get; init; }
+}
+public sealed record ProfileGroup(Guid Id, string Name, bool IsExpanded = true);
+public sealed record Profile(Guid Id, string Name, PriorityDirection Priority, IReadOnlyList<ProfileEntry> Entries)
+{
+    public IReadOnlyList<ProfileGroup> Groups { get; init; } = [];
+}
 
 public static class ProfileEditor
 {
@@ -13,7 +20,7 @@ public static class ProfileEditor
     public static Profile Add(Profile profile, Mod mod)
     {
         if (profile.Entries.Any(e => e.ModId == mod.Id)) throw new ArgumentException("Mod is already in the profile.");
-        return profile with { Entries = [.. profile.Entries, new(mod.Id, true, [])] };
+        return Organize(profile with { Entries = [.. profile.Entries, new(mod.Id, true, [])] });
     }
     public static Profile Remove(Profile profile, Guid modId) => profile with
     { Entries = profile.Entries.Where(e => e.ModId != modId).ToArray() };
@@ -23,14 +30,62 @@ public static class ProfileEditor
         PatchSelection.Select(mod, new(mod.Id, true, options));
         return Change(profile, mod.Id, e => e with { Options = options.ToArray() });
     }
-    public static Profile Move(Profile profile, Guid modId, int index)
+    public static Profile AddGroup(Profile profile, string name, IReadOnlyCollection<Guid>? modIds = null)
     {
+        var selected = modIds?.ToHashSet() ?? [];
+        if (selected.Any(id => profile.Entries.All(entry => entry.ModId != id)))
+            throw new KeyNotFoundException("Mod is not in the profile.");
+        var group = new ProfileGroup(Guid.NewGuid(), Name(name));
+        return Organize(profile with
+        {
+            Groups = [.. profile.Groups, group],
+            Entries = profile.Entries.Select(entry => selected.Contains(entry.ModId) ? entry with { GroupId = group.Id } : entry).ToArray()
+        });
+    }
+    public static Profile RenameGroup(Profile profile, Guid groupId, string name) => ChangeGroup(profile, groupId, group => group with { Name = Name(name) });
+    public static Profile SetGroupExpanded(Profile profile, Guid groupId, bool expanded) => ChangeGroup(profile, groupId, group => group with { IsExpanded = expanded });
+    public static Profile RemoveGroup(Profile profile, Guid groupId)
+    {
+        RequireGroup(profile, groupId);
+        return Organize(profile with
+        {
+            Groups = profile.Groups.Where(group => group.Id != groupId).ToArray(),
+            Entries = profile.Entries.Select(entry => entry.GroupId == groupId ? entry with { GroupId = null } : entry).ToArray()
+        });
+    }
+    public static Profile SetGroup(Profile profile, Guid modId, Guid? groupId)
+    {
+        RequireGroup(profile, groupId);
+        if (profile.Entries.All(entry => entry.ModId != modId)) throw new KeyNotFoundException("Mod is not in the profile.");
+        var entry = profile.Entries.Single(entry => entry.ModId == modId);
+        if (entry.GroupId == groupId) return profile;
+        return Organize(profile with { Entries = [.. profile.Entries.Where(item => item.ModId != modId), entry with { GroupId = groupId }] });
+    }
+    public static Profile Move(Profile profile, Guid modId, int index) => Move(profile, modId, index,
+        profile.Entries.SingleOrDefault(entry => entry.ModId == modId)?.GroupId);
+    public static Profile Move(Profile profile, Guid modId, int index, Guid? groupId)
+    {
+        RequireGroup(profile, groupId);
         if (index < 0 || index >= profile.Entries.Count) throw new ArgumentOutOfRangeException(nameof(index));
         var entries = profile.Entries.ToList();
         var old = entries.FindIndex(e => e.ModId == modId);
         if (old < 0) throw new KeyNotFoundException("Mod is not in the profile.");
-        var entry = entries[old]; entries.RemoveAt(old); entries.Insert(index, entry);
-        return profile with { Entries = entries.ToArray() };
+        var entry = entries[old] with { GroupId = groupId }; entries.RemoveAt(old); entries.Insert(index, entry);
+        return Organize(profile with { Entries = entries.ToArray() });
+    }
+    private static Profile Organize(Profile profile)
+    {
+        var order = profile.Groups.Select((group, index) => (group.Id, index)).ToDictionary(item => item.Id, item => item.index);
+        return profile with { Entries = profile.Entries.OrderBy(entry => entry.GroupId is { } id ? order[id] : -1).ToArray() };
+    }
+    private static void RequireGroup(Profile profile, Guid? groupId)
+    {
+        if (groupId is { } id && profile.Groups.All(group => group.Id != id)) throw new KeyNotFoundException("Group is not in the profile.");
+    }
+    private static Profile ChangeGroup(Profile profile, Guid groupId, Func<ProfileGroup, ProfileGroup> change)
+    {
+        RequireGroup(profile, groupId);
+        return profile with { Groups = profile.Groups.Select(group => group.Id == groupId ? change(group) : group).ToArray() };
     }
     public static IEnumerable<ProfileEntry> InDeploymentOrder(Profile profile) => profile.Priority switch
     {
@@ -43,7 +98,7 @@ public static class ProfileEditor
         if (profile.Entries.All(e => e.ModId != modId)) throw new KeyNotFoundException("Mod is not in the profile.");
         return profile with { Entries = profile.Entries.Select(e => e.ModId == modId ? change(e) : e).ToArray() };
     }
-    private static string Name(string name) => !string.IsNullOrWhiteSpace(name) ? name.Trim() : throw new ArgumentException("Profile name is required.");
+    private static string Name(string name) => !string.IsNullOrWhiteSpace(name) ? name.Trim() : throw new ArgumentException("A name is required.");
 }
 
 public sealed record OptionChoice(string Name, IReadOnlyList<Guid> PatchSetIds);

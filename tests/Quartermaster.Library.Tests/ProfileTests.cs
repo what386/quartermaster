@@ -15,6 +15,57 @@ public class ProfileTests
         [new(archive + ".patch_7", PatchFileKind.Main, 80, new string('a', 64)), new(archive + ".patch_7.stream", PatchFileKind.Stream, 3, new string('b', 64))], keys);
     private static LibraryState State(Profile profile, params Mod[] mods) => LibraryState.Empty with { Mods = mods, Profiles = [profile], ActiveProfileId = profile.Id };
 
+    [Fact]
+    public void CreatingGroupFromSelectionPreservesOrderAndEntryConfiguration()
+    {
+        var a = Mod(Set()); var b = Mod(Set()); var c = Mod(Set());
+        var profile = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Create("Test"), a), b), c);
+        profile = ProfileEditor.AddGroup(profile, "Existing", [a.Id]);
+        profile = ProfileEditor.SetEnabled(profile, a.Id, false);
+        var originalOrder = profile.Entries.Select(entry => entry.ModId).ToArray();
+        var grouped = ProfileEditor.AddGroup(profile, "Selected", [a.Id, c.Id, a.Id]);
+        var groupId = grouped.Groups[1].Id;
+        Assert.Equal(originalOrder.Where(id => id != b.Id), grouped.Entries.Where(entry => entry.GroupId == groupId).Select(entry => entry.ModId));
+        Assert.False(grouped.Entries.Single(entry => entry.ModId == a.Id).Enabled);
+        Assert.Null(grouped.Entries.Single(entry => entry.ModId == b.Id).GroupId);
+        Assert.DoesNotContain(grouped.Entries, entry => entry.GroupId == grouped.Groups[0].Id);
+        Assert.Throws<KeyNotFoundException>(() => ProfileEditor.AddGroup(profile, "Invalid", [a.Id, Guid.NewGuid()]));
+        Assert.Single(profile.Groups);
+    }
+
+    [Fact]
+    public async Task GroupsPersistMembershipAndVisibilityAndKeepDeploymentOrderAligned()
+    {
+        using var f = new Fixture();
+        var a = await f.Library.ImportAsync(f.Source("A", 1)); var b = await f.Library.ImportAsync(f.Source("B", 2)); var c = await f.Library.ImportAsync(f.Source("C", 3));
+        var profile = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Create("Grouped"), a), b), c);
+        profile = ProfileEditor.AddGroup(ProfileEditor.AddGroup(profile, "Weapons"), "Armor");
+        var weapons = profile.Groups[0].Id; var armor = profile.Groups[1].Id;
+        profile = ProfileEditor.SetGroup(profile, a.Id, weapons);
+        profile = ProfileEditor.SetGroup(profile, b.Id, armor);
+        Assert.Equal(new[] { c.Id, a.Id, b.Id }, profile.Entries.Select(entry => entry.ModId));
+        profile = ProfileEditor.SetEnabled(profile, a.Id, false);
+        profile = ProfileEditor.SetGroupExpanded(profile, weapons, false);
+        await f.Library.SaveProfileAsync(profile, makeActive: true);
+        var state = await f.Library.LoadAsync(); profile = Assert.Single(state.Profiles);
+        Assert.False(profile.Groups[0].IsExpanded); Assert.Equal(weapons, profile.Entries.Single(entry => entry.ModId == a.Id).GroupId);
+        Assert.False(profile.Entries.Single(entry => entry.ModId == a.Id).Enabled);
+        var plan = DeploymentPlanner.Create(ProfilePatches.Resolve(state, profile));
+        Assert.Equal(new[] { c.Id, b.Id }, plan.Patches.Select(patch => patch.SourceId));
+        var renamed = ProfileEditor.RenameGroup(ProfileEditor.SetGroupExpanded(profile, weapons, true), weapons, "Renamed");
+        Assert.Equal(plan.Signature, DeploymentPlanner.Create(ProfilePatches.Resolve(state, renamed)).Signature);
+        var moved = ProfileEditor.Move(profile, b.Id, 0, null);
+        Assert.Null(moved.Entries[0].GroupId); Assert.Equal(b.Id, moved.Entries[0].ModId);
+        var removed = ProfileEditor.RemoveGroup(profile, weapons);
+        Assert.Equal(3, removed.Entries.Count); Assert.Null(removed.Entries.Single(entry => entry.ModId == a.Id).GroupId);
+        Assert.False(removed.Entries.Single(entry => entry.ModId == a.Id).Enabled);
+        await f.Library.SaveProfileAsync(removed);
+        Assert.Single(Assert.Single((await f.Library.LoadAsync()).Profiles).Groups);
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Store.SaveAsync(State(profile with
+        { Entries = profile.Entries.Select(entry => entry with { GroupId = Guid.NewGuid() }).ToArray() }, a, b, c)));
+        Assert.Throws<KeyNotFoundException>(() => ProfileEditor.SetGroup(profile, a.Id, Guid.NewGuid()));
+    }
+
     [Theory]
     [InlineData(PriorityDirection.LastWins)]
     [InlineData(PriorityDirection.FirstWins)]

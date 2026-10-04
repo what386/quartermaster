@@ -29,7 +29,13 @@ public static class StateValidation
         }
         foreach (var profile in state.Profiles)
         {
-            Unique(profile.Entries.Select(e => e.ModId));
+            Unique(profile.Entries.Select(e => e.ModId)); Unique(profile.Groups.Select(group => group.Id));
+            if (profile.Groups.Any(group => string.IsNullOrWhiteSpace(group.Name))) throw new ArgumentException("Invalid group metadata.");
+            var groupOrder = profile.Groups.Select((group, index) => (group.Id, index)).ToDictionary(item => item.Id, item => item.index);
+            if (profile.Entries.Any(entry => entry.GroupId is { } id && !groupOrder.ContainsKey(id)))
+                throw new ArgumentException("Mod references a missing group.");
+            var positions = profile.Entries.Select(entry => entry.GroupId is { } id ? groupOrder[id] : -1).ToArray();
+            if (!positions.SequenceEqual(positions.Order())) throw new ArgumentException("Profile groups do not match load order.");
             if (string.IsNullOrWhiteSpace(profile.Name) || !Enum.IsDefined(profile.Priority)) throw new ArgumentException("Invalid profile metadata.");
             foreach (var entry in profile.Entries)
             {
