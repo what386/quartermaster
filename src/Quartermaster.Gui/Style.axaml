@@ -38,6 +38,11 @@
   <Style Selector="ListBox.modList"><Setter Property="Background" Value="#17191C" /><Setter Property="BorderThickness" Value="0" /></Style>
   <Style Selector="ListBox.modList ListBoxItem">
     <Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Background" Value="#1D1F23" />
+    <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
+    <Setter Property="Transitions"><Transitions>
+      <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
+      <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
+    </Transitions></Setter>
     <Setter Property="Template">
       <ControlTemplate>
         <Grid>
@@ -49,6 +54,7 @@
       </ControlTemplate>
     </Setter>
   </Style>
+  <Style Selector="ListBox.modList ListBoxItem.dragging"><Setter Property="Opacity" Value="0" /></Style>
   <Style Selector="ListBox.modList ListBoxItem:nth-child(2n)"><Setter Property="Background" Value="#17191C" /></Style>
   <Style Selector="ListBox.modList ListBoxItem:selected"><Setter Property="Background" Value="#34291F" /></Style>
   <Style Selector="ListBox.modList ListBoxItem:selected /template/ ContentPresenter"><Setter Property="Background" Value="#2B2723" /></Style>

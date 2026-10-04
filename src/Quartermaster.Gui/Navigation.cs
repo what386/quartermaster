@@ -1,4 +1,3 @@
-using Avalonia.Media;
 using Quartermaster.Gui.Mods;
 using Quartermaster.Gui.Shared;
 using Quartermaster.Library.Profiles;
@@ -7,12 +6,12 @@ namespace Quartermaster.Gui;
 
 public enum PageKind { Mods, Profiles, Providers, Settings }
 
-public sealed class NavigationItem(PageKind page, string label, string iconPath) : ViewModelBase
+public sealed class NavigationItem(PageKind page, string label, string iconFile) : ViewModelBase
 {
     private bool active;
     public PageKind Page { get; } = page;
     public string Label { get; } = label;
-    public Geometry Icon { get; } = Geometry.Parse(iconPath);
+    public string IconSource { get; } = $"avares://Quartermaster.Gui/Assets/{iconFile}";
     public bool IsActive { get => active; internal set => Set(ref active, value); }
     public Command OpenCommand { get; internal set; } = new(() => { });
 }

@@ -47,6 +47,19 @@ public sealed partial class ProfilesViewModel
     });
     public Task MoveModToGroupAsync(Guid modId, Guid? groupId) => Operations.RunAsync("Moving mod to group", ct =>
         Save(ProfileEditor.SetGroup(SelectedProfile!, modId, groupId), ct));
+    public Task MoveGroupAsync(Guid groupId, Guid targetId, bool after)
+    {
+        if (!Operations.CanInteract || SelectedProfile is null || groupId == targetId) return Task.CompletedTask;
+        var groups = Groups.ToList();
+        var from = groups.FindIndex(group => group.Id == groupId);
+        var target = groups.FindIndex(group => group.Id == targetId);
+        if (from < 0 || target < 0) return Task.CompletedTask;
+        var destination = target + (after ? 1 : 0);
+        if (from < destination) destination--;
+        if (from == destination) return Task.CompletedTask;
+        var moved = ProfileEditor.MoveGroup(SelectedProfile, groupId, destination);
+        return Operations.RunAsync("Reordering groups", ct => Save(moved, ct), showProgress: false);
+    }
     private void RebuildVisibleItems()
     {
         var items = new List<IProfileListItem>();

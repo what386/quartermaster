@@ -23,6 +23,82 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task DragAnimationsPreviewModsAndGroupsAndGroupDropsPersistMemberOrder()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        foreach (var name in new[] { "Armor", "Cape", "Helmet" }) await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
+        f.Dialogs.InputText = "Equipment";
+        await profiles.CreateGroupFromModsAsync(profiles.Entries.Where(mod => mod.Name != "Helmet").Select(mod => mod.Mod.Id).ToArray());
+        f.Dialogs.InputText = "Helmet group";
+        await profiles.CreateGroupFromModsAsync([profiles.Entries.Single(mod => mod.Name == "Helmet").Mod.Id]);
+        var firstId = profiles.Groups[0].Id; var secondId = profiles.Groups[1].Id;
+        await profiles.VisibleItems.OfType<ProfileGroupItem>().Last().ToggleCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>());
+            var list = view.FindControl<ListBox>("ProfileModsList")!;
+            ListBoxItem Header(Guid id) => list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileGroupItem group && group.Id == id);
+            Point At(ListBoxItem row, bool bottom = false) => row.TranslatePoint(new Point(240, bottom ? row.Bounds.Height - 3 : 3), window)!.Value;
+            var source = Header(firstId); var start = At(source); var end = At(Header(secondId), bottom: true);
+            window.MouseMove(start); window.MouseDown(start, MouseButton.Left); window.MouseMove(end);
+            Assert.Contains("dragging", source.Classes);
+            Assert.All(list.GetVisualDescendants().OfType<ListBoxItem>().Where(row => row.DataContext is ProfileModItem), row => Assert.Contains("dragging", row.Classes));
+            Assert.True(view.FindControl<Border>("DragPreview")!.IsVisible);
+            Assert.Contains(view.FindControl<StackPanel>("DragVisuals")!.GetVisualDescendants().OfType<ProfileGroupView>(),
+                preview => preview.DataContext is ProfileGroupItem { Name: "Equipment" });
+            var ghost = view.FindControl<Border>("DragPreview")!;
+            Assert.Equal(source.Bounds.Width, ghost.Width);
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(source.Bounds.Height + list.GetVisualDescendants().OfType<ListBoxItem>()
+                .Where(row => row.DataContext is ProfileModItem).Sum(row => row.Bounds.Height), ghost.Bounds.Height, 1);
+            Assert.Equal(-ghost.Bounds.Height, Header(secondId).GetBaseValue(Visual.RenderTransformProperty).Value!.Value.M32, 1);
+            if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } dragDirectory)
+            {
+                Directory.CreateDirectory(dragDirectory);
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(dragDirectory, "DragGroup.png"));
+            }
+            var translation = Assert.IsType<Avalonia.Media.TranslateTransform>(ghost.RenderTransform);
+            Assert.Equal(end.Y - start.Y + source.TranslatePoint(default, list)!.Value.Y, translation.Y, 1);
+            var previousY = translation.Y;
+            window.MouseMove(new Point(end.X + 40, end.Y - 8));
+            Assert.Equal(0, translation.X); Assert.Equal(previousY - 8, translation.Y, 1);
+            window.MouseMove(end);
+            Assert.Contains("dropAfter", Header(secondId).Classes);
+            Assert.Contains(source.Transitions!, transition => transition is Avalonia.Animation.TransformOperationsTransition);
+            window.MouseUp(end, MouseButton.Left); await f.Services.Operations.WhenIdle; window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(new[] { secondId, firstId }, profiles.Groups.Select(group => group.Id));
+            Assert.Equal(new[] { "Helmet", "Armor", "Cape" }, profiles.Entries.Select(mod => mod.Name));
+            Assert.True(profiles.Groups.Single(group => group.Id == firstId).IsExpanded);
+            Assert.False(profiles.Groups.Single(group => group.Id == secondId).IsExpanded);
+            Assert.DoesNotContain(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.Classes.Contains("dragging"));
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            Assert.Equal(new[] { secondId, firstId }, Assert.Single(persisted.Profiles).Groups.Select(group => group.Id));
+            var modRow = list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileModItem mod && mod.Name == "Cape");
+            start = At(modRow); end = At(Header(secondId));
+            window.MouseMove(start); window.MouseDown(start, MouseButton.Left); window.MouseMove(end);
+            Assert.Contains("dragging", modRow.Classes); Assert.Contains("dropInto", Header(secondId).Classes);
+            Assert.Contains(view.FindControl<StackPanel>("DragVisuals")!.GetVisualDescendants().OfType<ModRowView>(),
+                preview => preview.DataContext is ProfileModItem { Name: "Cape" });
+            if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } modDragDirectory)
+            {
+                window.CaptureRenderedFrame()?.Dispose();
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(modDragDirectory, "DragMod.png"));
+            }
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            window.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            window.MouseUp(end, MouseButton.Left);
+            Assert.Equal(firstId, profiles.Entries.Single(mod => mod.Name == "Cape").Entry.GroupId);
+            Assert.DoesNotContain(list.GetVisualDescendants().OfType<ListBoxItem>(), row => row.Classes.Contains("dragging") || row.Classes.Contains("dropInto"));
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task RightClickCreatesGroupsFromMultipleSingleOrNoSelectedMods()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

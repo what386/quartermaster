@@ -16,6 +16,24 @@ public class ProfileTests
     private static LibraryState State(Profile profile, params Mod[] mods) => LibraryState.Empty with { Mods = mods, Profiles = [profile], ActiveProfileId = profile.Id };
 
     [Fact]
+    public void MovingGroupsMovesTheirMembersAndPreservesConfiguration()
+    {
+        var a = Mod(Set()); var b = Mod(Set()); var c = Mod(Set());
+        var profile = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Create("Test"), a), b), c);
+        profile = ProfileEditor.AddGroup(profile, "First", [a.Id, b.Id]);
+        profile = ProfileEditor.AddGroup(profile, "Second", [c.Id]);
+        profile = ProfileEditor.SetEnabled(profile, a.Id, false);
+        profile = ProfileEditor.SetGroupExpanded(profile, profile.Groups[0].Id, false);
+        var moved = ProfileEditor.MoveGroup(profile, profile.Groups[0].Id, 1);
+        Assert.Equal(profile.Groups.Reverse(), moved.Groups);
+        Assert.Equal(new[] { c.Id, a.Id, b.Id }, moved.Entries.Select(entry => entry.ModId));
+        Assert.Equal(profile.Entries.Where(entry => entry.ModId != c.Id), moved.Entries.Skip(1));
+        StateValidation.Validate(State(moved, a, b, c));
+        Assert.Throws<KeyNotFoundException>(() => ProfileEditor.MoveGroup(profile, Guid.NewGuid(), 0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ProfileEditor.MoveGroup(profile, profile.Groups[0].Id, 2));
+    }
+
+    [Fact]
     public void CreatingGroupFromSelectionPreservesOrderAndEntryConfiguration()
     {
         var a = Mod(Set()); var b = Mod(Set()); var c = Mod(Set());

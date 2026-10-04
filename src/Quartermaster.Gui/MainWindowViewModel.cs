@@ -15,10 +15,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly Dictionary<PageKind, ViewModelBase> pages;
     private NavigationItem selected;
     public IReadOnlyList<NavigationItem> NavigationItems { get; } =
-        [new(PageKind.Mods, "Library", "M3,6 L12,2 L21,6 L21,18 L12,22 L3,18 Z M3,6 L12,11 L21,6 M12,11 L12,22"),
-         new(PageKind.Profiles, "Profiles", "M3,5 L21,5 M3,12 L21,12 M3,19 L21,19 M6,2 L6,8 M16,9 L16,15 M10,16 L10,22"),
-         new(PageKind.Providers, "Providers", "M9,5 L6,5 C0,5 0,14 6,14 L10,14 M15,10 L18,10 C24,10 24,19 18,19 L14,19 M8,16 L16,8"),
-         new(PageKind.Settings, "Settings", "M9,2 L15,2 L16,6 L20,8 L23,12 L20,16 L16,18 L15,22 L9,22 L8,18 L4,16 L1,12 L4,8 L8,6 Z M12,8 A4,4 0 1 0 12,16 A4,4 0 1 0 12,8")];
+        [new(PageKind.Mods, "Library", "library.svg"),
+         new(PageKind.Profiles, "Profiles", "sliders.svg"),
+         new(PageKind.Providers, "Providers", "link.svg"),
+         new(PageKind.Settings, "Settings", "gear.svg")];
     public NavigationItem LibraryNavigation => NavigationItems.Single(item => item.Page == PageKind.Mods);
     public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Providers or PageKind.Settings).ToArray();
     public OperationState Operations { get; }

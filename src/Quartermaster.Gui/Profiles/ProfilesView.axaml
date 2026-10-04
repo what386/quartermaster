@@ -51,6 +51,10 @@
           <MenuItem x:Name="CreateGroupMenuItem" Header="Create group" IsEnabled="{Binding HasProfile}" Click="CreateGroupFromSelection" />
         </ContextMenu></ListBox.ContextMenu>
       </ListBox>
+      <Border Grid.Row="1" x:Name="DragPreview" IsHitTestVisible="False" IsVisible="False" ZIndex="100"
+              HorizontalAlignment="Left" VerticalAlignment="Top" BoxShadow="0 6 18 0 #80000000">
+        <StackPanel x:Name="DragVisuals" />
+      </Border>
     </Grid>
   </Grid>
 </UserControl>

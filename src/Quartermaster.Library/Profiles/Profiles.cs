@@ -42,6 +42,15 @@ public static class ProfileEditor
             Entries = profile.Entries.Select(entry => selected.Contains(entry.ModId) ? entry with { GroupId = group.Id } : entry).ToArray()
         });
     }
+    public static Profile MoveGroup(Profile profile, Guid groupId, int index)
+    {
+        RequireGroup(profile, groupId);
+        if (index < 0 || index >= profile.Groups.Count) throw new ArgumentOutOfRangeException(nameof(index));
+        var groups = profile.Groups.ToList();
+        var group = groups.Single(item => item.Id == groupId);
+        groups.Remove(group); groups.Insert(index, group);
+        return Organize(profile with { Groups = groups.ToArray() });
+    }
     public static Profile RenameGroup(Profile profile, Guid groupId, string name) => ChangeGroup(profile, groupId, group => group with { Name = Name(name) });
     public static Profile SetGroupExpanded(Profile profile, Guid groupId, bool expanded) => ChangeGroup(profile, groupId, group => group with { IsExpanded = expanded });
     public static Profile RemoveGroup(Profile profile, Guid groupId)

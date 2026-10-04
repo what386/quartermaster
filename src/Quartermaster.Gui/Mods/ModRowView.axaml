@@ -1,5 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModRowView" x:DataType="vm:IModRow">
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared" x:Class="Quartermaster.Gui.Mods.ModRowView" x:DataType="vm:IModRow">
   <Grid ColumnDefinitions="32,Auto,56,*,Auto" Margin="10,6" MinHeight="48">
     <TextBlock Text="{Binding Number}" Classes="muted" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center" />
     <Button Grid.Column="1" Classes="rowSwitch" Classes.active="{Binding IsEnabled}" Command="{Binding EnableCommand}" IsVisible="{Binding HasToggle}" AutomationProperties.Name="{Binding ToggleDescription}" VerticalAlignment="Center" Margin="8,0,14,0">
@@ -19,8 +19,8 @@
       <Border BorderBrush="{DynamicResource ClashBrush}" BorderThickness="1" CornerRadius="3" Padding="5,2" IsVisible="{Binding HasConflict}"><TextBlock Text="CLASH" Foreground="{DynamicResource ClashBrush}" FontSize="9" /></Border>
       <Button x:Name="ModOptionsButton" Width="28" Height="28" MinHeight="0" Padding="5" Background="Transparent" BorderThickness="0"
               IsVisible="{Binding HasToggle}" IsEnabled="{Binding HasOptions}" Click="RequestOptions" ToolTip.Tip="Mod options" AutomationProperties.Name="Mod options">
-        <Path Data="M1,4 L5,4 M9,4 L17,4 M1,9 L11,9 M15,9 L17,9 M1,14 L3,14 M7,14 L17,14 M5,1 L9,1 L9,7 L5,7 Z M11,6 L15,6 L15,12 L11,12 Z M3,11 L7,11 L7,17 L3,17 Z"
-              Width="18" Height="18" Stretch="Uniform" Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.3" />
+        <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/sliders.svg" Width="18" Height="18"
+                        Foreground="{Binding $parent[Button].Foreground}" />
       </Button>
       <Path Data="M0,2 L18,2 M0,8 L18,8 M0,14 L18,14" Width="18" Height="16" Stroke="#6F767E" StrokeThickness="1.3" IsVisible="{Binding HasToggle}" ToolTip.Tip="Drag to reorder; right-click for mod actions" />
     </StackPanel>
