@@ -1,28 +1,60 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.SettingsView" x:DataType="vm:SettingsViewModel">
-  <ScrollViewer><StackPanel Margin="12" Spacing="18" IsEnabled="{Binding Operations.CanInteract}">
-    <StackPanel Spacing="8"><TextBlock Text="Settings" Classes="pageTitle" /><TextBlock Text="Connect your local library to the installed game." Classes="muted" /></StackPanel>
-    <Border Classes="card"><StackPanel Spacing="16">
-      <TextBlock Text="Helldivers 2 installation" Classes="sectionTitle" />
-      <TextBlock Text="Select the installation folder or its data folder." Classes="muted" />
-      <TextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="Path to Helldivers 2" />
-      <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="Browse" Command="{Binding BrowseCommand}" /><Button Content="Save folder" Classes="primary" Command="{Binding SavePathCommand}" /><Button Content="Find Steam installations" Command="{Binding DiscoverCommand}" /></StackPanel>
-      <ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Discovered installations" />
-      <Button Content="Use selected installation" Command="{Binding UseInstallationCommand}" HorizontalAlignment="Left" />
-    </StackPanel></Border>
-    <Border Classes="card"><StackPanel Spacing="12">
-      <TextBlock Text="Profile load priority" Classes="sectionTitle" />
-      <TextBlock Text="{Binding ActiveProfileName}" Classes="muted" />
-      <TextBlock Text="Choose which entries in this profile take precedence when mods overlap." Classes="muted" TextWrapping="Wrap" />
-      <Button Content="{Binding PriorityLabel}" Command="{Binding PriorityCommand}" HorizontalAlignment="Left" />
-    </StackPanel></Border>
-    <Border Classes="card"><StackPanel Spacing="12">
-      <TextBlock Text="Repatching" Classes="sectionTitle" />
-      <TextBlock Text="Check selected mods against the installed game before deployment. Repatched files are prepared temporarily; library originals remain unchanged." Classes="muted" TextWrapping="Wrap" />
-      <ComboBox ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" HorizontalAlignment="Stretch" />
-      <Button Content="Save repatch setting" Command="{Binding SaveRepatchCommand}" HorizontalAlignment="Left" />
-    </StackPanel></Border>
-    <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Deployment health" Classes="sectionTitle" /><TextBlock Text="{Binding DeploymentStatus}" TextWrapping="Wrap" /><Button Content="Purge patches" Command="{Binding PurgeCommand}" HorizontalAlignment="Left" /></StackPanel></Border>
-    <Border Classes="card"><StackPanel Spacing="12"><TextBlock Text="Library storage" Classes="sectionTitle" /><TextBlock Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" /><TextBlock Text="Imported originals, profiles and deployment records are stored here." Classes="muted" TextWrapping="Wrap" /></StackPanel></Border>
-  </StackPanel></ScrollViewer>
+  <Grid RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
+      <TextBlock Text="Settings" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search settings…" Margin="0,0,8,0" />
+      <Button Grid.Column="2" Content="Reset" Command="{Binding ResetCommand}" ToolTip.Tip="Restore defaults. Click Save to apply." Margin="0,0,8,0" />
+      <Button Grid.Column="3" Content="Save" Classes="primary" Command="{Binding SaveCommand}" />
+    </Grid>
+    <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><TextBlock Text="PREFERENCES" FontWeight="SemiBold" /></Border>
+    <ScrollViewer Grid.Row="2"><StackPanel Spacing="12">
+      <Border Classes="card" IsVisible="{Binding HasMatches}"><StackPanel Spacing="16">
+        <Grid x:Name="InstallationSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowInstallation}">
+          <StackPanel Spacing="4"><TextBlock Text="Game folder" FontWeight="SemiBold" /><TextBlock Text="Installation or data folder" Classes="muted" FontSize="11" /></StackPanel>
+          <StackPanel Grid.Column="1" Spacing="8">
+            <Grid ColumnDefinitions="*,Auto,Auto">
+              <TextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="Path to Helldivers 2" />
+              <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseCommand}" Margin="8,0" />
+              <Button Grid.Column="2" Content="Find Steam installs" Command="{Binding DiscoverCommand}" />
+            </Grid>
+            <ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Discovered installations" IsVisible="{Binding HasInstallations}" />
+          </StackPanel>
+        </Grid>
+        <Grid x:Name="PrioritySettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowPriority}">
+          <StackPanel Spacing="4"><TextBlock Text="Load priority" FontWeight="SemiBold" /><TextBlock Text="{Binding ActiveProfileName}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" /></StackPanel>
+          <ComboBox Grid.Column="1" ItemsSource="{Binding PriorityChoices}" SelectedIndex="{Binding PriorityChoice, Mode=TwoWay}" IsEnabled="{Binding HasProfile}" Width="320" HorizontalAlignment="Left" />
+        </Grid>
+        <Grid x:Name="RepatchSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowRepatch}">
+          <StackPanel Spacing="4"><TextBlock Text="Repatching" FontWeight="SemiBold" /><TextBlock Text="Before deployment" Classes="muted" FontSize="11" /></StackPanel>
+          <ComboBox Grid.Column="1" ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
+        </Grid>
+        <Grid x:Name="StorageSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowStorage}">
+          <TextBlock Text="Library storage" FontWeight="SemiBold" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" />
+        </Grid>
+        <Grid x:Name="VersionInformation" ColumnDefinitions="180,*" IsVisible="{Binding ShowVersion}">
+          <TextBlock Text="App version" FontWeight="SemiBold" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding ApplicationVersion}" Classes="muted" TextWrapping="Wrap" />
+        </Grid>
+        <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowPlatform}">
+          <TextBlock Text="Operating system" FontWeight="SemiBold" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding PlatformInformation}" Classes="muted" TextWrapping="Wrap" />
+        </Grid>
+        <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowRuntime}">
+          <TextBlock Text="Runtime" FontWeight="SemiBold" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding RuntimeVersion}" Classes="muted" TextWrapping="Wrap" />
+        </Grid>
+        <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowConfiguration}">
+          <TextBlock Text="Settings file" FontWeight="SemiBold" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding ConfigurationFilePath}" Classes="muted" TextWrapping="Wrap" />
+        </Grid>
+        <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowLogs}">
+          <TextBlock Text="Log file" FontWeight="SemiBold" />
+          <SelectableTextBlock Grid.Column="1" Text="{Binding LogFilePath}" Classes="muted" TextWrapping="Wrap" />
+        </Grid>
+      </StackPanel></Border>
+      <TextBlock Text="No matching settings." Classes="muted" IsVisible="{Binding !HasMatches}" Margin="16" />
+    </StackPanel></ScrollViewer>
+  </Grid>
 </UserControl>

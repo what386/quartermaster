@@ -135,6 +135,30 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         }
         finally { await ReloadAsync(CancellationToken.None); }
     }
+    public async Task SaveSettingsAsync(string gamePath, RepatchMode mode, Guid? profileId, PriorityDirection priority, CancellationToken ct)
+    {
+        if (!Enum.IsDefined(mode) || !Enum.IsDefined(priority)) throw new ArgumentException("Invalid settings choice.");
+        var directory = string.IsNullOrWhiteSpace(gamePath) ? null :
+            await Task.Run(() => SteamGameDiscovery.ResolveDataDirectory(gamePath), ct)
+            ?? throw new ArgumentException("Choose a Helldivers 2 installation or its data folder.");
+        var profile = profileId is null ? null : State.Profiles.Single(p => p.Id == profileId);
+        var updated = Settings with { GameDataDirectory = directory, Repatch = mode };
+        // Validate the complete draft before persisting any fields.
+        try
+        {
+            await Task.Run(async () =>
+            {
+                await settingsStore.SaveAsync(updated, ct);
+                if (profile is not null && profile.Priority != priority)
+                    await library.SaveProfileAsync(profile with { Priority = priority }, false, ct);
+            }, ct);
+        }
+        finally
+        {
+            Settings = await Task.Run(() => settingsStore.LoadAsync(CancellationToken.None));
+            await ReloadAsync(CancellationToken.None);
+        }
+    }
     public async Task SetRepatchModeAsync(RepatchMode mode, CancellationToken ct)
     {
         if (!Enum.IsDefined(mode)) throw new ArgumentException("Invalid repatch setting.");

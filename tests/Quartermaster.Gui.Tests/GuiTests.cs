@@ -106,6 +106,46 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task LibraryUsesFullWidthListWithDetailsDialogAndContextActions()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Source("Armor"), CancellationToken.None);
+        await f.Services.Session.ImportAsync(f.Source("Cape"), CancellationToken.None);
+        var mods = Page<ModsViewModel>(f, PageKind.Mods);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ModsView>());
+            var list = view.FindControl<ListBox>("ModsList")!;
+            Assert.Equal(view.Bounds.Width, list.Bounds.Width, 1);
+            Assert.DoesNotContain(window.GetVisualDescendants().OfType<ModDetailsDialog>(), _ => true);
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), b => b.Content is "Export repatched ZIP" or "Remove selected mod");
+            var row = Assert.Single(list.GetVisualDescendants().OfType<ListBoxItem>(), item => item.DataContext is ModListItem { Name: "Cape" });
+            var point = row.TranslatePoint(new Point(240, row.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(point); window.MouseDown(point, Avalonia.Input.MouseButton.Right); window.MouseUp(point, Avalonia.Input.MouseButton.Right);
+            Dispatcher.UIThread.RunJobs(); Assert.Equal("Cape", mods.SelectedMod!.Name);
+            var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
+            var details = Assert.IsType<MenuItem>(menu.Items[0]);
+            details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            window.CaptureRenderedFrame()?.Dispose();
+            var dialog = Assert.Single(window.GetVisualDescendants().OfType<ModDetailsDialog>());
+            Assert.Equal("Cape", Assert.IsType<ModDetailsViewModel>(dialog.DataContext).Name);
+            Assert.Empty(window.OwnedWindows); dialog.Cancel(); Dispatcher.UIThread.RunJobs();
+            menu.Open(list); Dispatcher.UIThread.RunJobs();
+            await Assert.IsType<AsyncCommand>(Assert.IsType<MenuItem>(menu.Items[1]).Command).ExecuteAsync(); menu.Close();
+            Assert.Equal("Cape-repatched.zip", f.Dialogs.SuggestedSaveName);
+            f.Dialogs.Confirm = false; menu.Open(list); Dispatcher.UIThread.RunJobs();
+            var remove = Assert.IsType<MenuItem>(menu.Items[3]);
+            await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); Assert.Equal(2, mods.Mods.Count);
+            f.Dialogs.Confirm = true; await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); menu.Close();
+            Assert.Equal("Armor", Assert.Single(mods.Mods).Name);
+            mods.Search = "missing"; Assert.False(mods.HasVisibleMods); Assert.Equal("No mods match your search.", mods.EmptyMessage);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ProfileContextMenuTargetsClickedModAndDragDropPersistsOrder()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -593,13 +633,13 @@ public class GuiTests
         Assert.False(Directory.Exists(Path.Combine(f.Data, "patched")));
         Assert.False(File.Exists(Path.Combine(f.Data, "patches.json")));
         var settings = Page<SettingsViewModel>(f, PageKind.Settings);
-        settings.RepatchChoice = (int)RepatchMode.Automatic; await settings.SaveRepatchCommand.ExecuteAsync();
+        settings.RepatchChoice = (int)RepatchMode.Automatic; await settings.SaveCommand.ExecuteAsync();
         f.Dialogs.Confirmations.Clear(); await profiles.DeployCommand.ExecuteAsync();
         Assert.DoesNotContain(f.Dialogs.Confirmations, c => c.Title == "Repatch required");
         Assert.False(f.Services.Operations.IsError);
         var saved = await new SettingsStore(f.Data).LoadAsync(CancellationToken.None);
         Assert.Equal(RepatchMode.Automatic, saved.Repatch);
-        settings.RepatchChoice = (int)RepatchMode.Never; await settings.SaveRepatchCommand.ExecuteAsync();
+        settings.RepatchChoice = (int)RepatchMode.Never; await settings.SaveCommand.ExecuteAsync();
         await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
         Assert.Equal(original, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
     }
@@ -643,22 +683,75 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task SettingsUsesOneSaveForDraftsAndSearchDoesNotDiscardEdits()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var settings = Page<SettingsViewModel>(f, PageKind.Settings);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
+            var save = Assert.Single(view.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "Save"));
+            Assert.False(save.IsEffectivelyEnabled);
+            Assert.DoesNotContain(view.GetVisualDescendants().OfType<Button>(), b => b.Content is "Save folder" or "Save repatch setting" or "Purge patches" or "Use selected installation");
+            var nextGame = Path.Combine(f.Root, "second-game"); Directory.CreateDirectory(nextGame);
+            File.WriteAllBytes(Path.Combine(nextGame, Fixture.Archive), []);
+            f.Dialogs.FolderPath = nextGame; await settings.BrowseCommand.ExecuteAsync();
+            var repatch = Assert.Single(view.FindControl<Grid>("RepatchSettings")!.GetVisualDescendants().OfType<ComboBox>());
+            var priority = Assert.Single(view.FindControl<Grid>("PrioritySettings")!.GetVisualDescendants().OfType<ComboBox>());
+            repatch.SelectedIndex = (int)RepatchMode.Automatic; priority.SelectedIndex = (int)PriorityDirection.FirstWins;
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(f.Game, f.Services.Session.GameDirectory);
+            Assert.Equal(RepatchMode.Ask, f.Services.Session.Settings.Repatch);
+            Assert.Equal(PriorityDirection.LastWins, f.Services.Session.ActiveProfile!.Priority);
+            settings.Search = "repatch"; window.CaptureRenderedFrame()?.Dispose();
+            Assert.True(view.FindControl<Grid>("RepatchSettings")!.IsEffectivelyVisible);
+            Assert.False(view.FindControl<Grid>("InstallationSettings")!.IsEffectivelyVisible);
+            await f.Services.Session.ReloadAsync(CancellationToken.None);
+            Assert.Equal(nextGame, settings.GamePath); Assert.Equal((int)RepatchMode.Automatic, settings.RepatchChoice);
+            settings.GamePath = Path.Combine(f.Root, "missing"); await settings.SaveCommand.ExecuteAsync();
+            Assert.True(f.Services.Operations.IsError);
+            Assert.Equal(RepatchMode.Ask, f.Services.Session.Settings.Repatch);
+            Assert.Equal(PriorityDirection.LastWins, f.Services.Session.ActiveProfile!.Priority);
+            settings.GamePath = nextGame; await settings.SaveCommand.ExecuteAsync();
+            Assert.False(f.Services.Operations.IsError); Assert.False(settings.SaveCommand.CanExecute(null));
+            var stored = await new SettingsStore(f.Data).LoadAsync(CancellationToken.None);
+            Assert.Equal(nextGame, stored.GameDataDirectory); Assert.Equal(RepatchMode.Automatic, stored.Repatch);
+            Assert.Equal(PriorityDirection.FirstWins, f.Services.Session.ActiveProfile!.Priority);
+            var reset = Assert.Single(view.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "Reset"));
+            reset.Command!.Execute(null);
+            Assert.Empty(settings.GamePath); Assert.Equal((int)RepatchMode.Ask, settings.RepatchChoice);
+            Assert.Equal((int)PriorityDirection.LastWins, settings.PriorityChoice);
+            Assert.Equal(nextGame, f.Services.Session.GameDirectory); Assert.Equal(RepatchMode.Automatic, f.Services.Session.Settings.Repatch);
+            Assert.True(settings.SaveCommand.CanExecute(null));
+            await settings.SaveCommand.ExecuteAsync();
+            stored = await new SettingsStore(f.Data).LoadAsync(CancellationToken.None);
+            Assert.Null(stored.GameDataDirectory); Assert.Equal(RepatchMode.Ask, stored.Repatch);
+            Assert.Equal(PriorityDirection.LastWins, f.Services.Session.ActiveProfile!.Priority);
+            Assert.Single(f.Services.Session.State.Profiles);
+            settings.Search = "no matching setting"; Assert.False(settings.HasMatches);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task InvalidSettingsAreReportedAndValidSettingsPersist()
     {
         using var f = new Fixture(discoverGame: false); await f.Shell.InitializeAsync();
         var settings = Page<SettingsViewModel>(f, PageKind.Settings);
-        settings.GamePath = Path.Combine(f.Root, "missing"); await settings.SavePathCommand.ExecuteAsync();
+        settings.GamePath = Path.Combine(f.Root, "missing"); await settings.SaveCommand.ExecuteAsync();
         Assert.True(f.Services.Operations.IsError); Assert.Empty(f.Services.Session.GameDirectory);
-        settings.GamePath = f.Game; await settings.SavePathCommand.ExecuteAsync();
+        settings.GamePath = f.Game; await settings.SaveCommand.ExecuteAsync();
         Assert.False(f.Services.Operations.IsError); Assert.Equal(f.Game, f.Services.Session.GameDirectory);
         await settings.DiscoverCommand.ExecuteAsync(); Assert.Empty(settings.Installations);
         Assert.Equal("Default", settings.ActiveProfileName);
         var previousPriority = f.Services.Session.ActiveProfile!.Priority;
-        await settings.PriorityCommand.ExecuteAsync();
+        settings.PriorityChoice = 1 - settings.PriorityChoice; await settings.SaveCommand.ExecuteAsync();
         Assert.NotEqual(previousPriority, f.Services.Session.ActiveProfile!.Priority);
         await f.Services.Session.ReloadAsync(CancellationToken.None);
         Assert.NotEqual(previousPriority, f.Services.Session.ActiveProfile!.Priority);
-        await settings.PriorityCommand.ExecuteAsync();
+        settings.PriorityChoice = 1 - settings.PriorityChoice; await settings.SaveCommand.ExecuteAsync();
         Assert.Equal(previousPriority, f.Services.Session.ActiveProfile!.Priority);
         settings.GamePath = "unsaved edit"; await f.Services.Session.ReloadAsync(CancellationToken.None);
         Assert.Equal("unsaved edit", settings.GamePath);

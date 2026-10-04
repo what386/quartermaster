@@ -18,6 +18,7 @@
   <Style Selector="TextBlock.sectionTitle"><Setter Property="FontSize" Value="15" /><Setter Property="FontWeight" Value="SemiBold" /></Style>
   <Style Selector="TextBlock.eyebrow"><Setter Property="FontSize" Value="10" /><Setter Property="LetterSpacing" Value="1.5" /><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
   <Style Selector="TextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
+  <Style Selector="SelectableTextBlock.muted"><Setter Property="Foreground" Value="{DynamicResource MutedBrush}" /></Style>
   <Style Selector="TextBlock.accent"><Setter Property="Foreground" Value="{DynamicResource AccentBrush}" /></Style>
   <Style Selector="TextBlock.success"><Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" /></Style>
   <Style Selector="TextBlock.error"><Setter Property="Foreground" Value="#F3A5A5" /></Style>

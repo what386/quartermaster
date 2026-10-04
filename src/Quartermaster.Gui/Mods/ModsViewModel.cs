@@ -53,6 +53,8 @@ public sealed class ModsViewModel : SessionViewModel
     }
     public ModDetailsViewModel? Details => SelectedMod is { } item ? new(item.Mod) : null;
     public bool HasMods => Session.State.Mods.Count > 0;
+    public bool HasVisibleMods => Mods.Count > 0;
+    public string EmptyMessage => HasMods ? "No mods match your search." : "Import a ZIP or folder to add mods to your library.";
     public bool HasSelection => SelectedMod is not null;
     public string CountLabel => $"{Mods.Count} mods";
     public AsyncCommand ImportZipCommand { get; }
@@ -93,7 +95,7 @@ public sealed class ModsViewModel : SessionViewModel
             Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)).Resources.SelectMany(c => c.SourceIds).ToHashSet() : [];
         Mods = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
             .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id))).ToArray();
-        Notify(nameof(Mods)); Notify(nameof(CountLabel)); Notify(nameof(HasMods));
+        Notify(nameof(Mods)); Notify(nameof(CountLabel)); Notify(nameof(HasMods)); Notify(nameof(HasVisibleMods)); Notify(nameof(EmptyMessage));
         SelectedMod = Mods.FirstOrDefault(m => m.Mod.Id == id) ?? Mods.FirstOrDefault();
         ExportRepatchedCommand.Refresh();
     }

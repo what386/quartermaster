@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModDetailsDialog" x:DataType="vm:ModDetailsViewModel" Width="520" Height="540">
+  <Grid RowDefinitions="*,Auto">
+    <ScrollViewer>
+      <StackPanel Spacing="18">
+        <TextBlock Text="{Binding Name}" Classes="sectionTitle" TextWrapping="Wrap" />
+        <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+        <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto"><TextBlock Text="Version" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding Version}" /><TextBlock Grid.Row="1" Text="Imported" Classes="muted" Margin="0,8,0,0" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ImportedAt}" Margin="0,8,0,0" /></Grid>
+        <TextBlock Text="{Binding ResourceSummary}" TextWrapping="Wrap" />
+        <TextBlock Text="This mod has options. Configure them in Profiles." IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />
+        <TextBlock Text="Archives" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Archives}" />
+        <TextBlock Text="Patch files" FontWeight="SemiBold" />
+        <ItemsControl ItemsSource="{Binding Files}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+    <Button Grid.Row="1" Content="Close" Click="CloseDialog" HorizontalAlignment="Right" Margin="0,16,0,0" />
+  </Grid>
+</UserControl>
