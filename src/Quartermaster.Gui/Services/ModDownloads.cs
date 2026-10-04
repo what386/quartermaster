@@ -13,6 +13,13 @@ public sealed class ModDownloads : ViewModelBase
     private readonly Dictionary<Guid, DownloadRow> rows = [];
     public event EventHandler? Changed;
     public IReadOnlyList<DownloadRow> Jobs { get; private set; } = [];
+    private string search = "";
+    public string Search { get => search; set { if (Set(ref search, value)) NotifyList(); } }
+    public IReadOnlyList<DownloadRow> VisibleJobs => Jobs.Where(row => row.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    public bool HasVisibleJobs => VisibleJobs.Count > 0;
+    public string EmptyMessage => Jobs.Count == 0 ? "No downloads queued." : "No downloads match your search.";
+    public string CountLabel => ModPresentation.Count(Jobs.Count, "download");
+    public OperationState Operations => services.Operations;
     public bool HasPendingDownloads => Jobs.Any(row => row.IsActive);
     public string PendingSummary
     {
@@ -46,9 +53,12 @@ public sealed class ModDownloads : ViewModelBase
             if (!rows.TryGetValue(job.Id, out var row)) rows[job.Id] = row = new DownloadRow(job, services);
             row.Update(job); return row;
         }).ToArray();
-        Notify(nameof(Jobs)); Notify(nameof(HasPendingDownloads)); Notify(nameof(PendingSummary)); Notify(nameof(PendingExplanation));
+        foreach (var id in rows.Keys.Where(id => !services.Providers.State.Jobs.Any(job => job.Id == id)).ToArray()) rows.Remove(id);
+        Notify(nameof(Jobs)); NotifyList(); Notify(nameof(HasPendingDownloads)); Notify(nameof(PendingSummary)); Notify(nameof(PendingExplanation));
         Changed?.Invoke(this, EventArgs.Empty);
     }
+    private void NotifyList()
+    { Notify(nameof(VisibleJobs)); Notify(nameof(HasVisibleJobs)); Notify(nameof(EmptyMessage)); Notify(nameof(CountLabel)); }
     public async Task AddAsync(CancellationToken ct, Guid? profileId = null)
     {
         var request = await services.Dialogs.RequestModImportAsync();
@@ -104,6 +114,12 @@ public sealed class DownloadRow : ViewModelBase
     public AsyncCommand OpenCommand { get; }
     public AsyncCommand RetryCommand { get; }
     public AsyncCommand CancelCommand { get; }
+    public AsyncCommand AttachCommand { get; }
+    public AsyncCommand RemoveCommand { get; }
+    public bool CanAttach => job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled;
+    public bool CanCancel => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading;
+    public bool CanRetry => job.Status is DownloadStatus.Failed or DownloadStatus.Cancelled;
+    public bool CanRemove => job.Status is DownloadStatus.Complete or DownloadStatus.Failed or DownloadStatus.Cancelled;
     public DownloadRow(DownloadJob job, AppServices services)
     {
         this.job = job;
@@ -111,9 +127,20 @@ public sealed class DownloadRow : ViewModelBase
         { services.Providers.OpenDownloadPage(job.Id); return Task.CompletedTask; });
         RetryCommand = services.Operations.CreateCommand("Retrying download", ct => services.Providers.RetryAsync(job.Id, ct),
             () => this.job.Status is DownloadStatus.Failed or DownloadStatus.Cancelled);
-        CancelCommand = services.Operations.CreateCommand("Cancelling download", ct => services.Providers.CancelAsync(job.Id, ct),
-            () => this.job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading);
+        AttachCommand = services.Operations.CreateCommand("Attaching mod ZIP", async ct =>
+        {
+            var path = await services.Dialogs.PickModZipAsync();
+            if (path is null) return;
+            await services.Providers.AttachZipAsync(job.Id, path, ct);
+            await services.Session.ReloadAsync(ct);
+        }, () => CanAttach);
+        CancelCommand = services.Operations.CreateCommand("Cancelling download", ct => services.Providers.RemoveAsync(job.Id, ct), () => CanCancel);
+        RemoveCommand = services.Operations.CreateCommand("Removing download", ct => services.Providers.RemoveAsync(job.Id, ct), () => CanRemove);
     }
     public void Update(DownloadJob value)
-    { job = value; Notify(nameof(Name)); Notify(nameof(Status)); Notify(nameof(IsWaiting)); Notify(nameof(IsActive)); RetryCommand.Refresh(); CancelCommand.Refresh(); }
+    {
+        job = value; Notify(nameof(Name)); Notify(nameof(Status)); Notify(nameof(IsWaiting)); Notify(nameof(IsActive));
+        Notify(nameof(CanAttach)); Notify(nameof(CanCancel)); Notify(nameof(CanRetry)); Notify(nameof(CanRemove));
+        RetryCommand.Refresh(); CancelCommand.Refresh(); AttachCommand.Refresh(); RemoveCommand.Refresh();
+    }
 }

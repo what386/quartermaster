@@ -100,6 +100,33 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
     }
     public async Task CancelAsync(Guid id, CancellationToken ct = default)
     { await StopWorkerAsync(id); await SetStatusAsync(id, DownloadStatus.Cancelled, ct: ct); }
+    public async Task RemoveAsync(Guid id, CancellationToken ct = default)
+    {
+        await StopWorkerAsync(id);
+        await MutateAsync(state => state with { Jobs = state.Jobs.Where(job => job.Id != id).ToArray() }, ct);
+    }
+    /// <summary>The user explicitly associates an existing ZIP with this request, bypassing automatic provider recognition.</summary>
+    public async Task AttachZipAsync(Guid id, string archive, CancellationToken ct = default)
+    {
+        archive = Path.GetFullPath(archive);
+        if (!archive.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) || !File.Exists(archive))
+            throw new ArgumentException("Choose an existing ZIP archive.");
+        await StopWorkerAsync(id, preserveImporting: true);
+        Task task;
+        await gate.WaitAsync(ct);
+        try
+        {
+            var job = State.Jobs.Single(j => j.Id == id);
+            if (job.Status is DownloadStatus.Complete or DownloadStatus.Importing)
+                throw new InvalidOperationException("This download is already complete or being imported.");
+            Start(job, archive: archive, ct: ct); task = workers[id].Task;
+        }
+        finally { gate.Release(); }
+        await task;
+        if (State.Jobs.Single(j => j.Id == id) is { Status: DownloadStatus.Failed, Error: { } error })
+            throw new InvalidDataException(error);
+        ct.ThrowIfCancellationRequested();
+    }
     public async Task RetryAsync(Guid id, CancellationToken ct = default)
     {
         await StopWorkerAsync(id); await SetStatusAsync(id, DownloadStatus.Waiting, ct: ct);
@@ -141,18 +168,27 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
         finally { gate.Release(); }
         if (task is not null) await task;
     }
-    private void Start(DownloadJob job, string? grant = null)
+    private void Start(DownloadJob job, string? grant = null, string? archive = null, CancellationToken ct = default)
     {
-        var source = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-        workers[job.Id] = (source, Task.Run(() => RunAsync(job, grant, source.Token)));
+        var source = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token, ct);
+        workers[job.Id] = (source, Task.Run(() => RunAsync(job, grant, archive, source.Token)));
     }
-    private async Task RunAsync(DownloadJob job, string? grant, CancellationToken ct)
+    private async Task RunAsync(DownloadJob job, string? grant, string? archive, CancellationToken ct)
     {
         var path = Path.Combine(cacheDirectory, job.Id.ToString("N") + ".zip");
         try
         {
             var provider = GetProvider(job.File.Provider);
-            if (grant is null) await provider.CreateScanner().WaitForDownloadAsync(job.File, () => State.Directories, path, ct);
+            if (archive is not null)
+            {
+                await SetStatusAsync(job.Id, DownloadStatus.Importing, ct: ct);
+                Directory.CreateDirectory(cacheDirectory);
+                await using var input = new FileStream(archive, FileMode.Open, FileAccess.Read, FileShare.Read);
+                if (input.Length > 8L * 1024 * 1024 * 1024) throw new InvalidDataException("Archive exceeds the size limit.");
+                await using var output = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None);
+                await input.CopyToAsync(output, ct);
+            }
+            else if (grant is null) await provider.CreateScanner().WaitForDownloadAsync(job.File, () => State.Directories, path, ct);
             else
             {
                 await SetStatusAsync(job.Id, DownloadStatus.Downloading, ct: ct);
@@ -171,7 +207,11 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
             await SetStatusAsync(job.Id, DownloadStatus.Complete, ct: ct);
             LibraryChanged?.Invoke(this, EventArgs.Empty);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { /* Persisted requests resume after shutdown. */ }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (archive is not null && !lifetime.IsCancellationRequested)
+                await SetStatusAsync(job.Id, DownloadStatus.Failed, "Attaching ZIP was cancelled.");
+        }
         catch (Exception ex)
         {
             await SetStatusAsync(job.Id, DownloadStatus.Failed, ex.Message);
@@ -179,11 +219,17 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }
-    private async Task StopWorkerAsync(Guid id)
+    private async Task StopWorkerAsync(Guid id, bool preserveImporting = false)
     {
         (CancellationTokenSource Cancellation, Task Task) worker;
         await gate.WaitAsync();
-        try { if (!workers.Remove(id, out worker)) return; worker.Cancellation.Cancel(); }
+        try
+        {
+            if (preserveImporting && State.Jobs.Any(job => job.Id == id && job.Status == DownloadStatus.Importing))
+                throw new InvalidOperationException("This download is already being imported.");
+            if (!workers.Remove(id, out worker)) return;
+            worker.Cancellation.Cancel();
+        }
         finally { gate.Release(); }
         await worker.Task; worker.Cancellation.Dispose();
     }
@@ -204,6 +250,9 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
         var pending = workers.Values.ToArray(); workers.Clear(); gate.Release();
         await Task.WhenAll(pending.Select(w => w.Task)).ConfigureAwait(false);
         foreach (var worker in pending) worker.Cancellation.Dispose();
+        // Desktop exit waits synchronously on the UI thread; keep the final storage write off that context.
+        await Task.Run(() => MutateAsync(state => state with { Jobs = state.Jobs.Where(job =>
+            job.Status is not (DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing)).ToArray() }, CancellationToken.None)).ConfigureAwait(false);
         lifetime.Dispose();
     }
 }

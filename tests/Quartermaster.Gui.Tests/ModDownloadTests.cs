@@ -211,6 +211,25 @@ public sealed class ModDownloadTests
         finally { window.Close(); }
     }
     [AvaloniaFact]
+    public async Task DownloadsTabCanAttachExistingZipAndRemoveImportedHistory()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Providers.SetDirectoriesAsync([Path.Combine(f.Root, "empty")]);
+        var file = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "Already downloaded", "expected.zip", "1",
+            new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
+        await f.Services.Providers.QueueAsync(file, f.Services.Session.ActiveProfile!.Id); Dispatcher.UIThread.RunJobs();
+        var row = Assert.Single(f.Services.Downloads.Jobs); f.Shell.Navigate(PageKind.Downloads);
+        Assert.Same(f.Services.Downloads, f.Shell.CurrentPage);
+        f.Dialogs.ZipPath = f.Zip("Existing mod");
+        await row.AttachCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+        Assert.False(f.Services.Operations.IsError); Assert.False(f.Services.Downloads.HasPendingDownloads);
+        Assert.Single(f.Services.Session.State.Mods); Assert.Single(f.Services.Session.ActiveProfile!.Entries);
+        Assert.True(File.Exists(f.Dialogs.ZipPath)); Assert.True(row.RemoveCommand.CanExecute(null));
+        await row.RemoveCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+        Assert.Empty(f.Services.Downloads.Jobs); Assert.Single(f.Services.Session.State.Mods);
+        Assert.Single(f.Services.Session.ActiveProfile.Entries);
+    }
+    [AvaloniaFact]
     public async Task SettingsSingleSaveValidatesAndStoresMaskedKeyAndDownloadFolder()
     {
         using var api = Api(); using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();

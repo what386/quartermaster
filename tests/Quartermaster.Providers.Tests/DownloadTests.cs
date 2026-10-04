@@ -103,15 +103,71 @@ public sealed class DownloadTests
         await resumed.WaitForJobAsync(id).WaitAsync(TimeSpan.FromSeconds(5)); Assert.Single((await f.Library.LoadAsync()).Mods);
     }
     [Fact]
-    public async Task InterruptedWaitingQueueResumesAutomatically()
+    public async Task NormalExitClearsPendingBrowserRequestsWithoutDeletingBrowserFiles()
     {
         using var f = new Fixture(); var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
-        var zip = f.Zip(f.Source("mod")); var expected = Expected(await File.ReadAllBytesAsync(zip)); Guid id;
+        var zip = f.Zip(f.Source("mod")); var expected = Expected(await File.ReadAllBytesAsync(zip));
         await using (var manager = new ProviderManager(f.Library, new(f.App), [new FakeProvider()], Path.Combine(f.App, "cache")))
-        { await manager.InitializeAsync(); await manager.SetDirectoriesAsync([folder]); id = (await manager.QueueAsync(expected)).Id; }
+        { await manager.InitializeAsync(); await manager.SetDirectoriesAsync([folder]); await manager.QueueAsync(expected); }
         File.Copy(zip, Path.Combine(folder, "mod.zip"));
         await using var resumed = new ProviderManager(f.Library, new(f.App), [new FakeProvider()], Path.Combine(f.App, "cache"));
-        await resumed.InitializeAsync(); await resumed.WaitForJobAsync(id).WaitAsync(TimeSpan.FromSeconds(5)); Assert.Single((await f.Library.LoadAsync()).Mods);
+        await resumed.InitializeAsync(); Assert.Empty(resumed.State.Jobs); Assert.Empty((await f.Library.LoadAsync()).Mods);
+        Assert.True(File.Exists(Path.Combine(folder, "mod.zip")));
+    }
+    [Fact]
+    public async Task AttachZipBypassesRecognitionAndPreservesProfileUpgradeState()
+    {
+        using var f = new Fixture(); var old = await f.Library.ImportAsync(f.Source("old", 1));
+        var profile = ProfileEditor.Add(ProfileEditor.Create("Profile"), old);
+        profile = ProfileEditor.AddGroup(profile, "Equipment", [old.Id]);
+        profile = ProfileEditor.SetEnabled(profile, old.Id, false); await f.Library.SaveProfileAsync(profile);
+        var archive = f.Zip(f.Source("new", 2), "already-downloaded.zip");
+        var bytes = await File.ReadAllBytesAsync(archive);
+        await using var manager = new ProviderManager(f.Library, new(f.App), [new FakeProvider()], Path.Combine(f.App, "cache"));
+        await manager.InitializeAsync(); await manager.SetDirectoriesAsync([Path.Combine(f.Root, "empty")]);
+        var job = await manager.QueueAsync(Expected([9, 9]), replacesModId: old.Id);
+        await manager.AttachZipAsync(job.Id, archive);
+        Assert.Equal(DownloadStatus.Complete, Assert.Single(manager.State.Jobs).Status);
+        var state = await f.Library.LoadAsync(); var entry = Assert.Single(Assert.Single(state.Profiles).Entries);
+        Assert.NotEqual(old.Id, entry.ModId); Assert.False(entry.Enabled); Assert.Equal(profile.Groups[0].Id, entry.GroupId);
+        Assert.Equal("2", Assert.Single(state.Mods.Single(mod => mod.Id == entry.ModId).Sources).FileId);
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(archive));
+        await manager.RemoveAsync(job.Id); Assert.Empty(manager.State.Jobs);
+        Assert.Equal(2, (await f.Library.LoadAsync()).Mods.Count);
+    }
+    [Fact]
+    public async Task InvalidManualZipFailsWithoutImportAndCanBeReplaced()
+    {
+        using var f = new Fixture(); var broken = Path.Combine(f.Root, "broken.zip"); await File.WriteAllBytesAsync(broken, [1, 2, 3]);
+        await using var manager = new ProviderManager(f.Library, new(f.App), [new FakeProvider()], Path.Combine(f.App, "cache"));
+        await manager.InitializeAsync(); await manager.SetDirectoriesAsync([Path.Combine(f.Root, "empty")]);
+        var job = await manager.QueueAsync(Expected([9]));
+        await Assert.ThrowsAsync<InvalidDataException>(() => manager.AttachZipAsync(job.Id, broken));
+        Assert.Equal(DownloadStatus.Failed, Assert.Single(manager.State.Jobs).Status); Assert.Empty((await f.Library.LoadAsync()).Mods);
+        var valid = f.Zip(f.Source("mod")); await manager.AttachZipAsync(job.Id, valid);
+        Assert.Equal(DownloadStatus.Complete, Assert.Single(manager.State.Jobs).Status); Assert.Single((await f.Library.LoadAsync()).Mods);
+    }
+    [Fact]
+    public async Task RemovingWaitingRequestStopsScannerAndRemovesPersistedEntry()
+    {
+        using var f = new Fixture(); var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        var archive = f.Zip(f.Source("mod")); var expected = Expected(await File.ReadAllBytesAsync(archive));
+        var store = new DownloadStore(f.App);
+        await using var manager = new ProviderManager(f.Library, store, [new FakeProvider()], Path.Combine(f.App, "cache"));
+        await manager.InitializeAsync(); await manager.SetDirectoriesAsync([folder]); var job = await manager.QueueAsync(expected);
+        await manager.RemoveAsync(job.Id); File.Copy(archive, Path.Combine(folder, "mod.zip"));
+        Assert.Empty(manager.State.Jobs); Assert.Empty((await store.LoadAsync()).Jobs); Assert.Empty((await f.Library.LoadAsync()).Mods);
+    }
+    [Fact]
+    public async Task QueuePersistedByCrashStillResumes()
+    {
+        using var f = new Fixture(); var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        var archive = f.Zip(f.Source("mod")); var expected = Expected(await File.ReadAllBytesAsync(archive));
+        var store = new DownloadStore(f.App); var job = new DownloadJob(Guid.NewGuid(), expected);
+        await store.SaveAsync(new([folder], [job])); File.Copy(archive, Path.Combine(folder, "mod.zip"));
+        await using var manager = new ProviderManager(f.Library, store, [new FakeProvider()], Path.Combine(f.App, "cache"));
+        await manager.InitializeAsync(); await manager.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal(DownloadStatus.Complete, Assert.Single(manager.State.Jobs).Status); Assert.Single((await f.Library.LoadAsync()).Mods);
     }
     [Fact]
     public async Task InvalidArchiveFailsWithoutImportAndCanRetry()

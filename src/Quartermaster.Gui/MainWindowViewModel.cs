@@ -18,11 +18,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         [new(PageKind.Mods, "Library", "library.svg"),
          new(PageKind.Profiles, "Profiles", "sliders.svg"),
          new(PageKind.Search, "Search", "search.svg"),
+         new(PageKind.Downloads, "Downloads", "downloads.svg"),
          new(PageKind.Settings, "Settings", "gear.svg")];
     public NavigationItem LibraryNavigation => NavigationItems.Single(item => item.Page == PageKind.Mods);
-    public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Settings).ToArray();
+    public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Downloads or PageKind.Settings).ToArray();
     public OperationState Operations { get; }
     public ModDownloads Downloads => services.Downloads;
+    public bool ShowDownloadProgress => Downloads.HasPendingDownloads && SelectedNavigation.Page != PageKind.Downloads;
     public NavigationItem SelectedNavigation
     {
         get => selected;
@@ -30,7 +32,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (value is null || !Set(ref selected, value)) return;
             foreach (var item in NavigationItems) item.IsActive = item == value;
-            Notify(nameof(CurrentPage)); RefreshProfiles(); NotifyStatus();
+            Notify(nameof(CurrentPage)); Notify(nameof(ShowDownloadProgress)); RefreshProfiles(); NotifyStatus();
         }
     }
     public ViewModelBase CurrentPage => pages[SelectedNavigation.Page];
@@ -47,6 +49,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel(AppServices services)
     {
         this.services = services; Operations = services.Operations;
+        services.Downloads.Changed += (_, _) => Notify(nameof(ShowDownloadProgress));
         selected = NavigationItems.Single(item => item.Page == PageKind.Profiles); selected.IsActive = true;
         foreach (var item in NavigationItems) item.OpenCommand = new(() => Navigate(item.Page));
         pages = new()
@@ -54,6 +57,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             [PageKind.Mods] = new ModsViewModel(services),
             [PageKind.Profiles] = new ProfilesViewModel(services),
             [PageKind.Search] = new SearchViewModel(services),
+            [PageKind.Downloads] = services.Downloads,
             [PageKind.Settings] = new SettingsViewModel(services)
         };
         AddProfileCommand = Operations.CreateCommand("Creating profile", async ct =>

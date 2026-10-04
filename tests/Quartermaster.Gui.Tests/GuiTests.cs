@@ -9,6 +9,7 @@ using Avalonia.VisualTree;
 using Quartermaster.Gui.Mods;
 using Quartermaster.Gui.Profiles;
 using Quartermaster.Gui.Search;
+using Quartermaster.Gui.Downloads;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Settings;
 using Quartermaster.Gui.Shared;
@@ -23,7 +24,7 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
-    public async Task LibraryDownloadPopupExposesBrowserCancelAndRetryWithoutBlockingTheApp()
+    public async Task DownloadsTabExposesBrowserAttachAndCancelWithoutBlockingTheApp()
     {
         Uri? opened = null;
         using var f = new Fixture(openBrowser: uri => opened = uri); await f.Shell.InitializeAsync();
@@ -38,15 +39,17 @@ public class GuiTests
         try
         {
             window.CaptureRenderedFrame()?.Dispose();
-            var view = Assert.Single(window.GetVisualDescendants().OfType<ModsView>());
-            var button = Assert.Single(view.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "Downloads"));
-            button.Flyout!.ShowAt(button); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            var nav = f.Shell.UtilityNavigationItems.Single(item => item.Page == PageKind.Downloads);
+            Assert.EndsWith("downloads.svg", nav.IconSource); nav.OpenCommand.Execute(null);
+            Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<DownloadsView>());
+            Assert.False(window.FindControl<Border>("DownloadProgressOverlay")!.IsVisible);
+            Assert.Contains(view.GetVisualDescendants().OfType<Button>(), b => Equals(b.Content, "Attach ZIP") && b.IsVisible);
             await row.OpenCommand.ExecuteAsync(); Assert.Equal(file.DownloadPage, opened);
             Assert.True(row.CancelCommand.CanExecute(null)); Assert.False(row.RetryCommand.CanExecute(null));
             await row.CancelCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
-            Assert.Same(row, Assert.Single(mods.Downloads.Jobs)); Assert.True(row.RetryCommand.CanExecute(null));
-            Assert.False(row.CancelCommand.CanExecute(null)); Assert.StartsWith("Cancelled", row.Status);
-            button.Flyout.Hide();
+            Assert.Empty(mods.Downloads.Jobs); Assert.Empty(f.Services.Providers.State.Jobs);
+            Assert.False(window.FindControl<Border>("DownloadProgressOverlay")!.IsVisible);
         }
         finally { window.Close(); }
     }
@@ -898,7 +901,7 @@ public class GuiTests
             var routes = new (PageKind Page, Type View)[]
             {
                 (PageKind.Mods, typeof(ModsView)), (PageKind.Profiles, typeof(ProfilesView)),
-                (PageKind.Search, typeof(SearchView)), (PageKind.Settings, typeof(SettingsView))
+                (PageKind.Search, typeof(SearchView)), (PageKind.Downloads, typeof(DownloadsView)), (PageKind.Settings, typeof(SettingsView))
             };
             foreach (var (page, view) in routes)
             {

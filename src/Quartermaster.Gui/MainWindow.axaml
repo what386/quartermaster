@@ -2,12 +2,14 @@
         xmlns:local="clr-namespace:Quartermaster.Gui" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
         xmlns:mods="clr-namespace:Quartermaster.Gui.Mods" xmlns:profiles="clr-namespace:Quartermaster.Gui.Profiles"
         xmlns:search="clr-namespace:Quartermaster.Gui.Search" xmlns:settings="clr-namespace:Quartermaster.Gui.Settings"
+        xmlns:downloads="clr-namespace:Quartermaster.Gui.Downloads" xmlns:services="clr-namespace:Quartermaster.Gui.Services"
         x:Class="Quartermaster.Gui.MainWindow" x:DataType="local:MainWindowViewModel"
         Title="Quartermaster" Width="1320" Height="850" MinWidth="1040" MinHeight="680">
   <Window.DataTemplates>
     <DataTemplate DataType="{x:Type mods:ModsViewModel}"><mods:ModsView /></DataTemplate>
     <DataTemplate DataType="{x:Type profiles:ProfilesViewModel}"><profiles:ProfilesView /></DataTemplate>
     <DataTemplate DataType="{x:Type search:SearchViewModel}"><search:SearchView /></DataTemplate>
+    <DataTemplate DataType="{x:Type services:ModDownloads}"><downloads:DownloadsView /></DataTemplate>
     <DataTemplate DataType="{x:Type settings:SettingsViewModel}"><settings:SettingsView /></DataTemplate>
   </Window.DataTemplates>
   <Grid>
@@ -65,13 +67,12 @@
     </Grid>
     <shared:DialogHost x:Name="DialogOverlay" />
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24" MaxWidth="620" Spacing="8">
-    <Border x:Name="DownloadProgressOverlay" IsVisible="{Binding Downloads.HasPendingDownloads}"
+    <Border x:Name="DownloadProgressOverlay" IsVisible="{Binding ShowDownloadProgress}"
             Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}"
             BorderThickness="1" CornerRadius="8" Padding="16,12">
-      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
-        <shared:BusySpinner IsVisible="{Binding Downloads.HasPendingDownloads}" VerticalAlignment="Center" />
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+        <shared:BusySpinner IsVisible="{Binding ShowDownloadProgress}" VerticalAlignment="Center" />
         <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{Binding Downloads.PendingSummary}" FontWeight="SemiBold" /><TextBlock Text="{Binding Downloads.PendingExplanation}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
-        <Button Grid.Column="2" Content="Downloads" VerticalAlignment="Center"><Button.Flyout><Flyout Placement="TopEdgeAlignedRight"><mods:DownloadQueueView DataContext="{Binding Downloads}" /></Flyout></Button.Flyout></Button>
       </Grid>
     </Border>
     <Border x:Name="ProgressOverlay" IsVisible="{Binding Operations.IsProgressVisible}" MinWidth="360"

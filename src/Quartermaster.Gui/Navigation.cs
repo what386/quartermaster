@@ -4,7 +4,7 @@ using Quartermaster.Library.Profiles;
 
 namespace Quartermaster.Gui;
 
-public enum PageKind { Mods, Profiles, Search, Settings }
+public enum PageKind { Mods, Profiles, Search, Downloads, Settings }
 
 public sealed class NavigationItem(PageKind page, string label, string iconFile) : ViewModelBase
 {

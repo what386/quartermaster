@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:Quartermaster.Gui.Services" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+             x:Class="Quartermaster.Gui.Downloads.DownloadsView" x:DataType="services:ModDownloads">
+  <Grid RowDefinitions="Auto,Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
+      <TextBlock Text="Downloads" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search downloads…" />
+    </Grid>
+    <TextBlock Grid.Row="1" Text="Finish downloading in your browser; Quartermaster watches your configured download folder and imports recognized ZIPs automatically. If a download isn't recognized or you already have the file, use Attach ZIP to associate it with that request. Cancel removes the request. Unfinished requests are cleared when you exit the app." Classes="muted" TextWrapping="Wrap" Margin="0,0,0,12" />
+    <Border Grid.Row="2" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="DOWNLOAD QUEUE" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding CountLabel}" /></Grid></Border>
+    <Grid Grid.Row="3">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding VisibleJobs}">
+          <ItemsControl.ItemTemplate><DataTemplate x:DataType="services:DownloadRow">
+            <Border Classes="card" Margin="0,0,0,8">
+              <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                <shared:BusySpinner IsVisible="{Binding IsActive}" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+                <WrapPanel Grid.Column="2" MaxWidth="470" Orientation="Horizontal" VerticalAlignment="Center">
+                  <Button Content="Open download page" Command="{Binding OpenCommand}" Margin="4" />
+                  <Button Content="Attach ZIP" Command="{Binding AttachCommand}" IsVisible="{Binding CanAttach}" Margin="4" />
+                  <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" Margin="4" />
+                  <Button Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" Margin="4" />
+                  <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" Margin="4" />
+                </WrapPanel>
+              </Grid>
+            </Border>
+          </DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding !HasVisibleJobs}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+  </Grid>
+</UserControl>

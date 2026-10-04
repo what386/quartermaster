@@ -26,16 +26,20 @@ only supported provider. For a Nexus mod page, select a file in the dialog.
 Quartermaster queues it and opens its download page in your default browser.
 Complete the download on Nexus; Quartermaster verifies the archive against
 Nexus's MD5 lookup and imports it automatically. Browser downloads are left in
-place. The Library's **Downloads** popup has **Open download page**, **Retry**,
-and **Cancel** actions. Only ZIP archives are currently supported.
+place. The sidebar's **Downloads** tab has **Open download page**, **Attach ZIP**,
+**Retry**, and **Cancel** actions. Only ZIP archives are currently supported.
 Use the dedicated **Search** page to find Helldivers 2 Nexus mods and add them
 through the same file-selection flow. Choose a provider from the dropdown (Nexus
 by default), then press Enter or click Search. The page reports loading, no
 matches, and search errors, including missing API-key configuration.
 Search results show provider thumbnails in larger cards. The file chooser's
 **Open download page** action explains the browser download flow before opening
-it. A floating activity spinner tracks pending downloads across pages; open its
-**Downloads** popup to reopen a page, retry, or cancel a request.
+it. A floating activity spinner tracks pending downloads across pages; manage
+requests in the **Downloads** tab. **Attach ZIP** explicitly associates an
+existing archive with a request when recognition fails or you already have the
+file. It skips provider recognition and uses the normal mod import and profile
+upgrade flow. **Cancel** removes a pending request; **Remove** clears a completed
+or failed entry without removing imported mods.
 
 Choose **Register nxm links** in Settings to make Quartermaster your user account's
 `nxm://` handler on Linux or Windows. Nexus's **Download with manager** action can
@@ -54,8 +58,9 @@ If selected options are no longer compatible, the new mod stays in the library
 and the request reports an error for manual configuration. Updates do not deploy
 automatically; original library files remain.
 
-`downloads.json` persists the queue and watched folders. Pending browser requests
-resume at startup; signed nxm grants are not stored in the queue or library.
+`downloads.json` persists the queue and watched folders. Normal app exit clears
+unfinished requests; pending requests left by a crash can resume at startup.
+Browser files are left untouched. Signed nxm grants are not stored in the queue or library.
 `download-cache/` holds temporary import copies. Personal API keys live separately
 under `credentials/` (owner-only files on Unix), outside profile exports. Keys
 are local plaintext files, not an encrypted system keychain. A private
