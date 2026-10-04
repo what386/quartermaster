@@ -15,9 +15,9 @@
           <Button Content="Add to profile" Command="{Binding AddCommand}" Classes="primary" />
         </StackPanel></Flyout></Button.Flyout>
       </Button>
-      <Button Grid.Column="3" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="4" Content="▶  Run" Command="{Binding RunCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="5" Content="Purge" Classes="danger" Command="{Binding PurgeCommand}" />
+      <Button Grid.Column="3" Content="Purge" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="4" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="5" Content="▶  Run" Command="{Binding RunCommand}" />
     </Grid>
     <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4">
       <Grid ColumnDefinitions="*,Auto"><TextBlock Text="LOADOUT" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding EntrySummary}" /></Grid>
