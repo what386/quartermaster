@@ -23,6 +23,69 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task DraggingSelectionMovesNonAdjacentModsTogetherAndKeepsSelection()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        foreach (var name in new[] { "Armor", "Cape", "Helmet", "Weapon" }) await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        for (var i = 0; i < 4; i++) await profiles.AddCommand.ExecuteAsync();
+        f.Dialogs.InputText = "Equipment"; await profiles.AddGroupCommand.ExecuteAsync();
+        var groupId = profiles.Groups.Single().Id;
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = window.GetVisualDescendants().OfType<ProfilesView>().Single();
+            var list = view.FindControl<ListBox>("ProfileModsList")!;
+            ListBoxItem Row(string name) => list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileModItem mod && mod.Name == name);
+            Point At(ListBoxItem row, bool after = false) => row.TranslatePoint(new Point(240, after ? row.Bounds.Height - 3 : row.Bounds.Height / 2), window)!.Value;
+            void Click(string name, RawInputModifiers modifiers = RawInputModifiers.None)
+            {
+                var point = At(Row(name)); window.MouseMove(point);
+                window.MouseDown(point, MouseButton.Left, modifiers); window.MouseUp(point, MouseButton.Left, modifiers);
+            }
+            Click("Armor"); Click("Helmet", RawInputModifiers.Control);
+            Assert.Equal(2, list.SelectedItems!.Count);
+            var start = At(Row("Helmet")); var end = At(Row("Weapon"), after: true);
+            window.MouseMove(start); window.MouseDown(start, MouseButton.Left); window.MouseMove(end);
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(2, list.SelectedItems.Count);
+            var previews = view.FindControl<StackPanel>("DragVisuals")!.GetVisualDescendants().OfType<ModRowView>().ToArray();
+            Assert.Equal(new[] { "Armor", "Helmet" }, previews.Select(row => ((ProfileModItem)row.DataContext!).Name));
+            Assert.Contains("dragging", Row("Armor").Classes); Assert.Contains("dragging", Row("Helmet").Classes);
+            Assert.DoesNotContain("dragging", Row("Cape").Classes);
+            Assert.Equal(-Row("Armor").Bounds.Height, Row("Cape").GetBaseValue(Visual.RenderTransformProperty).Value!.Value.M32, 1);
+            window.MouseUp(end, MouseButton.Left); await f.Services.Operations.WhenIdle; window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(new[] { "Cape", "Weapon", "Armor", "Helmet" }, profiles.Entries.Select(mod => mod.Name));
+            Assert.Equal(2, list.SelectedItems.Count);
+            start = At(Row("Armor"));
+            var header = list.GetVisualDescendants().OfType<ListBoxItem>().Single(row => row.DataContext is ProfileGroupItem);
+            end = At(header);
+            window.MouseMove(start); window.MouseDown(start, MouseButton.Left); window.MouseMove(end);
+            Assert.Contains("dropInto", header.Classes);
+            Assert.Equal(2, view.FindControl<StackPanel>("DragVisuals")!.Children.Count);
+            window.MouseUp(end, MouseButton.Left); await f.Services.Operations.WhenIdle; window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(2, list.SelectedItems.Count);
+            Assert.All(profiles.Entries.Where(mod => mod.Name is "Armor" or "Helmet"), mod => Assert.Equal(groupId, mod.Entry.GroupId));
+            Assert.All(profiles.Entries.Where(mod => mod.Name is "Cape" or "Weapon"), mod => Assert.Null(mod.Entry.GroupId));
+            var persisted = await new Quartermaster.Library.Storage.JsonLibraryStore(f.Data).LoadAsync();
+            Assert.Equal(profiles.Entries.Select(mod => mod.Mod.Id), Assert.Single(persisted.Profiles).Entries.Select(entry => entry.ModId));
+            Assert.Equal(new[] { "Cape", "Weapon", "Armor", "Helmet" }, profiles.Entries.Select(mod => mod.Name));
+            start = At(Row("Helmet")); end = At(Row("Cape"));
+            window.MouseMove(start); window.MouseDown(start, MouseButton.Left); window.MouseMove(end);
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            window.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null); window.MouseUp(end, MouseButton.Left);
+            Assert.Equal(2, list.SelectedItems.Count);
+            Assert.Equal(new[] { "Cape", "Weapon", "Armor", "Helmet" }, profiles.Entries.Select(mod => mod.Name));
+            Click("Armor"); Assert.Single(list.SelectedItems);
+            Click("Helmet", RawInputModifiers.Shift); Assert.Equal(2, list.SelectedItems.Count);
+            Click("Cape"); Assert.Single(list.SelectedItems);
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task DragAnimationsPreviewModsAndGroupsAndGroupDropsPersistMemberOrder()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

@@ -45,8 +45,14 @@ public sealed partial class ProfilesViewModel
         if (await Services.Dialogs.ConfirmAsync("Remove group", $"Remove {group.Name}? Its mods will remain in this profile and move to the ungrouped section.", "Remove"))
             await Save(ProfileEditor.RemoveGroup(current, id), ct);
     });
-    public Task MoveModToGroupAsync(Guid modId, Guid? groupId) => Operations.RunAsync("Moving mod to group", ct =>
-        Save(ProfileEditor.SetGroup(SelectedProfile!, modId, groupId), ct));
+    public Task MoveModToGroupAsync(Guid modId, Guid? groupId) => MoveModsToGroupAsync([modId], groupId);
+    public Task MoveModsToGroupAsync(IReadOnlyCollection<Guid> modIds, Guid? groupId)
+    {
+        if (!Operations.CanInteract || SelectedProfile is null || modIds.Count == 0) return Task.CompletedTask;
+        var moved = ProfileEditor.Move(SelectedProfile, modIds, SelectedProfile.Entries.Count, groupId);
+        if (moved.Entries.SequenceEqual(SelectedProfile.Entries)) return Task.CompletedTask;
+        return Operations.RunAsync("Moving mods to group", ct => Save(moved, ct), showProgress: false);
+    }
     public Task MoveGroupAsync(Guid groupId, Guid targetId, bool after)
     {
         if (!Operations.CanInteract || SelectedProfile is null || groupId == targetId) return Task.CompletedTask;

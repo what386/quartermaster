@@ -120,19 +120,16 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         WatchSession();
     }
     private Task Save(Profile value, CancellationToken ct) => Session.SaveProfileAsync(value, false, ct);
-    public Task MoveModAsync(Guid modId, Guid targetModId, bool after)
+    public Task MoveModAsync(Guid modId, Guid targetModId, bool after) => MoveModsAsync([modId], targetModId, after);
+    public Task MoveModsAsync(IReadOnlyCollection<Guid> modIds, Guid targetModId, bool after)
     {
-        if (!Operations.CanInteract || SelectedProfile is null || modId == targetModId) return Task.CompletedTask;
+        if (!Operations.CanInteract || SelectedProfile is null || modIds.Count == 0 || modIds.Contains(targetModId)) return Task.CompletedTask;
         var entries = SelectedProfile.Entries;
-        var from = entries.ToList().FindIndex(e => e.ModId == modId);
-        var target = entries.ToList().FindIndex(e => e.ModId == targetModId);
-        if (from < 0 || target < 0) return Task.CompletedTask;
-        var destination = target + (after ? 1 : 0);
-        if (from < destination) destination--;
-        if (from == destination && entries[from].GroupId == entries[target].GroupId) return Task.CompletedTask;
-        SelectedMod = Entries.Single(e => e.Mod.Id == modId);
-        var moved = ProfileEditor.Move(SelectedProfile, modId, destination, entries[target].GroupId);
-        return Operations.RunAsync("Reordering mods", ct => Save(moved, ct));
+        var target = entries.ToList().FindIndex(entry => entry.ModId == targetModId);
+        if (target < 0) return Task.CompletedTask;
+        var moved = ProfileEditor.Move(SelectedProfile, modIds, target + (after ? 1 : 0), entries[target].GroupId);
+        if (moved.Entries.SequenceEqual(entries)) return Task.CompletedTask;
+        return Operations.RunAsync("Reordering mods", ct => Save(moved, ct), showProgress: false);
     }
     protected override void Refresh()
     {

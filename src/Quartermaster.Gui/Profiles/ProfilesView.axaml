@@ -40,7 +40,7 @@
     </Border>
     <Grid Grid.Row="2" RowDefinitions="24,*">
       <Border Background="#25282C" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="106,0,0,0" /></Grid></Border>
-      <ListBox Grid.Row="1" x:Name="ProfileModsList" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedListItem, Mode=TwoWay}" DoubleTapped="OpenModDetails">
+      <ListBox Grid.Row="1" x:Name="ProfileModsList" Focusable="True" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedListItem, Mode=TwoWay}" DoubleTapped="QueueModDetails">
         <ListBox.ContextMenu><ContextMenu>
           <MenuItem x:Name="ModDetailsMenuItem" Header="Mod details" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
           <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" />

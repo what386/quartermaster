@@ -70,6 +70,20 @@ public static class ProfileEditor
         if (entry.GroupId == groupId) return profile;
         return Organize(profile with { Entries = [.. profile.Entries.Where(item => item.ModId != modId), entry with { GroupId = groupId }] });
     }
+    /// <summary>Moves a selection to an insertion boundary in the original entry order.</summary>
+    public static Profile Move(Profile profile, IReadOnlyCollection<Guid> modIds, int boundary, Guid? groupId)
+    {
+        RequireGroup(profile, groupId);
+        if (boundary < 0 || boundary > profile.Entries.Count) throw new ArgumentOutOfRangeException(nameof(boundary));
+        var selected = modIds.ToHashSet();
+        if (selected.Any(id => profile.Entries.All(entry => entry.ModId != id))) throw new KeyNotFoundException("Mod is not in the profile.");
+        if (selected.Count == 0) return profile;
+        var moving = profile.Entries.Where(entry => selected.Contains(entry.ModId)).Select(entry => entry with { GroupId = groupId }).ToArray();
+        var insertion = boundary - profile.Entries.Take(boundary).Count(entry => selected.Contains(entry.ModId));
+        var remaining = profile.Entries.Where(entry => !selected.Contains(entry.ModId)).ToList();
+        remaining.InsertRange(insertion, moving);
+        return Organize(profile with { Entries = remaining.ToArray() });
+    }
     public static Profile Move(Profile profile, Guid modId, int index) => Move(profile, modId, index,
         profile.Entries.SingleOrDefault(entry => entry.ModId == modId)?.GroupId);
     public static Profile Move(Profile profile, Guid modId, int index, Guid? groupId)

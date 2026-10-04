@@ -42,6 +42,12 @@ public partial class ProfilesView : UserControl
         model.SelectedMod = mod;
         OpenModDetails(sender, e);
     }
+    private void QueueModDetails(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (e.Source is Visual source && source.GetVisualAncestors().Prepend(source).OfType<ProfileGroupView>().Any()) return;
+        if (!dragging && draggedItem is ProfileModItem) pendingModDetails = true;
+    }
     private async void OpenModDetails(object? sender, RoutedEventArgs e)
     {
         if (e.Source is Visual source && source.GetVisualAncestors().Prepend(source).OfType<ProfileGroupView>().Any()) return;

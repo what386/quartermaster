@@ -16,6 +16,29 @@ public class ProfileTests
     private static LibraryState State(Profile profile, params Mod[] mods) => LibraryState.Empty with { Mods = mods, Profiles = [profile], ActiveProfileId = profile.Id };
 
     [Fact]
+    public void BulkMovesPreserveProfileOrderAndEntryStateAcrossGroups()
+    {
+        var a = Mod(Set()); var b = Mod(Set()); var c = Mod(Set()); var d = Mod(Set());
+        var profile = ProfileEditor.Create("Selection");
+        foreach (var mod in new[] { a, b, c, d }) profile = ProfileEditor.Add(profile, mod);
+        profile = ProfileEditor.SetEnabled(profile, c.Id, false);
+        var moved = ProfileEditor.Move(profile, [c.Id, a.Id], 4, null);
+        Assert.Equal(new[] { b.Id, d.Id, a.Id, c.Id }, moved.Entries.Select(entry => entry.ModId));
+        Assert.Equal(profile.Entries.Where(entry => entry.ModId == a.Id || entry.ModId == c.Id), moved.Entries.Skip(2));
+        moved = ProfileEditor.Move(moved, [c.Id, a.Id], 0, null);
+        Assert.Equal(new[] { a.Id, c.Id, b.Id, d.Id }, moved.Entries.Select(entry => entry.ModId));
+        moved = ProfileEditor.AddGroup(moved, "Equipment");
+        var grouped = ProfileEditor.Move(moved, [c.Id, a.Id], moved.Entries.Count, moved.Groups.Single().Id);
+        Assert.Equal(new[] { b.Id, d.Id, a.Id, c.Id }, grouped.Entries.Select(entry => entry.ModId));
+        Assert.All(grouped.Entries.Skip(2), entry => Assert.Equal(grouped.Groups.Single().Id, entry.GroupId));
+        Assert.False(grouped.Entries.Last().Enabled);
+        StateValidation.Validate(State(grouped, a, b, c, d));
+        Assert.Throws<KeyNotFoundException>(() => ProfileEditor.Move(profile, [a.Id, Guid.NewGuid()], 0, null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ProfileEditor.Move(profile, [a.Id], 5, null));
+        Assert.Same(profile, ProfileEditor.Move(profile, [], 0, null));
+    }
+
+    [Fact]
     public void MovingGroupsMovesTheirMembersAndPreservesConfiguration()
     {
         var a = Mod(Set()); var b = Mod(Set()); var c = Mod(Set());

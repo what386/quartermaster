@@ -40,7 +40,6 @@
     <Setter Property="Padding" Value="0" /><Setter Property="HorizontalContentAlignment" Value="Stretch" /><Setter Property="Background" Value="#1D1F23" />
     <Setter Property="RenderTransform" Value="translate(0px, 0px)" />
     <Setter Property="Transitions"><Transitions>
-      <DoubleTransition Property="Opacity" Duration="0:0:0.12" />
       <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12" />
     </Transitions></Setter>
     <Setter Property="Template">

@@ -16,6 +16,10 @@ public partial class ProfilesView
     private ProfilesViewModel? observedModel;
     private IProfileListItem? draggedItem;
     private Guid? dragProfile;
+    private HashSet<Guid> draggedModIds = [];
+    private readonly Dictionary<(bool Group, Guid Id), double> dragOffsets = [];
+    private bool collapseSelectionOnClick;
+    private bool pendingModDetails;
     private Point dragStart;
     private double dragGrabOffset;
     private double dragBlockTop;
@@ -67,6 +71,10 @@ public partial class ProfilesView
         if (row?.DataContext is not IProfileListItem item || !properties.IsLeftButtonPressed) return;
         // The group header button remains clickable, but crossing the threshold turns it into a drag.
         if (item is ProfileModItem && ancestors.OfType<Button>().Any()) return;
+        pendingModDetails = false;
+        collapseSelectionOnClick = item is ProfileModItem && e.KeyModifiers == KeyModifiers.None &&
+            ProfileModsList.SelectedItems?.Contains(item) == true && ProfileModsList.SelectedItems.Count > 1;
+        if (collapseSelectionOnClick) { e.Handled = true; ProfileModsList.Focus(); }
         draggedItem = item; dragProfile = model.SelectedProfile?.Id;
         dragStart = e.GetPosition(ProfileModsList); dragPointer = e.Pointer;
     }
@@ -79,8 +87,14 @@ public partial class ProfilesView
         if (!dragging)
         {
             if (Math.Abs(position.X - dragStart.X) < 6 && Math.Abs(position.Y - dragStart.Y) < 6) return;
-            dragging = true;
-            model.SelectedListItem = draggedItem;
+            dragging = true; pendingModDetails = false;
+            if (draggedItem is ProfileModItem clicked)
+            {
+                var selected = ProfileModsList.SelectedItems?.OfType<ProfileModItem>().ToArray() ?? [];
+                draggedModIds = (selected.Any(mod => mod.Mod.Id == clicked.Mod.Id) ? selected.Select(mod => mod.Mod.Id) : [clicked.Mod.Id]).ToHashSet();
+                if (draggedModIds.Count == 1) model.SelectedListItem = draggedItem;
+            }
+            else model.SelectedListItem = draggedItem;
             e.Pointer.Capture(ProfileModsList);
             CreateDragVisual();
         }
@@ -110,8 +124,11 @@ public partial class ProfilesView
     {
         var sources = Rows().Where(IsSource).ToArray();
         var first = sources[0];
-        dragBlockTop = LayoutTop(first);
-        dragBlockHeight = sources.Last().Bounds.Height + LayoutTop(sources.Last()) - dragBlockTop;
+        dragOffsets.Clear();
+        dragBlockHeight = 0;
+        foreach (var row in sources) { dragOffsets[RowKey(row)] = dragBlockHeight; dragBlockHeight += row.Bounds.Height; }
+        var grabbed = sources.First(row => Equals(row.DataContext, draggedItem));
+        dragBlockTop = LayoutTop(grabbed) - dragOffsets[RowKey(grabbed)];
         dragGrabOffset = dragStart.Y - dragBlockTop;
         DragVisuals.Children.Clear();
         foreach (var row in sources)
@@ -143,8 +160,8 @@ public partial class ProfilesView
     private double LayoutTop(ListBoxItem row) => row.GetVisualParent()?.TranslatePoint(row.Bounds.Position, ProfileModsList)?.Y ?? 0;
     private static TransformOperations Translation(double x, double y) => TransformOperations.Parse(
         string.Create(CultureInfo.InvariantCulture, $"translate({x}px, {y}px)"));
-    private bool IsSource(ListBoxItem row) => Equals(row.DataContext, draggedItem) ||
-        draggedItem is ProfileGroupItem group && row.DataContext is ProfileModItem mod && mod.Entry.GroupId == group.Id;
+    private bool IsSource(ListBoxItem row) => Equals(row.DataContext, draggedItem) || row.DataContext is ProfileModItem mod &&
+        (draggedModIds.Contains(mod.Mod.Id) || draggedItem is ProfileGroupItem group && mod.Entry.GroupId == group.Id);
     private void SetDropTarget(ListBoxItem? row, bool after)
     {
         dropTarget?.Classes.Remove("dropBefore"); dropTarget?.Classes.Remove("dropAfter"); dropTarget?.Classes.Remove("dropInto");
@@ -152,8 +169,6 @@ public partial class ProfilesView
         var intoGroup = draggedItem is ProfileModItem && row?.DataContext is ProfileGroupItem;
         row?.Classes.Add(intoGroup ? "dropInto" : after ? "dropAfter" : "dropBefore");
         var rows = Rows();
-        var sourceStart = Array.FindIndex(rows, IsSource);
-        var sourceEnd = Array.FindLastIndex(rows, IsSource);
         var boundary = row is null ? -1 : Array.IndexOf(rows, row) + (after ? 1 : 0);
         // A mod dropped on a header joins the end of that group's visible block.
         if (row?.DataContext is ProfileGroupItem targetGroup && (after || intoGroup))
@@ -161,16 +176,15 @@ public partial class ProfilesView
             boundary = Array.IndexOf(rows, row) + 1;
             while (boundary < rows.Length && rows[boundary].DataContext is ProfileModItem mod && mod.Entry.GroupId == targetGroup.Id) boundary++;
         }
+        var removedHeight = 0d;
         for (var i = 0; i < rows.Length; i++)
         {
             var current = rows[i]; animatedRows.Add(current);
             current.Classes.Set("dragging", dragging && IsSource(current));
             var offset = 0d;
-            if (boundary >= 0 && sourceStart >= 0 && !IsSource(current))
-            {
-                if (boundary > sourceEnd + 1 && i > sourceEnd && i < boundary) offset = -dragBlockHeight;
-                else if (boundary < sourceStart && i >= boundary && i < sourceStart) offset = dragBlockHeight;
-            }
+            if (boundary >= 0 && !IsSource(current) && !IsSource(row!))
+                offset = -removedHeight + (i >= boundary ? dragBlockHeight : 0);
+            if (IsSource(current)) removedHeight += current.Bounds.Height;
             current.RenderTransform = Translation(0, offset);
         }
     }
@@ -179,11 +193,18 @@ public partial class ProfilesView
     {
         var source = draggedItem; var target = dropTarget?.DataContext as IProfileListItem;
         var profile = dragProfile; var after = dropAfter; var wasDragging = dragging;
+        var selectedIds = draggedModIds.ToArray(); var collapseSelection = collapseSelectionOnClick; var openDetails = pendingModDetails;
         var positions = wasDragging ? Rows().ToDictionary(RowKey, row => IsSource(row)
-            ? (dragTranslation?.Y ?? dragBlockTop) + LayoutTop(row) - dragBlockTop
+            ? (dragTranslation?.Y ?? dragBlockTop) + dragOffsets.GetValueOrDefault(RowKey(row))
             : row.TranslatePoint(default, ProfileModsList)?.Y ?? LayoutTop(row)) : [];
         ClearDrag();
-        if (!wasDragging) return;
+        if (!wasDragging)
+        {
+            if (collapseSelection && source is not null)
+            { ProfileModsList.SelectedItems?.Clear(); ProfileModsList.SelectedItem = source; }
+            if (openDetails) OpenModDetails(this, new RoutedEventArgs());
+            return;
+        }
         e.Handled = true;
         if (source is null || target is null || DataContext is not ProfilesViewModel model || model.SelectedProfile?.Id != profile) return;
         try
@@ -191,10 +212,19 @@ public partial class ProfilesView
             if (source is ProfileGroupItem group && target is ProfileGroupItem targetGroup) await model.MoveGroupAsync(group.Id, targetGroup.Id, after);
             else if (source is ProfileModItem mod)
             {
-                if (target is ProfileGroupItem destination) await model.MoveModToGroupAsync(mod.Mod.Id, destination.Id);
-                else if (target is ProfileModItem destinationMod) await model.MoveModAsync(mod.Mod.Id, destinationMod.Mod.Id, after);
+                if (target is ProfileGroupItem destination) await model.MoveModsToGroupAsync(selectedIds, destination.Id);
+                else if (target is ProfileModItem destinationMod) await model.MoveModsAsync(selectedIds, destinationMod.Mod.Id, after);
             }
-            if (!model.Operations.IsError) AnimateDrop(positions, profile);
+            if (!model.Operations.IsError)
+            {
+                if (source is ProfileModItem && model.SelectedProfile?.Id == profile)
+                {
+                    ProfileModsList.SelectedItems?.Clear();
+                    foreach (var mod in model.VisibleItems.OfType<ProfileModItem>().Where(mod => selectedIds.Contains(mod.Mod.Id)))
+                        ProfileModsList.SelectedItems?.Add(mod);
+                }
+                AnimateDrop(positions, profile);
+            }
         }
         catch (Exception ex) { model.Operations.ReportError(ex); }
     }
@@ -226,6 +256,7 @@ public partial class ProfilesView
         dropTarget?.Classes.Remove("dropBefore"); dropTarget?.Classes.Remove("dropAfter"); dropTarget?.Classes.Remove("dropInto");
         foreach (var row in animatedRows) { row.Classes.Remove("dragging"); row.RenderTransform = Translation(0, 0); }
         animatedRows.Clear(); DragPreview.IsVisible = false; DragVisuals.Children.Clear(); dragTranslation = null;
+        draggedModIds.Clear(); dragOffsets.Clear(); collapseSelectionOnClick = false; pendingModDetails = false;
         draggedItem = null; dragProfile = null; dragPointer = null; dragging = false; dropTarget = null;
         if (pointer?.Captured == ProfileModsList) pointer.Capture(null);
     }
