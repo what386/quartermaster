@@ -115,6 +115,15 @@ public sealed class MainWindowViewModel : ViewModelBase
             { IsDeployed = deployed });
         }
     }
+    public async Task ImportDropsAsync(IReadOnlyList<string> paths, Guid? profileId)
+    {
+        if (!Operations.CanInteract || paths.Count == 0) return;
+        await Operations.RunAsync("Importing dropped mods", ct => services.Session.ImportDropsAsync(paths, profileId, ct));
+        if (Operations.IsError) return;
+        if (profileId is { } id && SidebarProfiles.FirstOrDefault(profile => profile.Profile.Id == id) is { } target)
+            await target.SelectCommand.ExecuteAsync();
+        else Navigate(PageKind.Mods);
+    }
     private bool deployingProfile;
     public async Task DeployProfileAsync(Guid id)
     {

@@ -58,6 +58,21 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         await Task.Run(() => library.ImportAsync(source, cancellationToken: ct), ct);
         await ReloadAsync(CancellationToken.None);
     }
+    public async Task ImportDropsAsync(IReadOnlyList<string> sources, Guid? profileId, CancellationToken ct)
+    {
+        try
+        {
+            await Task.Run(async () =>
+            {
+                foreach (var source in sources)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await library.ImportAsync(source, profileId: profileId, cancellationToken: ct);
+                }
+            }, ct);
+        }
+        finally { await ReloadAsync(CancellationToken.None); }
+    }
     public async Task RemoveModAsync(Guid id, CancellationToken ct)
     {
         await Task.Run(() => library.RemoveAsync(id, ct), ct);

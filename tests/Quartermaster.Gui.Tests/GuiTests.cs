@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
+using Avalonia.Input;
+using Avalonia.Platform.Storage;
 using Avalonia.VisualTree;
 using Quartermaster.Gui.Mods;
 using Quartermaster.Gui.Profiles;
@@ -19,6 +21,65 @@ public class GuiTests
 {
     private static T Page<T>(Fixture fixture, PageKind page) where T : ViewModelBase
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
+
+    [AvaloniaFact]
+    public async Task FileDropsImportIntoLibraryAndSpecifiedProfileWithoutDeploying()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            async Task Drop(Control target, string[] paths, bool accepted = true)
+            {
+                window.CaptureRenderedFrame()?.Dispose();
+                var data = new DataTransfer();
+                foreach (var path in paths)
+                {
+                    IStorageItem? item = Directory.Exists(path)
+                        ? await window.StorageProvider.TryGetFolderFromPathAsync(new Uri(path))
+                        : await window.StorageProvider.TryGetFileFromPathAsync(new Uri(path));
+                    data.Add(DataTransferItem.CreateFile(Assert.IsAssignableFrom<IStorageItem>(item)));
+                }
+                var position = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), window)!.Value;
+                var host = window.FindControl<Grid>("ShellContent")!;
+                var over = new DragEventArgs(DragDrop.DragOverEvent, data, window, position, KeyModifiers.None);
+                host.RaiseEvent(over);
+                Assert.Equal(accepted ? DragDropEffects.Copy : DragDropEffects.None, over.DragEffects);
+                host.RaiseEvent(new DragEventArgs(DragDrop.DropEvent, data, window, position, KeyModifiers.None));
+                await f.Services.Operations.WhenIdle;
+                // Profile navigation follows the completed import operation.
+                await f.Services.Operations.WhenIdle;
+                Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            }
+            Page<ModsViewModel>(f, PageKind.Mods); window.CaptureRenderedFrame()?.Dispose();
+            await Drop(Assert.Single(window.GetVisualDescendants().OfType<ModsView>()), [f.Zip("Library ZIP"), f.Source("Library folder")]);
+            Assert.Equal(2, f.Services.Session.State.Mods.Count);
+            Assert.Empty(Assert.Single(f.Services.Session.State.Profiles).Entries);
+            f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+            var targetId = f.Services.Session.State.ActiveProfileId;
+            var defaultProfile = f.Shell.SidebarProfiles.Single(p => p.Name == "Default");
+            await defaultProfile.SelectCommand.ExecuteAsync();
+            window.CaptureRenderedFrame()?.Dispose();
+            var other = window.GetVisualDescendants().OfType<Button>().Single(b => b.DataContext is SidebarProfile { Name: "Other" });
+            await Drop(other, [f.Source("Profile folder")]);
+            Assert.Equal(targetId, f.Services.Session.State.ActiveProfileId);
+            Assert.Single(f.Services.Session.State.Profiles.Single(p => p.Id == targetId).Entries);
+            window.CaptureRenderedFrame()?.Dispose();
+            await Drop(Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>()), [f.Zip("Profile ZIP")]);
+            Assert.Equal(2, f.Services.Session.State.Profiles.Single(p => p.Id == targetId).Entries.Count);
+            Assert.Empty(f.Services.Session.State.Profiles.Single(p => p.Name == "Default").Entries);
+            var unsupported = Path.Combine(f.Root, "readme.txt"); File.WriteAllText(unsupported, "unsupported");
+            await Drop(Assert.Single(window.GetVisualDescendants().OfType<ProfilesView>()), [unsupported], accepted: false);
+            Page<SettingsViewModel>(f, PageKind.Settings); window.CaptureRenderedFrame()?.Dispose();
+            await Drop(Assert.Single(window.GetVisualDescendants().OfType<SettingsView>()), [f.Source("Rejected")], accepted: false);
+            var libraryButton = window.GetVisualDescendants().OfType<Button>().Single(b => b.DataContext is NavigationItem { Page: PageKind.Mods });
+            await Drop(libraryButton, [f.Zip("Sidebar library")]);
+            Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
+            Assert.Equal(5, f.Services.Session.State.Mods.Count);
+            Assert.DoesNotContain(Directory.GetFiles(f.Game), path => path.Contains(".patch_"));
+        }
+        finally { await f.Services.Operations.WhenIdle; window.Close(); }
+    }
 
     [AvaloniaFact]
     public async Task ShellRendersAllPagesWithBoundDataAndCapturesPreviews()

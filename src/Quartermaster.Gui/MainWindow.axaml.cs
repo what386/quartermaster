@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ConfigureModDrops();
         Closing += async (_, e) =>
         {
             DialogOverlay.CancelActiveDialog();

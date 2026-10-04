@@ -12,6 +12,24 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Fact]
+    public async Task ImportCanAddToSpecificProfileWithoutChangingActiveProfile()
+    {
+        using var f = new Fixture();
+        var active = ProfileEditor.Create("Active"); var target = ProfileEditor.Create("Target");
+        await f.Library.SaveProfileAsync(active, makeActive: true);
+        await f.Library.SaveProfileAsync(target);
+        var source = f.Source("Dropped");
+        var mod = await f.Library.ImportAsync(source, profileId: target.Id);
+        var state = await f.Library.LoadAsync();
+        Assert.Equal(active.Id, state.ActiveProfileId);
+        Assert.Empty(state.Profiles.Single(p => p.Id == active.Id).Entries);
+        Assert.Equal(mod.Id, Assert.Single(state.Profiles.Single(p => p.Id == target.Id).Entries).ModId);
+        await Assert.ThrowsAsync<KeyNotFoundException>(() => f.Library.ImportAsync(source, profileId: Guid.NewGuid()));
+        Assert.Single((await f.Library.LoadAsync()).Mods);
+        Assert.Single(Directory.GetDirectories(Path.Combine(f.App, "library")));
+    }
+
+    [Fact]
     public async Task LegacyLibraryStateMigratesToSeparateMetadataFiles()
     {
         using var f = new Fixture();

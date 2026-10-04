@@ -7,12 +7,17 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
 {
     public Task<LibraryState> LoadAsync(CancellationToken cancellationToken = default) => store.LoadAsync(cancellationToken);
 
-    public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default)
+    public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default, Guid? profileId = null)
     {
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
         var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var target = profileId is null ? null : state.Profiles.SingleOrDefault(p => p.Id == profileId)
+            ?? throw new KeyNotFoundException("Profile does not exist.");
         var mod = await contents.ImportAsync(source, name, cancellationToken).ConfigureAwait(false);
-        try { await store.SaveAsync(state with { Mods = [.. state.Mods, mod] }, cancellationToken).ConfigureAwait(false); }
+        var updated = state with { Mods = [.. state.Mods, mod] };
+        if (target is not null) updated = updated with
+        { Profiles = state.Profiles.Select(p => p.Id == target.Id ? ProfileEditor.Add(p, mod) : p).ToArray() };
+        try { await store.SaveAsync(updated, cancellationToken).ConfigureAwait(false); }
         catch { await contents.DeleteAsync(mod.Id, CancellationToken.None).ConfigureAwait(false); throw; }
         return mod;
     }
