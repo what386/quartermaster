@@ -7,13 +7,27 @@ using Quartermaster.Gui.Shared;
 
 namespace Quartermaster.Gui.Profiles;
 
-public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null) : IModRow
+public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
+
+public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : IModRow
 {
     public string Name => Mod.Name;
     public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
     public string Description => ModPresentation.Description(Mod);
     public string Monogram => ModPresentation.Monogram(Mod);
+    public bool IsLoaded => DeploymentState == ModDeploymentState.Loaded;
+    public bool IsUnloaded => DeploymentState == ModDeploymentState.Unloaded;
+    public bool HasDeploymentWarning => DeploymentState is ModDeploymentState.Warning or ModDeploymentState.Unknown;
+    public string DeploymentDescription => DeploymentState switch
+    {
+        ModDeploymentState.Unloaded => "Disabled and unloaded",
+        ModDeploymentState.Loaded => "Enabled and deployed",
+        ModDeploymentState.Unknown => "Deployment state could not be verified. Check the game folder or purge and redeploy.",
+        _ => Entry.Enabled ? "Enabled but not deployed as configured. Deploy this profile to apply changes." :
+            "Disabled but still deployed. Redeploy or purge to unload."
+    };
+    public bool HasOptions => Mod.Options.Count > 0;
     public bool HasToggle => true;
     public bool IsEnabled => Entry.Enabled;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Entry.Enabled ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
@@ -51,7 +65,7 @@ public sealed class ProfilesViewModel : SessionViewModel
         set
         {
             if (!Set(ref selectedMod, value)) return;
-            Options = value is null ? null : new(value.Mod, value.Entry.Options);
+            Options = value is null ? null : new(value.Mod, value.Entry.Options, Session.GetOptionImages(value.Mod));
             Notify(nameof(Options)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
         }
     }
@@ -126,7 +140,7 @@ public sealed class ProfilesViewModel : SessionViewModel
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
         Entries = SelectedProfile?.Entries.Select((e, index) => new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !e.Enabled), ct)),
-                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]))).ToArray() ?? [];
+                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e))).ToArray() ?? [];
         AvailableMods = Session.State.Mods.Where(m => Entries.All(e => e.Mod.Id != m.Id)).ToArray();
         Notify(nameof(Entries)); Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
         SelectedMod = Entries.FirstOrDefault(e => e.Mod.Id == id) ?? Entries.FirstOrDefault();
@@ -136,6 +150,24 @@ public sealed class ProfilesViewModel : SessionViewModel
         Notify(nameof(Conflicts)); Notify(nameof(HasConflicts)); Notify(nameof(ArchiveSummary));
         Notify(nameof(HasProfile)); Notify(nameof(ActiveLabel));
         RefreshCommands();
+    }
+    private ModDeploymentState DeploymentStateFor(Mod mod, ProfileEntry entry)
+    {
+        if (Session.Inspection is not { Ledger.Status: DeploymentStatus.Complete } inspection)
+            return ModDeploymentState.Unknown;
+        var owned = inspection.Ledger.Files.Where(file => file.SourceId == mod.Id).ToArray();
+        var health = inspection.Files.ToDictionary(file => file.Name, file => file.Status);
+        var anyLoaded = owned.Any(file => health.TryGetValue(file.Name, out var status) && status != ManagedFileStatus.Missing);
+        if (!entry.Enabled) return anyLoaded ? ModDeploymentState.Warning : ModDeploymentState.Unloaded;
+        if (!anyLoaded) return ModDeploymentState.Warning;
+        // Match the selected variants and original hashes; repatched files have their own deployed hashes.
+        var expected = PatchSelection.Select(mod, entry).SelectMany(set => set.Files.Select(file => (set.Id, File: file)))
+            .ToDictionary(item => (item.Id, item.File.Kind), item => item.File);
+        return owned.Length == expected.Count && owned.All(file =>
+            health.GetValueOrDefault(file.Name, ManagedFileStatus.Missing) == ManagedFileStatus.Present &&
+            expected.TryGetValue((file.PatchSetId, file.Kind), out var original) &&
+            original.Sha256.Equals(file.SourceSha256, StringComparison.OrdinalIgnoreCase))
+            ? ModDeploymentState.Loaded : ModDeploymentState.Warning;
     }
     private void RefreshCommands()
     {

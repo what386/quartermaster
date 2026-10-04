@@ -1,0 +1,10 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mods="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModImagePreview">
+  <Grid RowDefinitions="Auto,*,Auto">
+    <TextBlock x:Name="PreviewTitle" Classes="sectionTitle" TextWrapping="Wrap" Margin="0,0,0,12" />
+    <Border Grid.Row="1" Background="#101214" CornerRadius="4" Padding="12">
+      <mods:ModPreviewImage x:Name="FullImage" DecodeWidth="0" CanPreview="False" Stretch="Uniform" />
+    </Border>
+    <Button Grid.Row="2" x:Name="BackButton" Content="Back to options" HorizontalAlignment="Right" Margin="0,12,0,0" Click="ReturnToOptions" />
+  </Grid>
+</UserControl>

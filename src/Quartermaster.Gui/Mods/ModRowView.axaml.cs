@@ -1,10 +1,23 @@
 using Avalonia.Controls;
+using Avalonia.Interactivity;
 using Avalonia.Media.Imaging;
 
 namespace Quartermaster.Gui.Mods;
 
 public partial class ModRowView : UserControl
 {
+    public static readonly RoutedEvent<RoutedEventArgs> OptionsRequestedEvent =
+        RoutedEvent.Register<ModRowView, RoutedEventArgs>(nameof(OptionsRequested), RoutingStrategies.Bubble);
+    public event EventHandler<RoutedEventArgs> OptionsRequested
+    {
+        add => AddHandler(OptionsRequestedEvent, value);
+        remove => RemoveHandler(OptionsRequestedEvent, value);
+    }
+    private void RequestOptions(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        RaiseEvent(new RoutedEventArgs(OptionsRequestedEvent));
+    }
     private Bitmap? icon;
     public ModRowView()
     {

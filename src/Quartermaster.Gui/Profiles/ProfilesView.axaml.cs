@@ -98,6 +98,14 @@ public partial class ProfilesView : UserControl
         SetDropTarget(null, false);
         if (pointer?.Captured == ProfileModsList) pointer.Capture(null);
     }
+    private void OpenModOptions(object? sender, RoutedEventArgs e)
+    {
+        e.Handled = true;
+        if (modDialog is not null || DataContext is not ProfilesViewModel { Operations.CanInteract: true } model ||
+            e.Source is not Mods.ModRowView { DataContext: ProfileModItem { HasOptions: true } mod }) return;
+        model.SelectedMod = mod;
+        OpenModDetails(sender, e);
+    }
     private async void OpenModDetails(object? sender, RoutedEventArgs e)
     {
         if (modDialog is not null || DataContext is not ProfilesViewModel { HasSelectedMod: true } model ||

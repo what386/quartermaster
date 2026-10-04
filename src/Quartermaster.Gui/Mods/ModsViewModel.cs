@@ -11,6 +11,11 @@ public sealed record ModListItem(Mod Mod, int Index, bool HasConflict, string? I
     public string Number => (Index + 1).ToString();
     public string Description => ModPresentation.Description(Mod);
     public string Monogram => ModPresentation.Monogram(Mod);
+    public bool IsLoaded => false;
+    public bool IsUnloaded => false;
+    public bool HasDeploymentWarning => false;
+    public string? DeploymentDescription => null;
+    public bool HasOptions => Mod.Options.Count > 0;
     public bool HasToggle => false;
     public bool IsEnabled => false;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Avalonia.Layout.HorizontalAlignment.Left;
@@ -28,6 +33,11 @@ public interface IModRow
     string? IconPath { get; }
     bool HasConflict { get; }
     bool HasToggle { get; }
+    bool HasOptions { get; }
+    bool IsLoaded { get; }
+    bool IsUnloaded { get; }
+    bool HasDeploymentWarning { get; }
+    string? DeploymentDescription { get; }
     bool IsEnabled { get; }
     Avalonia.Layout.HorizontalAlignment KnobAlignment { get; }
     string ToggleDescription { get; }

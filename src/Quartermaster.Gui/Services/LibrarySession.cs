@@ -59,6 +59,12 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         if (!iconPaths.TryGetValue(mod.Id, out var path)) iconPaths[mod.Id] = path = contents.GetIconPath(mod);
         return path;
     }
+    private readonly Dictionary<Guid, IReadOnlyList<ModOptionImages>> optionImages = [];
+    public IReadOnlyList<ModOptionImages> GetOptionImages(Mod mod)
+    {
+        if (!optionImages.TryGetValue(mod.Id, out var images)) optionImages[mod.Id] = images = contents.GetOptionImages(mod);
+        return images;
+    }
     public async Task AddModToProfileAsync(Guid modId, Guid profileId, CancellationToken ct)
     {
         await Task.Run(() => library.AddToProfileAsync(modId, profileId, ct), ct);

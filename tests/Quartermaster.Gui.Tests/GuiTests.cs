@@ -23,6 +23,186 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task OptionPreviewsFollowSelectionAndAppearInDropdown()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync(); var source = f.OptionsSource();
+        Directory.CreateDirectory(Path.Combine(source, "images"));
+        foreach (var name in new[] { "default", "blue", "red" })
+        {
+            using var bitmap = new Avalonia.Media.Imaging.WriteableBitmap(new PixelSize(640, 360), new Vector(96, 96),
+                Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul);
+            using (var buffer = bitmap.Lock())
+            {
+                var pixels = new byte[buffer.RowBytes * buffer.Size.Height];
+                for (var index = 0; index < pixels.Length; index += 4)
+                {
+                    pixels[index] = name == "blue" ? (byte)210 : (byte)70;
+                    pixels[index + 1] = 110; pixels[index + 2] = name == "red" ? (byte)210 : (byte)70; pixels[index + 3] = 255;
+                }
+                global::System.Runtime.InteropServices.Marshal.Copy(pixels, 0, buffer.Address, pixels.Length);
+            }
+            bitmap.Save(Path.Combine(source, "images", name + ".png"));
+        }
+        await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), """
+            {"Version":1,"Name":"Preview variants","Options":[
+              {"Name":"Color","Description":"Choose a color","Image":"images/default.png","Include":["common"],"SubOptions":[
+                {"Name":"Blue","Description":"Blue preview","Image":"images/blue.png","Include":["blue"]},
+                {"Name":"Red","Description":"Red preview","Image":"images/red.png","Include":["red"]},
+                {"Name":"Nothing","Include":[]}]},
+              {"Name":"Embedded","Image":"images/default.png","Include":["common"]},
+              {"Name":"Unsafe","Image":"../outside.png","Include":["common"]}]}
+            """);
+        await f.Services.Session.ImportAsync(source, CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var list = window.GetVisualDescendants().OfType<ListBox>().Single(box => box.Name == "ProfileModsList");
+            list.ContextMenu!.Open(list); Dispatcher.UIThread.RunJobs();
+            Assert.IsType<MenuItem>(list.ContextMenu.Items[0]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            window.CaptureRenderedFrame()?.Dispose();
+            var dialog = Assert.Single(window.GetVisualDescendants().OfType<ModSettingsDialog>());
+            var option = profiles.Options!.Options[0];
+            var preview = dialog.GetVisualDescendants().OfType<ModPreviewImage>().Single(image => ReferenceEquals(image.DataContext, option));
+            Assert.NotNull(preview.Source); Assert.EndsWith("blue.png", preview.FilePath);
+            var enabled = dialog.GetVisualDescendants().OfType<CheckBox>().Single(check => ReferenceEquals(check.DataContext, option));
+            Assert.True(enabled.TranslatePoint(new(0, 0), dialog)!.Value.X < preview.TranslatePoint(new(0, 0), dialog)!.Value.X);
+            var embedded = dialog.GetVisualDescendants().OfType<ModPreviewImage>().Single(image => ReferenceEquals(image.DataContext, profiles.Options.Options[1]));
+            Assert.NotNull(embedded.Source);
+            Assert.False(dialog.GetVisualDescendants().OfType<ModPreviewImage>().Single(image => ReferenceEquals(image.DataContext, profiles.Options.Options[2])).IsVisible);
+            var combo = dialog.GetVisualDescendants().OfType<ComboBox>().Single(control => ReferenceEquals(control.DataContext, option));
+            var checkPosition = enabled.TranslatePoint(new(0, 0), dialog)!.Value;
+            var comboPosition = combo.TranslatePoint(new(0, 0), dialog)!.Value;
+            var imagePosition = preview.TranslatePoint(new(0, 0), dialog)!.Value;
+            Assert.True(checkPosition.Y + enabled.Bounds.Height <= comboPosition.Y);
+            Assert.True(comboPosition.X + combo.Bounds.Width <= imagePosition.X);
+            if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } screenshotDirectory)
+            {
+                Directory.CreateDirectory(screenshotDirectory);
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(screenshotDirectory, "Options.png"));
+            }
+            combo.IsDropDownOpen = true; window.CaptureRenderedFrame()?.Dispose();
+            var popup = combo.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().Single();
+            var choices = popup.Child!.GetVisualDescendants().OfType<ModPreviewImage>().ToArray();
+            Assert.Equal(3, choices.Length);
+            Assert.Equal(2, choices.Count(image => image.Source is not null));
+            Assert.Contains(choices, image => image.FilePath?.EndsWith("red.png") == true);
+            var clickedChoice = choices.Single(image => image.FilePath?.EndsWith("red.png") == true);
+            clickedChoice.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(ModPreviewImage.PreviewRequestedEvent));
+            window.CaptureRenderedFrame()?.Dispose();
+            var viewer = dialog.FindControl<ModImagePreview>("ImagePreview")!;
+            Assert.True(viewer.IsVisible); Assert.False(combo.IsDropDownOpen);
+            var fullImage = viewer.FindControl<ModPreviewImage>("FullImage")!;
+            Assert.EndsWith("red.png", fullImage.FilePath); Assert.Equal(new PixelSize(640, 360), Assert.IsType<Avalonia.Media.Imaging.Bitmap>(fullImage.Source).PixelSize);
+            Assert.Equal(0, option.ChoiceIndex); // Enlarging a dropdown image doesn't select it.
+            Assert.Same(viewer.FindControl<Button>("BackButton"), window.FocusManager!.GetFocusedElement());
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null); window.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.True(window.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+            Assert.False(viewer.IsVisible); Assert.Null(fullImage.Source);
+            combo.SelectedIndex = 1; Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame()?.Dispose();
+            var previewPoint = preview.TranslatePoint(new Point(preview.Bounds.Width / 2, preview.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(previewPoint); window.MouseDown(previewPoint, MouseButton.Left); window.MouseUp(previewPoint, MouseButton.Left);
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.True(viewer.IsVisible); Assert.True(dialog.Width > 520); Assert.Empty(window.OwnedWindows);
+            Assert.EndsWith("red.png", fullImage.FilePath);
+            window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null); window.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(viewer.IsVisible); Assert.True(window.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+            Assert.Equal(1, option.ChoiceIndex); Assert.Equal(520, dialog.Width);
+            preview.Focus();
+            window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null); window.KeyRelease(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+            Assert.True(viewer.IsVisible);
+            viewer.FindControl<Button>("BackButton")!.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+
+            Assert.EndsWith("red.png", preview.FilePath); Assert.NotNull(preview.Source);
+            combo.SelectedIndex = 2; Dispatcher.UIThread.RunJobs();
+            Assert.EndsWith("default.png", preview.FilePath); // Fall back to option artwork.
+            enabled.IsChecked = false; Assert.False(combo.IsEnabled);
+            enabled.IsChecked = true; combo.SelectedIndex = 1;
+            await profiles.ApplyOptionsCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+            Assert.Equal(1, Assert.Single(profiles.SelectedProfile!.Entries).Options[0].ChoiceIndex);
+            dialog.Cancel(); Dispatcher.UIThread.RunJobs();
+            Assert.Null(preview.Source); Assert.Null(embedded.Source);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ModIconBordersTrackEnabledStateAndActualDeploymentPerMod()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Source("Cape"), CancellationToken.None);
+        await f.Services.Session.ImportAsync(f.Source("Armor", 2), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            void Check(string name, ModDeploymentState state, string color)
+            {
+                var item = profiles.Entries.Single(e => e.Name == name);
+                Assert.Equal(state, item.DeploymentState);
+                window.CaptureRenderedFrame()?.Dispose();
+                var row = window.GetVisualDescendants().OfType<ModRowView>().Single(view => view.DataContext is ProfileModItem mod && mod.Name == name);
+                var border = row.GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("modTile"));
+                Assert.Equal(Avalonia.Media.Color.Parse(color), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(border.BorderBrush).Color);
+                Assert.Equal(item.DeploymentDescription, ToolTip.GetTip(border));
+            }
+            Check("Cape", ModDeploymentState.Warning, "#E2C457");
+            profiles.SelectedMod = profiles.Entries.Single(e => e.Name == "Cape");
+            await profiles.ToggleCommand.ExecuteAsync();
+            Check("Cape", ModDeploymentState.Unloaded, "#E56A6A");
+            await profiles.ToggleCommand.ExecuteAsync(); await profiles.DeployCommand.ExecuteAsync();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Check("Cape", ModDeploymentState.Loaded, "#4AB98A");
+            Check("Armor", ModDeploymentState.Loaded, "#4AB98A");
+            f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+            profiles.ModToAdd = f.Services.Session.State.Mods.Single(m => m.Name == "Cape");
+            await profiles.AddCommand.ExecuteAsync();
+            Check("Cape", ModDeploymentState.Loaded, "#4AB98A"); // Loaded from the original profile.
+            await profiles.ToggleCommand.ExecuteAsync();
+            Check("Cape", ModDeploymentState.Warning, "#E2C457");
+            await f.Shell.SidebarProfiles.Single(p => p.Name == "Default").SelectCommand.ExecuteAsync();
+            var capeId = profiles.Entries.Single(e => e.Name == "Cape").Mod.Id;
+            var owned = f.Services.Session.Inspection!.Ledger.Files.First(file => file.SourceId == capeId);
+            File.WriteAllBytes(Path.Combine(f.Game, owned.Name), [0]);
+            await f.Services.Session.ReloadAsync(CancellationToken.None);
+            Check("Cape", ModDeploymentState.Warning, "#E2C457");
+            Check("Armor", ModDeploymentState.Loaded, "#4AB98A");
+            profiles.SelectedMod = profiles.Entries.Single(e => e.Name == "Cape");
+            await profiles.ToggleCommand.ExecuteAsync();
+            Check("Cape", ModDeploymentState.Warning, "#E2C457");
+            await profiles.PurgeCommand.ExecuteAsync();
+            Check("Cape", ModDeploymentState.Unloaded, "#E56A6A");
+            Check("Armor", ModDeploymentState.Warning, "#E2C457");
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task ChangedOptionsAndIncompleteDeploymentShowWarningInsteadOfLoaded()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.OptionsSource(), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
+        await profiles.DeployCommand.ExecuteAsync();
+        Assert.Equal(ModDeploymentState.Loaded, Assert.Single(profiles.Entries).DeploymentState);
+        var mod = Assert.Single(f.Services.Session.State.Mods);
+        await f.Services.Session.SaveProfileAsync(ProfileEditor.SetOptions(profiles.SelectedProfile!, mod, [new(mod.Options[0].Id, true, 1)]), false, CancellationToken.None);
+        Assert.Equal(ModDeploymentState.Warning, Assert.Single(profiles.Entries).DeploymentState);
+        await File.WriteAllTextAsync(Path.Combine(f.Data, "deployment.lock"), "invalid");
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var unknown = Assert.Single(profiles.Entries);
+        Assert.Equal(ModDeploymentState.Unknown, unknown.DeploymentState);
+        Assert.True(unknown.HasDeploymentWarning); Assert.Contains("could not be verified", unknown.DeploymentDescription);
+    }
+
+    [AvaloniaFact]
     public async Task ManifestIconsCompactRowsAndLibraryAddToMenuWorkInBothViews()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -738,7 +918,8 @@ public class GuiTests
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         f.Dialogs.FolderPath = f.OptionsSource(); await Page<ModsViewModel>(f, PageKind.Mods).ImportFolderCommand.ExecuteAsync();
-        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.ImportAsync(f.Source("Plain mod"), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
         var window = new MainWindow { DataContext = f.Shell }; window.Show();
         try
         {
@@ -746,9 +927,17 @@ public class GuiTests
             var option = Assert.Single(profiles.Options!.Options);
             Assert.DoesNotContain(window.GetVisualDescendants().OfType<ComboBox>(), c => c.DataContext == option);
             var list = Assert.Single(window.GetVisualDescendants().OfType<ListBox>(), box => box.Name == "ProfileModsList");
-            var menu = list.ContextMenu!; menu.Open(list); Dispatcher.UIThread.RunJobs();
-            var details = Assert.IsType<MenuItem>(menu.Items[0]);
-            details.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            var order = profiles.SelectedProfile!.Entries.Select(e => e.ModId).ToArray();
+            var optionRow = list.GetVisualDescendants().OfType<ModRowView>().Single(row => row.DataContext is ProfileModItem { HasOptions: true });
+            var plainRow = list.GetVisualDescendants().OfType<ModRowView>().Single(row => row.DataContext is ProfileModItem { HasOptions: false });
+            Assert.False(plainRow.FindControl<Button>("ModOptionsButton")!.IsEnabled);
+            profiles.SelectedMod = profiles.Entries.Single(item => item.Name == "Plain mod");
+            var button = optionRow.FindControl<Button>("ModOptionsButton")!;
+            Assert.True(button.IsVisible); Assert.True(button.IsEnabled);
+            var point = button.TranslatePoint(new Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(point); window.MouseDown(point, MouseButton.Left); window.MouseUp(point, MouseButton.Left);
+            Assert.Equal("Armor variants", profiles.SelectedMod!.Name);
+            option = Assert.Single(profiles.Options!.Options);
             Dispatcher.UIThread.RunJobs();
             var popup = Assert.Single(window.GetVisualDescendants().OfType<ModSettingsDialog>());
             window.CaptureRenderedFrame()?.Dispose();
@@ -758,11 +947,15 @@ public class GuiTests
             choice.SelectedIndex = 1; Dispatcher.UIThread.RunJobs();
             Assert.Equal(1, option.ChoiceIndex);
             await profiles.ApplyOptionsCommand.ExecuteAsync();
-            var state = f.Services.Session.State; var mod = Assert.Single(state.Mods); var entry = Assert.Single(profiles.SelectedProfile!.Entries);
+            var state = f.Services.Session.State; var mod = state.Mods.Single(m => m.Options.Count > 0);
+            var entry = profiles.SelectedProfile!.Entries.Single(e => e.ModId == mod.Id);
+            Assert.Equal(order, profiles.SelectedProfile.Entries.Select(e => e.ModId));
             Assert.Equal(new[] { "common", "red" }, PatchSelection.Select(mod, entry).Select(p => p.Folder));
             var reopened = new AppServices(f.Data, f.Dialogs, () => []); await reopened.Session.InitializeAsync(CancellationToken.None);
-            Assert.Equal(1, Assert.Single(reopened.Session.ActiveProfile!.Entries[0].Options).ChoiceIndex);
+            Assert.Equal(1, Assert.Single(reopened.Session.ActiveProfile!.Entries.Single(e => e.ModId == mod.Id).Options).ChoiceIndex);
             popup.Cancel(); Dispatcher.UIThread.RunJobs();
+            f.Shell.Navigate(PageKind.Mods); window.CaptureRenderedFrame()?.Dispose();
+            Assert.All(window.GetVisualDescendants().OfType<ModRowView>(), row => Assert.False(row.FindControl<Button>("ModOptionsButton")!.IsVisible));
         }
         finally { window.Close(); }
     }

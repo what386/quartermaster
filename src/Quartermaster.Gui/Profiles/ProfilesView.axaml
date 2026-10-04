@@ -31,7 +31,7 @@
           <Separator />
           <MenuItem Header="Remove from profile" Command="{Binding RemoveCommand}" />
         </ContextMenu></ListBox.ContextMenu>
-        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileModItem"><mods:ModRowView /></DataTemplate></ListBox.ItemTemplate>
+        <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ProfileModItem"><mods:ModRowView OptionsRequested="OpenModOptions" /></DataTemplate></ListBox.ItemTemplate>
       </ListBox>
     </Grid>
   </Grid>

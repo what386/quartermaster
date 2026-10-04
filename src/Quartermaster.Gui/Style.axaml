@@ -66,5 +66,7 @@
   <Style Selector="TextBox"><Setter Property="MinHeight" Value="32" /><Setter Property="CornerRadius" Value="2" /><Setter Property="Background" Value="#141619" /></Style>
   <Style Selector="ComboBox"><Setter Property="MinHeight" Value="32" /><Setter Property="CornerRadius" Value="2" /></Style>
   <Style Selector="Border.modTile"><Setter Property="Width" Value="44" /><Setter Property="Height" Value="44" /><Setter Property="BorderThickness" Value="2" /><Setter Property="BorderBrush" Value="#5C6269" /><Setter Property="CornerRadius" Value="7" /><Setter Property="Background" Value="#24272B" /></Style>
-  <Style Selector="Border.modTile.enabled"><Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" /></Style>
+  <Style Selector="Border.modTile.loaded"><Setter Property="BorderBrush" Value="{DynamicResource SuccessBrush}" /></Style>
+  <Style Selector="Border.modTile.unloaded"><Setter Property="BorderBrush" Value="#E56A6A" /></Style>
+  <Style Selector="Border.modTile.warning"><Setter Property="BorderBrush" Value="{DynamicResource ClashBrush}" /></Style>
 </Styles>

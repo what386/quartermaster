@@ -2,11 +2,25 @@
              xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModOptionsView" x:DataType="vm:ModOptionsViewModel">
   <ItemsControl ItemsSource="{Binding Options}">
     <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:OptionEdit">
-      <StackPanel Spacing="8" Margin="0,0,0,16">
-        <CheckBox Content="{Binding Name}" IsChecked="{Binding Enabled, Mode=TwoWay}" />
-        <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
-        <ComboBox ItemsSource="{Binding Choices}" SelectedIndex="{Binding ChoiceIndex, Mode=TwoWay}" IsVisible="{Binding HasChoices}" IsEnabled="{Binding Enabled}" HorizontalAlignment="Stretch" />
-      </StackPanel>
+      <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+        <StackPanel Spacing="6" VerticalAlignment="Center">
+          <CheckBox Content="{Binding Name}" IsChecked="{Binding Enabled, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}" FontWeight="SemiBold" ToolTip.Tip="{Binding Description}" />
+          <ComboBox ItemsSource="{Binding Choices}" SelectedIndex="{Binding ChoiceIndex, Mode=TwoWay}" IsVisible="{Binding HasChoices}" IsEnabled="{Binding Enabled}" HorizontalAlignment="Stretch">
+            <ComboBox.SelectionBoxItemTemplate><DataTemplate x:DataType="vm:OptionChoiceItem"><TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.SelectionBoxItemTemplate>
+            <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:OptionChoiceItem">
+              <Grid ColumnDefinitions="*,Auto" MinWidth="280" MaxWidth="420" Margin="0,4">
+                <StackPanel Spacing="4" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                </StackPanel>
+                <vm:ModPreviewImage Grid.Column="1" FilePath="{Binding ImagePath}" Width="96" Height="64" Margin="12,0,0,0" Stretch="Uniform" PreviewRequested="RequestPreview" />
+              </Grid>
+            </DataTemplate></ComboBox.ItemTemplate>
+            <ComboBox.Styles><Style Selector="ComboBoxItem"><Setter Property="HorizontalContentAlignment" Value="Stretch" /></Style></ComboBox.Styles>
+          </ComboBox>
+        </StackPanel>
+        <vm:ModPreviewImage Grid.Column="1" FilePath="{Binding PreviewImagePath}" Width="112" Height="88" Margin="12,0,0,0" Stretch="Uniform" PreviewRequested="RequestPreview" />
+      </Grid>
     </DataTemplate></ItemsControl.ItemTemplate>
   </ItemsControl>
 </UserControl>

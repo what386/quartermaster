@@ -21,23 +21,50 @@ public sealed class ModContentStore : IModContentStore
     public string GetModDirectory(Guid id) => ManagedPaths.Resolve(root, id.ToString("N"));
     public string GetFilePath(Guid id, PatchFile file) => ManagedPaths.Resolve(GetModDirectory(id), file.RelativePath);
 
-    /// <summary>Resolves the optional manifest icon inside the stored mod, including older imports.</summary>
+    /// <summary>Resolves optional artwork from the stored manifest, including older imports.</summary>
     public string? GetIconPath(Mod mod)
+    {
+        var source = ReadManifest(mod);
+        return source is { } value ? ResolveImage(value.Directory, value.Manifest.IconPath) : null;
+    }
+    public IReadOnlyList<ModOptionImages> GetOptionImages(Mod mod)
+    {
+        if (ReadManifest(mod) is not { } source) return [];
+        var options = source.Manifest.Options ?? [];
+        return mod.Options.Select((option, index) =>
+        {
+            var metadata = index < options.Count && options[index].Name == option.Name ? options[index] : null;
+            var choices = metadata?.SubOptions ?? [];
+            return new ModOptionImages(option.Id, ResolveImage(source.Directory, metadata?.Image),
+                option.Choices.Select((choice, choiceIndex) =>
+                {
+                    var item = choiceIndex < choices.Count && choices[choiceIndex].Name == choice.Name ? choices[choiceIndex] : null;
+                    return new ModChoiceImage(ResolveImage(source.Directory, item?.Image), item?.Description ?? "");
+                }).ToArray());
+        }).ToArray();
+    }
+    private (string Directory, Manifest Manifest)? ReadManifest(Mod mod)
     {
         try
         {
-            var directory = GetModDirectory(mod.Id);
-            var manifestPath = ManagedPaths.Enumerate(directory).SingleOrDefault(path =>
+            var manifestPath = ManagedPaths.Enumerate(GetModDirectory(mod.Id)).SingleOrDefault(path =>
                 Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase));
             if (manifestPath is null) return null;
-            using var document = global::System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
-            var icon = document.RootElement.EnumerateObject().FirstOrDefault(property =>
-                property.Name.Equals("IconPath", StringComparison.OrdinalIgnoreCase)).Value;
-            if (icon.ValueKind != global::System.Text.Json.JsonValueKind.String || string.IsNullOrWhiteSpace(icon.GetString())) return null;
-            var path = ManagedPaths.Resolve(Path.GetDirectoryName(manifestPath)!, icon.GetString()!.Replace('\\', '/'));
-            return File.Exists(path) ? path : null;
+            var manifest = global::System.Text.Json.JsonSerializer.Deserialize<Manifest>(File.ReadAllText(manifestPath), JsonFiles.Options);
+            return manifest is null ? null : (Path.GetDirectoryName(manifestPath)!, manifest);
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or global::System.Text.Json.JsonException or ArgumentException or InvalidOperationException)
+        { return null; }
+    }
+    private static string? ResolveImage(string directory, string? relative)
+    {
+        if (string.IsNullOrWhiteSpace(relative)) return null;
+        try
+        {
+            var path = ManagedPaths.Resolve(directory, relative.Replace('\\', '/'));
+            return File.Exists(path) ? path : null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
         { return null; }
     }
 

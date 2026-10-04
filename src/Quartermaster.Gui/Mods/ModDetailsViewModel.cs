@@ -20,27 +20,34 @@ public sealed class ModOptionsViewModel
 {
     public IReadOnlyList<OptionEdit> Options { get; }
     public bool HasOptions => Options.Count > 0;
-    public ModOptionsViewModel(Mod mod, IReadOnlyList<OptionSelection> selections)
+    public ModOptionsViewModel(Mod mod, IReadOnlyList<OptionSelection> selections, IReadOnlyList<ModOptionImages>? images = null)
     {
-        Options = mod.Options.Select(o => new OptionEdit(o, selections.FirstOrDefault(s => s.OptionId == o.Id) ?? new(o.Id))).ToArray();
+        Options = mod.Options.Select(o => new OptionEdit(o, selections.FirstOrDefault(s => s.OptionId == o.Id) ?? new(o.Id), images?.FirstOrDefault(image => image.OptionId == o.Id))).ToArray();
     }
     public IReadOnlyList<OptionSelection> Selections() => Options.Select(o => new OptionSelection(o.Id, o.Enabled, o.ChoiceIndex)).ToArray();
 }
 
+public sealed record OptionChoiceItem(string Name, string Description, string? ImagePath);
+
 public sealed class OptionEdit : ViewModelBase
 {
+    private readonly string? optionImagePath;
     private bool enabled;
     private int choiceIndex;
     public Guid Id { get; }
     public string Name { get; }
     public string Description { get; }
-    public IReadOnlyList<string> Choices { get; }
+    public IReadOnlyList<OptionChoiceItem> Choices { get; }
+    public string? PreviewImagePath => (ChoiceIndex < Choices.Count ? Choices[ChoiceIndex].ImagePath : null) ?? optionImagePath;
     public bool HasChoices => Choices.Count > 0;
     public bool Enabled { get => enabled; set => Set(ref enabled, value); }
-    public int ChoiceIndex { get => choiceIndex; set { if (value >= 0) Set(ref choiceIndex, value); } }
-    public OptionEdit(ModOption option, OptionSelection selection)
+    public int ChoiceIndex { get => choiceIndex; set { if (value >= 0 && (Choices.Count == 0 ? value == 0 : value < Choices.Count) && Set(ref choiceIndex, value)) Notify(nameof(PreviewImagePath)); } }
+    public OptionEdit(ModOption option, OptionSelection selection, ModOptionImages? images = null)
     {
         Id = option.Id; Name = option.Name; Description = option.Description;
-        Choices = option.Choices.Select(c => c.Name).ToArray(); enabled = selection.Enabled; choiceIndex = selection.ChoiceIndex;
+        optionImagePath = images?.ImagePath;
+        Choices = option.Choices.Select((choice, index) => new OptionChoiceItem(choice.Name,
+            images?.Choices.ElementAtOrDefault(index)?.Description ?? "", images?.Choices.ElementAtOrDefault(index)?.ImagePath)).ToArray();
+        enabled = selection.Enabled; choiceIndex = selection.ChoiceIndex;
     }
 }

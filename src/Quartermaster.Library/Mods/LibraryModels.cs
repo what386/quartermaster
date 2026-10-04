@@ -8,6 +8,8 @@ public sealed record PatchSet(Guid Id, string Archive, int OriginalSlot, string 
 public sealed record Mod(Guid Id, string Name, string Description, string? Version, Guid? ManifestId,
     DateTimeOffset ImportedAt, IReadOnlyList<PatchSet> PatchSets, IReadOnlyList<ModOption> Options,
     IReadOnlyList<SourceReference> Sources);
+public sealed record ModOptionImages(Guid OptionId, string? ImagePath, IReadOnlyList<ModChoiceImage> Choices);
+public sealed record ModChoiceImage(string? ImagePath, string Description);
 public sealed record LibraryState(int SchemaVersion, IReadOnlyList<Mod> Mods,
     IReadOnlyList<Profile> Profiles, Guid? ActiveProfileId)
 {

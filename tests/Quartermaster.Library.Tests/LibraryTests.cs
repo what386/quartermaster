@@ -12,6 +12,33 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task OptionArtworkResolvesNestedManifestPathsForExistingImports(bool zip)
+    {
+        using var f = new Fixture(); var source = f.Source("nested");
+        Directory.CreateDirectory(Path.Combine(source, "images"));
+        File.WriteAllBytes(Path.Combine(source, "images", "default.png"), [1]);
+        File.WriteAllBytes(Path.Combine(source, "images", "choice.png"), [2]);
+        await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), """
+            {"Version":1,"Options":[{"Name":"Style","Image":"images/default.png","SubOptions":[
+              {"Name":"Preview","Description":"Choice description","Image":"images/choice.png","Include":[""]},
+              {"Name":"Unsafe","Image":"../outside.png","Include":[""]},
+              {"Name":"Missing","Image":"images/missing.png","Include":[""]}]}]}
+            """);
+        var wrapper = Path.Combine(f.Root, "wrapper"); Directory.CreateDirectory(wrapper);
+        Directory.Move(source, Path.Combine(wrapper, "nested"));
+        var mod = await f.Library.ImportAsync(zip ? f.Zip(wrapper) : wrapper);
+        mod = Assert.Single((await f.Library.LoadAsync()).Mods);
+        var images = Assert.Single(f.Contents.GetOptionImages(mod));
+        Assert.Equal(Assert.Single(mod.Options).Id, images.OptionId);
+        Assert.Equal(Path.Combine(f.Contents.GetModDirectory(mod.Id), "nested", "images", "default.png"), images.ImagePath);
+        Assert.Equal(Path.Combine(f.Contents.GetModDirectory(mod.Id), "nested", "images", "choice.png"), images.Choices[0].ImagePath);
+        Assert.Equal("Choice description", images.Choices[0].Description);
+        Assert.Null(images.Choices[1].ImagePath); Assert.Null(images.Choices[2].ImagePath);
+    }
+
+    [Theory]
     [InlineData("icon.png", true)]
     [InlineData("../outside.png", false)]
     [InlineData("missing.png", false)]
