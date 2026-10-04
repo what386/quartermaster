@@ -22,7 +22,8 @@ public static class ProfileEditor
         var groups = profile.Groups.ToDictionary(group => group.Id, group => group with { Id = Guid.NewGuid() });
         return profile with
         {
-            Id = Guid.NewGuid(), Name = profile.Name + " (copy)",
+            Id = Guid.NewGuid(),
+            Name = profile.Name + " (copy)",
             Groups = profile.Groups.Select(group => groups[group.Id]).ToArray(),
             Entries = profile.Entries.Select(entry => entry with
             {
