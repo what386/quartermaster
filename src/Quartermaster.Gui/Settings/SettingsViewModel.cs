@@ -33,7 +33,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
         {
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
-                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(HasMatches) }) Notify(name);
+                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(HasMatches) }) Notify(name);
         }
     }
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || keywords.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -47,7 +47,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowLogs => Matches("Log file diagnostics troubleshooting " + LogFilePath);
     public bool ShowConfiguration => Matches("Settings configuration file " + ConfigurationFilePath);
     public bool HasMatches => ShowInstallation || ShowPriority || ShowRepatch || ShowStorage ||
-        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration || ShowNexus;
+        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration || ShowNexus || ShowGitHub;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;

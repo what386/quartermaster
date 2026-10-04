@@ -23,6 +23,60 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDownloadTests
 {
     [AvaloniaFact]
+    public async Task GitHubSettingsValidateSaveMaskAndRemoveOptionalToken()
+    {
+        using var api = new HttpClient(new Handler(request =>
+        {
+            Assert.Equal("/user", request.RequestUri!.AbsolutePath);
+            Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
+            Assert.Equal("personal-token", request.Headers.Authorization.Parameter);
+            return Json(new { login = "diver" });
+        }));
+        using var f = new Fixture(githubApi: api); await f.Shell.InitializeAsync();
+        var settings = (SettingsViewModel)Navigate(f, PageKind.Settings);
+        Assert.False(settings.HasSavedGitHubToken);
+        settings.Search = "github"; Assert.True(settings.HasMatches); Assert.True(settings.ShowGitHub); Assert.False(settings.ShowNexus);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<GitHubSettingsView>());
+            Assert.Equal('●', view.FindControl<TextBox>("GitHubTokenInput")!.PasswordChar);
+            settings.GitHubToken = "personal-token"; Assert.True(settings.SaveCommand.CanExecute(null));
+            await settings.SaveCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+            Assert.True(settings.HasSavedGitHubToken); Assert.Equal("diver", settings.GitHubAccount);
+            Assert.Equal("personal-token", await f.Services.Keys.GetAsync("github")); Assert.Empty(settings.GitHubToken);
+            Assert.DoesNotContain("personal-token", File.ReadAllText(Path.Combine(f.Data, "settings.json")));
+            Assert.DoesNotContain("personal-token", File.ReadAllText(Path.Combine(f.Data, "log.jsonl")));
+            await settings.InitializeProviderSettingsAsync(CancellationToken.None);
+            Assert.True(settings.HasSavedGitHubToken); Assert.Empty(settings.GitHubToken);
+            settings.RemoveGitHubToken = true; await settings.SaveCommand.ExecuteAsync();
+            Assert.False(f.Services.Operations.IsError); Assert.False(settings.HasSavedGitHubToken); Assert.Null(await f.Services.Keys.GetAsync("github"));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task InvalidGitHubTokenPreservesExistingCredentialsAndOtherSettings()
+    {
+        using var api = new HttpClient(new Handler(_ => new(HttpStatusCode.Unauthorized)));
+        using var f = new Fixture(githubApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("github", "saved-token");
+        var settings = (SettingsViewModel)Navigate(f, PageKind.Settings);
+        settings.GitHubToken = "invalid-token";
+        settings.RepatchChoice = (int)Quartermaster.Gui.Services.RepatchMode.Automatic;
+        await settings.SaveCommand.ExecuteAsync();
+        Assert.True(f.Services.Operations.IsError); Assert.Equal("saved-token", await f.Services.Keys.GetAsync("github"));
+        Assert.Equal(Quartermaster.Gui.Services.RepatchMode.Ask, f.Services.Session.Settings.Repatch);
+        Assert.DoesNotContain("invalid-token", f.Services.Operations.Message);
+        Assert.DoesNotContain("invalid-token", File.ReadAllText(Path.Combine(f.Data, "log.jsonl")));
+        await settings.InitializeProviderSettingsAsync(CancellationToken.None);
+        settings.ResetCommand.Execute(null);
+        Assert.True(settings.RemoveGitHubToken); Assert.Equal("saved-token", await f.Services.Keys.GetAsync("github"));
+        await settings.SaveCommand.ExecuteAsync(); Assert.Null(await f.Services.Keys.GetAsync("github"));
+    }
+
+    [AvaloniaFact]
     public async Task GitHubRepositoryImportAndUpdateDownloadDirectlyIntoProfile()
     {
         byte[] initial = []; byte[] updated = []; var latest = 1;

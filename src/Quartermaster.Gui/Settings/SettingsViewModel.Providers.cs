@@ -2,6 +2,7 @@ using Quartermaster.Gui.Shared;
 using Quartermaster.Providers.Downloads;
 using Quartermaster.Providers.Providers.NexusMods;
 using Quartermaster.Providers.Protocol;
+using Quartermaster.Providers.Providers.GitHub;
 
 namespace Quartermaster.Gui.Settings;
 
@@ -13,13 +14,23 @@ public sealed partial class SettingsViewModel
     private string nexusAccount = "Not connected";
     private string downloadFolder = "";
     private string savedDownloadFolder = "";
+    private string githubToken = "";
+    private bool removeGitHubToken;
+    private bool hasSavedGitHubToken;
+    private string githubAccount = "Optional · Public API access";
+    public string GitHubToken { get => githubToken; set { if (Set(ref githubToken, value)) SaveCommand.Refresh(); } }
+    public bool RemoveGitHubToken { get => removeGitHubToken; set { if (Set(ref removeGitHubToken, value)) SaveCommand.Refresh(); } }
+    public bool HasSavedGitHubToken { get => hasSavedGitHubToken; private set => Set(ref hasSavedGitHubToken, value); }
+    public string GitHubAccount { get => githubAccount; private set => Set(ref githubAccount, value); }
+    public bool ShowGitHub => Matches("GitHub provider account API key personal access token authentication rate limits");
     public string NexusApiKey { get => nexusApiKey; set { if (Set(ref nexusApiKey, value)) SaveCommand.Refresh(); } }
     public bool RemoveNexusKey { get => removeNexusKey; set { if (Set(ref removeNexusKey, value)) SaveCommand.Refresh(); } }
     public bool HasSavedNexusKey { get => hasSavedNexusKey; private set => Set(ref hasSavedNexusKey, value); }
     public string NexusAccount { get => nexusAccount; private set => Set(ref nexusAccount, value); }
     public string DownloadFolder { get => downloadFolder; set { if (Set(ref downloadFolder, value)) SaveCommand.Refresh(); } }
     public bool ShowNexus => Matches("Nexus Mods provider account API key authentication nxm downloads browser folder");
-    private bool ProviderDraftChanged => !string.IsNullOrWhiteSpace(NexusApiKey) || RemoveNexusKey && HasSavedNexusKey || DownloadFolder != savedDownloadFolder;
+    private bool ProviderDraftChanged => !string.IsNullOrWhiteSpace(NexusApiKey) || RemoveNexusKey && HasSavedNexusKey ||
+        !string.IsNullOrWhiteSpace(GitHubToken) || RemoveGitHubToken && HasSavedGitHubToken || DownloadFolder != savedDownloadFolder;
     public AsyncCommand BrowseDownloadsCommand { get; private set; } = null!;
     public AsyncCommand RegisterNxmCommand { get; private set; } = null!;
     private void InitializeProviderCommands()
@@ -35,18 +46,24 @@ public sealed partial class SettingsViewModel
     {
         HasSavedNexusKey = await Services.Keys.GetAsync(NexusAdapter.ProviderId, ct) is not null;
         NexusAccount = HasSavedNexusKey ? "Personal API key saved" : "Not connected";
+        HasSavedGitHubToken = !string.IsNullOrWhiteSpace(await Services.Keys.GetAsync(GitHubProvider.ProviderId, ct));
+        GitHubAccount = HasSavedGitHubToken ? "Personal access token saved" : "Optional · Public API access";
         savedDownloadFolder = Services.Providers.State.Directories.FirstOrDefault() ?? DownloadStore.DefaultDownloadsDirectory;
         DownloadFolder = savedDownloadFolder;
     }
-    private async Task<NexusUser?> ValidateProviderDraftAsync(CancellationToken ct)
+    private async Task<(NexusUser? Nexus, string? GitHub)> ValidateProviderDraftAsync(CancellationToken ct)
     {
         if (DownloadFolder != savedDownloadFolder && (string.IsNullOrWhiteSpace(DownloadFolder) || !Path.IsPathFullyQualified(DownloadFolder.Trim())))
             throw new ArgumentException("Choose an absolute download folder path.");
-        return !RemoveNexusKey && !string.IsNullOrWhiteSpace(NexusApiKey)
+        var nexus = !RemoveNexusKey && !string.IsNullOrWhiteSpace(NexusApiKey)
             ? await Services.ValidateNexusKeyAsync(NexusApiKey.Trim(), ct) : null;
+        var github = !RemoveGitHubToken && !string.IsNullOrWhiteSpace(GitHubToken)
+            ? await Services.GitHub.ValidateTokenAsync(GitHubToken.Trim(), ct) : null;
+        return (nexus, github);
     }
-    private async Task SaveProviderDraftAsync(NexusUser? user, CancellationToken ct)
+    private async Task SaveProviderDraftAsync((NexusUser? Nexus, string? GitHub) accounts, CancellationToken ct)
     {
+        var user = accounts.Nexus;
         if (RemoveNexusKey)
         {
             await Services.Keys.SetAsync(NexusAdapter.ProviderId, null, ct);
@@ -58,6 +75,17 @@ public sealed partial class SettingsViewModel
             HasSavedNexusKey = true; NexusAccount = $"{user.Name} · {(user.IsPremium ? "Premium" : "Free account")}";
         }
         NexusApiKey = ""; RemoveNexusKey = false;
+        if (RemoveGitHubToken)
+        {
+            await Services.Keys.SetAsync(GitHubProvider.ProviderId, null, ct);
+            HasSavedGitHubToken = false; GitHubAccount = "Optional · Public API access";
+        }
+        else if (accounts.GitHub is { } login)
+        {
+            await Services.Keys.SetAsync(GitHubProvider.ProviderId, GitHubToken.Trim(), ct);
+            HasSavedGitHubToken = true; GitHubAccount = login;
+        }
+        GitHubToken = ""; RemoveGitHubToken = false;
         if (DownloadFolder != savedDownloadFolder)
         {
             await Services.Providers.SetDirectoriesAsync([DownloadFolder.Trim()], ct);
@@ -65,5 +93,9 @@ public sealed partial class SettingsViewModel
         }
     }
     private void ResetProviderDraft()
-    { NexusApiKey = ""; RemoveNexusKey = HasSavedNexusKey; DownloadFolder = DownloadStore.DefaultDownloadsDirectory; }
+    {
+        NexusApiKey = ""; RemoveNexusKey = HasSavedNexusKey;
+        GitHubToken = ""; RemoveGitHubToken = HasSavedGitHubToken;
+        DownloadFolder = DownloadStore.DefaultDownloadsDirectory;
+    }
 }

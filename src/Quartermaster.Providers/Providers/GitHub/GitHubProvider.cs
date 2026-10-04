@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Security.Cryptography;
 using Quartermaster.Library.Mods;
@@ -18,14 +19,28 @@ public sealed class GitHubProvider : IModProvider, IDisposable
     private readonly HttpClient downloads;
     private readonly bool ownsApi;
     private readonly bool ownsDownloads;
+    private readonly Func<CancellationToken, Task<string?>> token;
     private static readonly JsonSerializerOptions Json = new() { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
     private sealed record Asset(long Id, string Name, string BrowserDownloadUrl, long Size, string? Digest, DateTimeOffset? CreatedAt);
     private sealed record Release(string TagName, string? Name, string? Body, bool Draft, bool Prerelease, DateTimeOffset? PublishedAt, Asset[] Assets);
+    private sealed record User(string Login);
 
-    public GitHubProvider(HttpClient? api = null, HttpClient? downloads = null)
+    public GitHubProvider(HttpClient? api = null, HttpClient? downloads = null, Func<CancellationToken, Task<string?>>? token = null)
     {
         this.api = api ?? new HttpClient(); ownsApi = api is null;
         this.downloads = downloads ?? new HttpClient { Timeout = TimeSpan.FromMinutes(30) }; ownsDownloads = downloads is null;
+        this.token = token ?? (_ => Task.FromResult<string?>(null));
+    }
+    public async Task<string> ValidateTokenAsync(string value, CancellationToken ct = default)
+    {
+        var user = await GetAsync<User>("user", ct, ValidateTokenFormat(value)).ConfigureAwait(false);
+        return !string.IsNullOrWhiteSpace(user.Login) ? user.Login : throw new InvalidDataException("Invalid GitHub account response.");
+    }
+    private static string ValidateTokenFormat(string value)
+    {
+        value = value.Trim();
+        if (value.Length is 0 or > 4096 || value.Any(c => c < 33 || c > 126)) throw new ArgumentException("Invalid GitHub token format.");
+        return value;
     }
     public bool CanHandle(Uri link) => link.IsAbsoluteUri && link.Scheme == "https" && link.Host is "github.com" or "www.github.com";
     public async Task<ProviderMod> ResolveAsync(string value, CancellationToken ct = default)
@@ -81,13 +96,17 @@ public sealed class GitHubProvider : IModProvider, IDisposable
                 new Uri(asset.BrowserDownloadUrl), Size: asset.Size, Sha256: sha);
         }).ToArray();
 
-    private async Task<T> GetAsync<T>(string path, CancellationToken ct)
+    private async Task<T> GetAsync<T>(string path, CancellationToken ct, string? tokenOverride = null)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.github.com/" + path);
         request.Headers.UserAgent.ParseAdd("Quartermaster");
         request.Headers.Accept.ParseAdd("application/vnd.github+json");
         request.Headers.Add("X-GitHub-Api-Version", "2022-11-28");
+        var credential = tokenOverride ?? await token(ct).ConfigureAwait(false);
+        if (!string.IsNullOrWhiteSpace(credential)) request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", ValidateTokenFormat(credential));
         using var response = await api.SendAsync(request, ct).ConfigureAwait(false);
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+            throw new HttpRequestException("GitHub rejected the token. Update or remove it in Settings.", null, response.StatusCode);
         if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.TooManyRequests)
             throw new HttpRequestException("GitHub refused the request or its public API rate limit was reached. Try again later.", null, response.StatusCode);
         if (response.StatusCode == HttpStatusCode.NotFound)

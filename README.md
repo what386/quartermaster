@@ -82,7 +82,10 @@ library imports. Nexus routes and search follow the
 release asset links. Repository links use the latest stable release. Choose an
 uploaded ZIP asset and Quartermaster downloads it directly into `temp/` and
 imports it through the Downloads queue. GitHub's generated source-code archives
-are excluded. No API key is required for public repositories; API rate-limit
+are excluded. Public repositories work without a token. Settings accepts an
+optional GitHub personal access token, validated before saving, to increase
+the API rate limit. Tokens are stored in `credentials/github.key`, outside
+settings and profile exports, and applied only to GitHub API requests. API rate-limit
 errors appear in the app. Download sizes and available SHA-256 digests are
 verified before import.
 

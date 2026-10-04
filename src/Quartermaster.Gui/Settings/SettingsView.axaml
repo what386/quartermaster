@@ -30,6 +30,7 @@
           <ComboBox Grid.Column="1" ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
         </Grid>
         <vm:NexusSettingsView IsVisible="{Binding ShowNexus}" />
+        <vm:GitHubSettingsView IsVisible="{Binding ShowGitHub}" />
         <Grid x:Name="StorageSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowStorage}">
           <TextBlock Text="Library storage" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" />

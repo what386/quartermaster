@@ -46,7 +46,7 @@ public sealed class AppServices : IAsyncDisposable
             using var client = new Quartermaster.Providers.Providers.NexusMods.NexusClient(_ => Task.FromResult<string?>(key), nexusApi);
             return await client.ValidateAsync(ct);
         };
-        GitHub = new(githubApi, githubDownloads);
+        GitHub = new(githubApi, githubDownloads, ct => Keys.GetAsync("github", ct));
         Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Providers.NexusMods.NexusAdapter(Nexus), GitHub], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),

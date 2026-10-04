@@ -13,6 +13,45 @@ namespace Quartermaster.Providers.Tests;
 
 public sealed class GitHubTests
 {
+    [Fact]
+    public async Task OptionalTokenIsReadForEveryApiRequestAndNeverSentToPublicAssetDownloads()
+    {
+        using var f = new Fixture(); string? token = null;
+        byte[] bytes = [1, 2, 3]; var requests = 0;
+        using var api = Http(request =>
+        {
+            requests++;
+            if (token is null) Assert.Null(request.Headers.Authorization);
+            else { Assert.Equal("Bearer", request.Headers.Authorization!.Scheme); Assert.Equal(token, request.Headers.Authorization.Parameter); }
+            return Json(Release(Asset(bytes: bytes)));
+        });
+        using var downloads = Http(request =>
+        { Assert.Null(request.Headers.Authorization); return new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) }; });
+        using var provider = new GitHubProvider(api, downloads, _ => Task.FromResult(token));
+        await provider.ResolveAsync("https://github.com/owner/mod");
+        token = "first-token"; await provider.ResolveAsync("https://github.com/owner/mod");
+        token = "replacement-token"; var file = Assert.Single((await provider.ResolveAsync("https://github.com/owner/mod")).Files);
+        await provider.DownloadAsync(file.DownloadPage.AbsoluteUri, file, Path.Combine(f.App, "mod.zip"));
+        token = null; await provider.ResolveAsync("https://github.com/owner/mod"); Assert.Equal(4, requests);
+    }
+
+    [Fact]
+    public async Task TokenValidationUsesDraftInsteadOfSavedTokenAndReportsRejectionWithoutExposingIt()
+    {
+        using var api = Http(request =>
+        {
+            Assert.Equal("/user", request.RequestUri!.AbsolutePath);
+            Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
+            return request.Headers.Authorization.Parameter == "new-token" ? Json(new { login = "diver" }) :
+                new(HttpStatusCode.Unauthorized) { Content = new StringContent("rejected-secret-token") };
+        });
+        using var provider = new GitHubProvider(api, token: _ => Task.FromResult<string?>("saved-token"));
+        Assert.Equal("diver", await provider.ValidateTokenAsync(" new-token "));
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => provider.ValidateTokenAsync("rejected-secret-token"));
+        Assert.Contains("Settings", error.Message); Assert.DoesNotContain("rejected-secret-token", error.Message);
+        await Assert.ThrowsAsync<ArgumentException>(() => provider.ValidateTokenAsync("bad\r\ntoken"));
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> send) : HttpMessageHandler
     { protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => Task.FromResult(send(request)); }
     private static HttpClient Http(Func<HttpRequestMessage, HttpResponseMessage> send) => new(new Handler(send));
