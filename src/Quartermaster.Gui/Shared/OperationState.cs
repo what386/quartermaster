@@ -53,4 +53,12 @@ public sealed class OperationState : ViewModelBase
         }
     }
     public void ReportError(Exception exception) { IsError = true; Message = exception.Message; }
+    public IProgress<T> CreateProgress<T>(Func<T, string> format)
+    {
+        var operation = completion;
+        return new Progress<T>(value =>
+        {
+            if (IsBusy && !IsError && operation == completion) Message = format(value);
+        });
+    }
 }

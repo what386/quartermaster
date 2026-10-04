@@ -29,8 +29,8 @@ public static class ProfilePatches
 public sealed class ProfileDeploymentService(DeploymentService deployment)
 {
     public Task<DeploymentLedger> DeployAsync(LibraryState state, Guid profileId, string targetDirectory,
-        DeploymentOptions? options = null, CancellationToken ct = default) =>
-        deployment.DeployAsync(ProfilePatches.Resolve(state, profileId), targetDirectory, options, ct);
+        DeploymentOptions? options = null, CancellationToken ct = default, IProgress<DeploymentProgress>? progress = null) =>
+        deployment.DeployAsync(ProfilePatches.Resolve(state, profileId), targetDirectory, options, ct, progress);
     public Task<DeploymentInspection> InspectAsync(string targetDirectory, CancellationToken ct = default) => deployment.InspectAsync(targetDirectory, ct);
     public Task PurgeAsync(string targetDirectory, CancellationToken ct = default) => deployment.PurgeAsync(targetDirectory, ct);
 }

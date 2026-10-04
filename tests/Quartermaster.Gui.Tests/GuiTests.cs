@@ -1443,6 +1443,42 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task DeploymentProgressShowsModCountAndCurrentName()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Source("Cape", 1), CancellationToken.None);
+        await f.Services.Session.ImportAsync(f.Source("Armor", 2), CancellationToken.None);
+        var profile = f.Services.Session.ActiveProfile!;
+        foreach (var mod in f.Services.Session.State.Mods) profile = ProfileEditor.Add(profile, mod);
+        await f.Services.Session.SaveProfileAsync(profile, true, CancellationToken.None);
+        await f.Services.Session.SaveSettingsAsync(f.Game, RepatchMode.Never, null, profile.Priority, CancellationToken.None);
+        var messages = new List<string>();
+        f.Services.Operations.PropertyChanged += (_, e) =>
+        { if (e.PropertyName == nameof(OperationState.Message)) messages.Add(f.Services.Operations.Message); };
+        await Page<ProfilesViewModel>(f, PageKind.Profiles).DeployCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        var names = ProfileEditor.InDeploymentOrder(profile).Select(entry => f.Services.Session.State.Mods.Single(mod => mod.Id == entry.ModId).Name).ToArray();
+        Assert.Contains($"Deploying 1 of 2: {names[0]}", messages);
+        Assert.Contains($"Deploying 2 of 2: {names[1]}", messages);
+        Assert.Equal("Deploying profile complete", f.Services.Operations.Message);
+    }
+    [AvaloniaFact]
+    public async Task QueuedProgressCannotOverwriteLaterOperations()
+    {
+        var operations = new OperationState();
+        await operations.RunAsync("First", _ =>
+        {
+            operations.CreateProgress<string>(value => value).Report("Old progress");
+            return Task.CompletedTask;
+        });
+        await operations.RunAsync("Second", _ =>
+        {
+            Dispatcher.UIThread.RunJobs(); Assert.Equal("Second", operations.Message);
+            return Task.CompletedTask;
+        });
+        Assert.Equal("Second complete", operations.Message);
+    }
+    [AvaloniaFact]
     public async Task ModOptionControlsSaveSelectedVariantToLibrary()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

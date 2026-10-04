@@ -12,7 +12,7 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
     }
 
     public async Task<DeploymentLedger> DeployAsync(DeploymentRequest request, string targetDirectory,
-        DeploymentOptions? options = null, CancellationToken ct = default)
+        DeploymentOptions? options = null, CancellationToken ct = default, IProgress<DeploymentProgress>? progress = null)
     {
         options ??= new();
         if (options.Repatch && repairer is null) throw new InvalidOperationException("Repatching requires a repair adapter.");
@@ -20,7 +20,7 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
         var inspection = await InspectUnlocked(workspace, ct).ConfigureAwait(false);
         if (inspection.NeedsPurge) throw new IOException("Deployment is incomplete or unknown. Purge patches, then redeploy.");
         var plan = DeploymentPlanner.Create(request);
-        return await Execute(workspace, plan, options, ct).ConfigureAwait(false);
+        return await Execute(workspace, plan, options, ct, progress).ConfigureAwait(false);
     }
 
     public async Task PurgeAsync(string targetDirectory, CancellationToken ct = default)
@@ -68,14 +68,19 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
     }
 
     private async Task<DeploymentLedger> Execute(IDeploymentWorkspace workspace,
-        DeploymentPlan plan, DeploymentOptions options, CancellationToken ct)
+        DeploymentPlan plan, DeploymentOptions options, CancellationToken ct, IProgress<DeploymentProgress>? progress)
     {
         workspace.BeginStaging();
         try
         {
             var files = new List<OwnedFile>();
-            foreach (var patch in plan.Patches)
+            var mods = plan.Patches.GroupBy(patch => patch.SourceId).ToArray();
+            var current = 0;
+            foreach (var mod in mods)
             {
+                ct.ThrowIfCancellationRequested();
+                progress?.Report(new(DeploymentPhase.Preparing, ++current, mods.Length, mod.Key));
+                foreach (var patch in mod)
                 foreach (var source in patch.Files)
                 {
                     ct.ThrowIfCancellationRequested();
@@ -104,15 +109,27 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
             await workspace.WriteLedgerAsync(ledger with { Status = DeploymentStatus.Deploying }, ct).ConfigureAwait(false);
             DeletePatches(workspace, ct);
             var operationId = Guid.NewGuid();
-            foreach (var file in files.OrderBy(f => f.Kind == PatchFileKind.Main))
+            current = 0;
+            foreach (var mod in files.GroupBy(file => file.SourceId))
             {
                 ct.ThrowIfCancellationRequested();
-                await workspace.PublishAsync(file.Name, operationId, ct).ConfigureAwait(false);
+                progress?.Report(new(DeploymentPhase.Deploying, ++current, mods.Length, mod.Key));
+                foreach (var file in mod.OrderBy(f => f.Kind == PatchFileKind.Main))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await workspace.PublishAsync(file.Name, operationId, ct).ConfigureAwait(false);
+                }
             }
-            foreach (var file in files)
+            current = 0;
+            foreach (var mod in files.GroupBy(file => file.SourceId))
             {
                 ct.ThrowIfCancellationRequested();
-                await workspace.VerifyAsync(DeploymentArea.Target, file, ct).ConfigureAwait(false);
+                progress?.Report(new(DeploymentPhase.Verifying, ++current, mods.Length, mod.Key));
+                foreach (var file in mod)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    await workspace.VerifyAsync(DeploymentArea.Target, file, ct).ConfigureAwait(false);
+                }
             }
             ct.ThrowIfCancellationRequested();
             await workspace.WriteLedgerAsync(ledger, ct).ConfigureAwait(false);

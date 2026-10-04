@@ -157,7 +157,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         catch (Exception ex) when (ex is IOException or ArgumentException) { DeploymentProblem = ex.Message; }
     }
     private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException("Choose your game folder in Settings first.");
-    public async Task DeployAsync(Guid profileId, IDialogService dialogs, CancellationToken ct)
+    public async Task DeployAsync(Guid profileId, IDialogService dialogs, CancellationToken ct, IProgress<DeploymentProgress>? progress = null)
     {
         var request = ProfilePatches.Resolve(State, profileId); var target = RequireGame();
         IPatchRepairer? adapter = null;
@@ -190,7 +190,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             await Task.Run(async () =>
             {
                 var repair = adapter is not null;
-                await new DeploymentService(storage, adapter).DeployAsync(request, target, new(Repatch: repair), ct);
+                await new DeploymentService(storage, adapter).DeployAsync(request, target, new(Repatch: repair), ct, progress);
             }, ct);
         }
         finally { await ReloadAsync(CancellationToken.None); }

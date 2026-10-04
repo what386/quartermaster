@@ -33,6 +33,25 @@ public class DeploymentServiceTests
     }
 
     [Fact]
+    public async Task ProgressCountsModsOnceAcrossMultiplePatchesAndKeepsCompanionsBeforeMainFiles()
+    {
+        var storage = new MemoryStorage(); var first = Create(1, storage).Patches[0]; var second = Create(3, storage).Patches[0];
+        var request = new DeploymentRequest(Guid.NewGuid(), [first, first with { PatchSetId = Guid.NewGuid() }, second]);
+        var updates = new List<DeploymentProgress>();
+        await new DeploymentService(storage).DeployAsync(request, "game", progress: new CallbackProgress(updates.Add));
+        foreach (var phase in Enum.GetValues<DeploymentPhase>())
+        {
+            var phaseUpdates = updates.Where(update => update.Phase == phase).ToArray();
+            Assert.Equal(new[] { first.SourceId, second.SourceId }, phaseUpdates.Select(update => update.SourceId));
+            Assert.Equal(new[] { 1, 2 }, phaseUpdates.Select(update => update.Current));
+            Assert.All(phaseUpdates, update => Assert.Equal(2, update.Total));
+        }
+        Assert.Equal(new[] { Archive + ".patch_0.stream", Archive + ".patch_1.stream", Archive + ".patch_0", Archive + ".patch_1", Archive + ".patch_2.stream", Archive + ".patch_2" },
+            storage.Events.Where(e => e.StartsWith("Publish:")).Select(e => e[8..]));
+    }
+    private sealed class CallbackProgress(Action<DeploymentProgress> callback) : IProgress<DeploymentProgress>
+    { public void Report(DeploymentProgress value) => callback(value); }
+    [Fact]
     public async Task FailedPublicationLeavesIncompleteManifestUntilPurge()
     {
         var storage = new MemoryStorage(); var old = Create(1, storage);

@@ -104,7 +104,12 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         {
             var current = SelectedProfile!;
             if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout.", "Deploy"))
-                await Session.DeployAsync(current.Id, Services.Dialogs, ct);
+            {
+                var names = Session.State.Mods.ToDictionary(mod => mod.Id, mod => mod.Name);
+                var progress = Operations.CreateProgress<DeploymentProgress>(update =>
+                    $"{update.Phase} {update.Current} of {update.Total}: {names.GetValueOrDefault(update.SourceId, "Unknown mod")}");
+                await Session.DeployAsync(current.Id, Services.Dialogs, ct, progress);
+            }
         }, () => HasProfile && Session.GameDirectory != "");
         RunCommand = Operations.CreateCommand("Launching game", async ct =>
         {

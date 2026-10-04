@@ -5,6 +5,8 @@ namespace Quartermaster.Core.Deployment;
 public enum DeploymentArea { Target, Staged }
 public sealed record FileFingerprint(long Size, string Sha256);
 public sealed record DeploymentOptions(bool Repatch = false, bool AllowRemovedUnits = false);
+public enum DeploymentPhase { Preparing, Deploying, Verifying }
+public sealed record DeploymentProgress(DeploymentPhase Phase, int Current, int Total, Guid SourceId);
 public sealed record DeploymentInspection(DeploymentLedger Ledger, IReadOnlyList<TrackedFile> Files, IReadOnlyList<OccupiedSlot> UntrackedSlots)
 {
     public bool NeedsPurge => Ledger.Status != DeploymentStatus.Complete || UntrackedSlots.Count > 0 ||
