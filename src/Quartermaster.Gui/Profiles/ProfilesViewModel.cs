@@ -7,13 +7,13 @@ using Quartermaster.Gui.Shared;
 
 namespace Quartermaster.Gui.Profiles;
 
-public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict) : IModRow
+public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null) : IModRow
 {
     public string Name => Mod.Name;
+    public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
     public string Description => ModPresentation.Description(Mod);
     public string Monogram => ModPresentation.Monogram(Mod);
-    public string Summary => $"{ModPresentation.Count(Mod.PatchSets.Count, "patch set")} · {Mod.Version ?? "Local import"}";
     public bool HasToggle => true;
     public bool IsEnabled => Entry.Enabled;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Entry.Enabled ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
@@ -126,7 +126,7 @@ public sealed class ProfilesViewModel : SessionViewModel
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
         Entries = SelectedProfile?.Entries.Select((e, index) => new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !e.Enabled), ct)),
-                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId))).ToArray() ?? [];
+                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]))).ToArray() ?? [];
         AvailableMods = Session.State.Mods.Where(m => Entries.All(e => e.Mod.Id != m.Id)).ToArray();
         Notify(nameof(Entries)); Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
         SelectedMod = Entries.FirstOrDefault(e => e.Mod.Id == id) ?? Entries.FirstOrDefault();

@@ -11,6 +11,35 @@ namespace Quartermaster.Library.Tests;
 
 public class LibraryTests
 {
+    [Theory]
+    [InlineData("icon.png", true)]
+    [InlineData("../outside.png", false)]
+    [InlineData("missing.png", false)]
+    public async Task ManifestIconIsResolvedRelativeToManifestAndConfinedToMod(string icon, bool valid)
+    {
+        using var f = new Fixture(); var source = f.Source("nested");
+        File.WriteAllBytes(Path.Combine(source, "icon.png"), [1]);
+        await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), global::System.Text.Json.JsonSerializer.Serialize(new { Version = 1, IconPath = icon }));
+        var wrapper = Path.Combine(f.Root, "wrapper"); Directory.CreateDirectory(wrapper);
+        Directory.Move(source, Path.Combine(wrapper, "nested"));
+        var mod = await f.Library.ImportAsync(f.Zip(wrapper));
+        var reloaded = Assert.Single((await f.Library.LoadAsync()).Mods);
+        Assert.Equal(valid ? Path.Combine(f.Contents.GetModDirectory(mod.Id), "nested", "icon.png") : null, f.Contents.GetIconPath(reloaded));
+    }
+
+    [Fact]
+    public async Task AddingLibraryModToProfilePreservesOtherProfilesAndRejectsDuplicates()
+    {
+        using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("mod"));
+        var active = ProfileEditor.Create("Active"); var target = ProfileEditor.Create("Target");
+        await f.Library.SaveProfileAsync(active, makeActive: true); await f.Library.SaveProfileAsync(target);
+        await f.Library.AddToProfileAsync(mod.Id, target.Id);
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Library.AddToProfileAsync(mod.Id, target.Id));
+        var state = await f.Library.LoadAsync(); Assert.Single(state.Mods);
+        Assert.Equal(active.Id, state.ActiveProfileId); Assert.Empty(state.Profiles.Single(p => p.Id == active.Id).Entries);
+        Assert.Equal(mod.Id, Assert.Single(state.Profiles.Single(p => p.Id == target.Id).Entries).ModId);
+    }
+
     [Fact]
     public async Task ImportCanAddToSpecificProfileWithoutChangingActiveProfile()
     {

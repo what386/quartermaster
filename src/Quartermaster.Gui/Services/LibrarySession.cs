@@ -53,6 +53,17 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
         await RefreshInspectionAsync(ct); Publish();
     }
     private void Publish() { Notify(nameof(State)); Notify(nameof(GameDirectory)); Notify(nameof(DeploymentStatus)); Changed?.Invoke(this, EventArgs.Empty); }
+    private readonly Dictionary<Guid, string?> iconPaths = [];
+    public string? GetIconPath(Mod mod)
+    {
+        if (!iconPaths.TryGetValue(mod.Id, out var path)) iconPaths[mod.Id] = path = contents.GetIconPath(mod);
+        return path;
+    }
+    public async Task AddModToProfileAsync(Guid modId, Guid profileId, CancellationToken ct)
+    {
+        await Task.Run(() => library.AddToProfileAsync(modId, profileId, ct), ct);
+        await ReloadAsync(CancellationToken.None);
+    }
     public async Task ImportAsync(string source, CancellationToken ct)
     {
         await Task.Run(() => library.ImportAsync(source, cancellationToken: ct), ct);

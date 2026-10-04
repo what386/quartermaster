@@ -13,13 +13,15 @@ public partial class MainWindow
     private void ConfigureModDrops()
     {
         DragDrop.SetAllowDrop(ShellContent, true);
-        ShellContent.AddHandler(DragDrop.DragOverEvent, (_, e) =>
+        void UpdateDragEffects(object? sender, DragEventArgs e)
         {
             e.DragEffects = DataContext is MainWindowViewModel { Operations.CanInteract: true } &&
                 !DialogOverlay.IsOpen && ResolveDropTarget(e).Accepted && DroppedPaths(e).Count > 0
                 ? DragDropEffects.Copy : DragDropEffects.None;
             e.Handled = true;
-        });
+        }
+        ShellContent.AddHandler(DragDrop.DragEnterEvent, UpdateDragEffects);
+        ShellContent.AddHandler(DragDrop.DragOverEvent, UpdateDragEffects);
         ShellContent.AddHandler(DragDrop.DropEvent, ImportDroppedMods);
     }
     private (bool Accepted, Guid? ProfileId) ResolveDropTarget(DragEventArgs e)

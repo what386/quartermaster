@@ -22,6 +22,16 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         return mod;
     }
 
+    public async Task AddToProfileAsync(Guid modId, Guid profileId, CancellationToken cancellationToken = default)
+    {
+        await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
+        var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
+        var mod = state.Mods.SingleOrDefault(m => m.Id == modId) ?? throw new KeyNotFoundException("Mod is not in the library.");
+        var profile = state.Profiles.SingleOrDefault(p => p.Id == profileId) ?? throw new KeyNotFoundException("Profile does not exist.");
+        await store.SaveAsync(state with
+        { Profiles = state.Profiles.Select(p => p.Id == profileId ? ProfileEditor.Add(profile, mod) : p).ToArray() }, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task RemoveAsync(Guid modId, CancellationToken cancellationToken = default)
     {
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);

@@ -11,6 +11,22 @@ public partial class ModsView : UserControl
     public ModsView()
     {
         InitializeComponent();
+        ModsList.ContextMenu!.Opening += (_, _) =>
+        {
+            AddToProfileMenuItem.Items.Clear();
+            if (DataContext is not ModsViewModel { SelectedMod: { } selected } model) return;
+            foreach (var profile in model.Profiles)
+            {
+                var modId = selected.Mod.Id; var profileId = profile.Id;
+                AddToProfileMenuItem.Items.Add(new MenuItem
+                {
+                    Header = profile.Name,
+                    Command = new Shared.AsyncCommand(() => model.AddToProfileAsync(modId, profileId),
+                        () => model.Operations.CanInteract && model.Profiles.Any(p => p.Id == profileId &&
+                            p.Entries.All(entry => entry.ModId != modId)), model.Operations.ReportError)
+                });
+            }
+        };
         ModsList.AddHandler(PointerPressedEvent, (_, e) =>
         {
             if (!e.GetCurrentPoint(ModsList).Properties.IsRightButtonPressed || e.Source is not Avalonia.Visual source ||

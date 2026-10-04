@@ -23,6 +23,100 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task ManifestIconsCompactRowsAndLibraryAddToMenuWorkInBothViews()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var source = f.Source("Icon mod");
+        await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), """{"Version":1,"Name":"Icon mod","ModVersion":"v2","Description":"First paragraph.\n\nSecond paragraph.","IconPath":"icon.png"}""");
+        using (var bitmap = new Avalonia.Media.Imaging.WriteableBitmap(new PixelSize(32, 32), new Vector(96, 96),
+            Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul))
+            bitmap.Save(Path.Combine(source, "icon.png"));
+        await f.Services.Session.ImportAsync(source, CancellationToken.None);
+        var longSource = f.Source("Long mod");
+        await File.WriteAllTextAsync(Path.Combine(longSource, "manifest.json"), global::System.Text.Json.JsonSerializer.Serialize(new
+        { Version = 1, Description = string.Join(" ", Enumerable.Repeat("Long description that wraps.", 80)), IconPath = "bad.png" }));
+        File.WriteAllText(Path.Combine(longSource, "bad.png"), "invalid image");
+        await f.Services.Session.ImportAsync(longSource, CancellationToken.None);
+        f.Dialogs.InputText = "Target"; await f.Shell.AddProfileCommand.ExecuteAsync();
+        var targetId = f.Services.Session.State.ActiveProfileId;
+        await f.Shell.SidebarProfiles.Single(p => p.Name == "Default").SelectCommand.ExecuteAsync();
+        var activeId = f.Services.Session.State.ActiveProfileId;
+        var mods = Page<ModsViewModel>(f, PageKind.Mods);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<ModsView>());
+            var list = view.FindControl<ListBox>("ModsList")!;
+            var row = list.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is ModListItem { Name: "Icon mod" });
+            var contents = Assert.Single(row.GetVisualDescendants().OfType<ModRowView>());
+            Assert.NotNull(contents.FindControl<Image>("ModIcon")!.Source);
+            Assert.False(contents.FindControl<TextBlock>("ModMonogram")!.IsVisible);
+            Assert.Contains(contents.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Icon mod · v2");
+            Assert.Contains(contents.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "First paragraph. Second paragraph.");
+            var longRow = list.GetVisualDescendants().OfType<ListBoxItem>().Single(item => item.DataContext is ModListItem { Name: "Long mod" });
+            Assert.True(longRow.Bounds.Height > row.Bounds.Height);
+            Assert.True(Assert.Single(longRow.GetVisualDescendants().OfType<ModRowView>()).FindControl<TextBlock>("ModMonogram")!.IsVisible);
+            var point = row.TranslatePoint(new Point(240, row.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(point); window.MouseDown(point, MouseButton.Right); window.MouseUp(point, MouseButton.Right);
+            Dispatcher.UIThread.RunJobs(); Assert.Equal("Icon mod", mods.SelectedMod!.Name);
+            var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
+            var addTo = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Add to"));
+            var target = addTo.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Target"));
+            await Assert.IsType<AsyncCommand>(target.Command).ExecuteAsync(); menu.Close();
+            Assert.Equal(activeId, f.Services.Session.State.ActiveProfileId);
+            Assert.Equal(mods.SelectedMod!.Mod.Id, Assert.Single(f.Services.Session.State.Profiles.Single(p => p.Id == targetId).Entries).ModId);
+            Assert.Equal(2, f.Services.Session.State.Mods.Count);
+            menu.Open(list); Dispatcher.UIThread.RunJobs();
+            target = addTo.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Target"));
+            Assert.False(target.Command!.CanExecute(null)); menu.Close();
+            await f.Shell.SidebarProfiles.Single(p => p.Name == "Target").SelectCommand.ExecuteAsync();
+            window.CaptureRenderedFrame()?.Dispose();
+            var profileRow = Assert.Single(window.GetVisualDescendants().OfType<ModRowView>());
+            Assert.NotNull(profileRow.FindControl<Image>("ModIcon")!.Source);
+            Assert.DoesNotContain(Directory.GetFiles(f.Game), path => path.Contains(".patch_"));
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(PageKind.Mods)]
+    [InlineData(PageKind.Profiles)]
+    public async Task BlankListAreaAcceptsFileDropsWhenEmptyOrPartiallyFilled(PageKind page)
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        f.Shell.Navigate(page);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            for (var index = 0; index < 3; index++)
+            {
+                window.CaptureRenderedFrame()?.Dispose();
+                var list = window.GetVisualDescendants().OfType<ListBox>().Single(control => control.Name == (page == PageKind.Mods ? "ModsList" : "ProfileModsList"));
+                // Stay far below any rows or empty-list message.
+                var position = list.TranslatePoint(new Point(list.Bounds.Width - 24, list.Bounds.Height - 24), window)!.Value;
+                if (index == 2)
+                {
+                    var view = list.GetVisualAncestors().OfType<UserControl>().First();
+                    var header = Assert.IsType<Grid>(Assert.IsType<Grid>(view.Content).Children[0]);
+                    position = header.TranslatePoint(new Point(header.Bounds.Width - 24, header.Bounds.Height + 4), window)!.Value;
+                }
+                var file = await window.StorageProvider.TryGetFileFromPathAsync(new Uri(f.Zip("Dropped " + index)));
+                var data = new DataTransfer(); data.Add(DataTransferItem.CreateFile(file!));
+                window.DragDrop(position, Avalonia.Input.Raw.RawDragEventType.DragEnter, data, DragDropEffects.Copy, RawInputModifiers.None);
+                window.DragDrop(position, Avalonia.Input.Raw.RawDragEventType.DragOver, data, DragDropEffects.Copy, RawInputModifiers.None);
+                window.DragDrop(position, Avalonia.Input.Raw.RawDragEventType.Drop, data, DragDropEffects.Copy, RawInputModifiers.None);
+                await f.Services.Operations.WhenIdle;
+                await f.Services.Operations.WhenIdle;
+                Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+                Assert.Equal(index + 1, f.Services.Session.State.Mods.Count);
+                Assert.Equal(page == PageKind.Profiles ? index + 1 : 0, Assert.Single(f.Services.Session.State.Profiles).Entries.Count);
+            }
+        }
+        finally { await f.Services.Operations.WhenIdle; window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task FileDropsImportIntoLibraryAndSpecifiedProfileWithoutDeploying()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

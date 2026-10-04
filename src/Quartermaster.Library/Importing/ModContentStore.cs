@@ -21,6 +21,26 @@ public sealed class ModContentStore : IModContentStore
     public string GetModDirectory(Guid id) => ManagedPaths.Resolve(root, id.ToString("N"));
     public string GetFilePath(Guid id, PatchFile file) => ManagedPaths.Resolve(GetModDirectory(id), file.RelativePath);
 
+    /// <summary>Resolves the optional manifest icon inside the stored mod, including older imports.</summary>
+    public string? GetIconPath(Mod mod)
+    {
+        try
+        {
+            var directory = GetModDirectory(mod.Id);
+            var manifestPath = ManagedPaths.Enumerate(directory).SingleOrDefault(path =>
+                Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase));
+            if (manifestPath is null) return null;
+            using var document = global::System.Text.Json.JsonDocument.Parse(File.ReadAllText(manifestPath));
+            var icon = document.RootElement.EnumerateObject().FirstOrDefault(property =>
+                property.Name.Equals("IconPath", StringComparison.OrdinalIgnoreCase)).Value;
+            if (icon.ValueKind != global::System.Text.Json.JsonValueKind.String || string.IsNullOrWhiteSpace(icon.GetString())) return null;
+            var path = ManagedPaths.Resolve(Path.GetDirectoryName(manifestPath)!, icon.GetString()!.Replace('\\', '/'));
+            return File.Exists(path) ? path : null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or global::System.Text.Json.JsonException or ArgumentException or InvalidOperationException)
+        { return null; }
+    }
+
     public async Task<byte[]> ReadVerifiedAsync(Guid modId, PatchFile file, CancellationToken ct)
     {
         var path = GetFilePath(modId, file);
