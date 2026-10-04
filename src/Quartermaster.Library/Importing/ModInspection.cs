@@ -25,7 +25,7 @@ internal static class ManifestReader
         var manifest = await JsonFiles.ReadAsync<Manifest>(ManagedPaths.Resolve(root, manifests[0]), ct).ConfigureAwait(false);
         if (manifest.Version != 1) throw new InvalidDataException("Unsupported manifest version.");
         var baseFolder = Path.GetDirectoryName(manifests[0])?.Replace('\\', '/') ?? "";
-        IReadOnlyList<Guid> Resolve(IReadOnlyList<string>? folders)
+        IReadOnlyList<Guid> Resolve(IReadOnlyList<string>? folders, IReadOnlyList<string>? choiceFolders = null)
         {
             var ids = new HashSet<Guid>();
             var ordered = new List<Guid>();
@@ -36,13 +36,43 @@ internal static class ManifestReader
                 var prefix = baseFolder == "" ? folder : folder == "" ? baseFolder : baseFolder + "/" + folder;
                 var matches = sets.Where(s => prefix == "" || s.Folder == prefix || s.Folder.StartsWith(prefix + "/", StringComparison.Ordinal)).ToArray();
                 if (matches.Length == 0) throw new InvalidDataException($"Manifest Include matches no patch sets: {raw}");
-                foreach (var set in matches) if (ids.Add(set.Id)) ordered.Add(set.Id);
+                // A parent Include covers shared content, while descendant choice folders
+                // belong exclusively to the selected SubOption. An exact repeated Include
+                // remains shared (some manifests deliberately reuse common patches).
+                var branches = (choiceFolders ?? []).Select(path => path.Replace('\\', '/').TrimEnd('/'))
+                    .Where(path => folder == "" ? path != "" : path.StartsWith(folder + "/", StringComparison.Ordinal))
+                    .Select(path => baseFolder == "" ? path : baseFolder + "/" + path).ToArray();
+                foreach (var set in matches)
+                    if (!branches.Any(branch => set.Folder == branch || set.Folder.StartsWith(branch + "/", StringComparison.Ordinal)) && ids.Add(set.Id))
+                        ordered.Add(set.Id);
             }
             return ordered.ToArray();
         }
         var options = (manifest.Options ?? []).Select(o => new ModOption(Guid.NewGuid(), o.Name, o.Description,
-            Resolve(o.Include), (o.SubOptions ?? []).Select(c => new OptionChoice(c.Name, Resolve(c.Include))).ToArray())).ToArray();
+            Resolve(o.Include, (o.SubOptions ?? []).SelectMany(c => c.Include ?? []).ToArray()),
+            (o.SubOptions ?? []).Select(c => new OptionChoice(c.Name, Resolve(c.Include))).ToArray())).ToArray();
         return (manifest, options);
+    }
+
+    /// <summary>Corrects old recursive parent includes while retaining IDs used by saved profiles.</summary>
+    public static async Task<Mod> CorrectLegacyIncludesAsync(string root, Mod mod, CancellationToken ct)
+    {
+        if (!mod.Options.Any(option => option.PatchSetIds.Intersect(option.Choices.SelectMany(choice => choice.PatchSetIds)).Any())) return mod;
+        var directory = ManagedPaths.Resolve(root, "library/" + mod.Id.ToString("N"));
+        if (!Directory.Exists(directory)) return mod;
+        var manifests = ManagedPaths.Enumerate(directory).Where(path => Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase))
+            .Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/')).ToArray();
+        if (manifests.Length != 1) return mod;
+        var (_, parsed) = await ReadAsync(directory, manifests, mod.PatchSets, ct).ConfigureAwait(false);
+        if (parsed.Count != mod.Options.Count) return mod;
+        for (var i = 0; i < parsed.Count; i++)
+        {
+            var old = mod.Options[i]; var current = parsed[i];
+            if (old.Name != current.Name || old.Choices.Count != current.Choices.Count ||
+                old.Choices.Where((choice, index) => choice.Name != current.Choices[index].Name ||
+                    !choice.PatchSetIds.SequenceEqual(current.Choices[index].PatchSetIds)).Any()) return mod;
+        }
+        return mod with { Options = mod.Options.Select((option, index) => option with { PatchSetIds = parsed[index].PatchSetIds }).ToArray() };
     }
 }
 

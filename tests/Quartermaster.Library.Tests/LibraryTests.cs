@@ -11,6 +11,62 @@ namespace Quartermaster.Library.Tests;
 
 public class LibraryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ParentIncludesKeepSharedPatchesAndOnlyTheSelectedDescendantChoice(bool wrapped)
+    {
+        using var f = new Fixture();
+        var prefix = wrapped ? "Variants/wrapper" : "Variants";
+        f.Source(prefix + "/Reticle/Half-Size", 1);
+        f.Source(prefix + "/Reticle/Removed", 2);
+        f.Source(prefix + "/Reticle/Shared/Nested", 3);
+        var root = Path.Combine(f.Root, prefix);
+        await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), """
+            {"Version":1,"Options":[{"Name":"Reticle","Include":["Reticle"],"SubOptions":[
+              {"Name":"Half-Size","Include":["Reticle/Half-Size"]},
+              {"Name":"Removed","Include":["Reticle/Removed"]},
+              {"Name":"Vanilla","Include":[]}]}]}
+            """);
+        var mod = await f.Library.ImportAsync(f.Zip(Path.Combine(f.Root, "Variants")));
+        var option = Assert.Single(mod.Options);
+        Assert.EndsWith("Reticle/Shared/Nested", Assert.Single(mod.PatchSets, set => option.PatchSetIds.Contains(set.Id)).Folder);
+        var entry = new ProfileEntry(mod.Id, true, []);
+        Assert.Equal(2, PatchSelection.Select(mod, entry).Count);
+        Assert.DoesNotContain(PatchSelection.Select(mod, entry), set => set.Folder.EndsWith("/Removed"));
+        entry = entry with { Options = [new(option.Id, true, 1)] };
+        Assert.Equal(2, PatchSelection.Select(mod, entry).Count);
+        Assert.DoesNotContain(PatchSelection.Select(mod, entry), set => set.Folder.EndsWith("/Half-Size"));
+        Assert.Single(PatchSelection.Select(mod, entry with { Options = [new(option.Id, true, 2)] }));
+        Assert.Empty(PatchSelection.Select(mod, entry with { Options = [new(option.Id, false)] }));
+    }
+
+    [Fact]
+    public async Task ExistingRecursiveIncludesAreCorrectedWithoutChangingSavedOptionSelections()
+    {
+        using var f = new Fixture();
+        f.Source("Variants/Reticle/Half-Size", 1); f.Source("Variants/Reticle/Removed", 2);
+        var root = Path.Combine(f.Root, "Variants");
+        await File.WriteAllTextAsync(Path.Combine(root, "manifest.json"), """
+            {"Version":1,"Options":[{"Name":"Reticle","Include":["Reticle"],"SubOptions":[
+              {"Name":"Half-Size","Include":["Reticle/Half-Size"]},
+              {"Name":"Removed","Include":["Reticle/Removed"]}]}]}
+            """);
+        var mod = await f.Library.ImportAsync(f.Zip(root)); var option = Assert.Single(mod.Options);
+        Assert.Empty(option.PatchSetIds);
+        // Recreate metadata written by the old recursive importer.
+        var legacy = mod with { Options = [option with { PatchSetIds = mod.PatchSets.Select(set => set.Id).ToArray() }] };
+        var profile = ProfileEditor.SetOptions(ProfileEditor.Add(ProfileEditor.Create("Reticle"), legacy), legacy, [new(option.Id, true, 1)]);
+        await f.Store.SaveAsync(new(LibraryState.CurrentSchemaVersion, [legacy], [profile], profile.Id));
+        var reloaded = await f.Library.LoadAsync(); var corrected = Assert.Single(reloaded.Mods);
+        Assert.Equal(option.Id, Assert.Single(corrected.Options).Id);
+        Assert.Empty(corrected.Options[0].PatchSetIds);
+        Assert.Equal(profile.Entries[0].Options, reloaded.Profiles[0].Entries[0].Options);
+        Assert.Equal("Reticle/Removed", Assert.Single(PatchSelection.Select(corrected, profile.Entries[0])).Folder);
+        await f.Store.SaveAsync(reloaded);
+        Assert.Empty(Assert.Single((await f.Library.LoadAsync()).Mods).Options[0].PatchSetIds);
+    }
+
     [Fact]
     public async Task ImportsCleanCentralTemporaryStorageOnSuccessAndFailure()
     {

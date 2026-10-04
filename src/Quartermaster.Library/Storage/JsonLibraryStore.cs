@@ -1,6 +1,7 @@
 using Quartermaster.Core.Patching;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
+using Quartermaster.Library.Importing;
 using global::System.Text.Json;
 using global::System.Text.Json.Serialization;
 
@@ -34,7 +35,10 @@ public sealed class JsonLibraryStore : ILibraryStore
         try { StateValidation.Validate(state); }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NullReferenceException)
         { throw new InvalidDataException("Invalid library state.", ex); }
-        return state;
+        var mods = new List<Mod>();
+        foreach (var mod in state.Mods)
+            mods.Add(await ManifestReader.CorrectLegacyIncludesAsync(Root, mod, cancellationToken).ConfigureAwait(false));
+        return state with { Mods = mods.ToArray() };
     }
     public async Task SaveAsync(LibraryState state, CancellationToken cancellationToken = default)
     {
