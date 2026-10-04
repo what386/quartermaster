@@ -122,7 +122,7 @@ public class GuiTests
             if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } dragDirectory)
             {
                 Directory.CreateDirectory(dragDirectory);
-                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(dragDirectory, "DragGroup.png"));
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(dragDirectory, "DragGroup.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
             }
             var translation = Assert.IsType<Avalonia.Media.TranslateTransform>(ghost.RenderTransform);
             Assert.Equal(end.Y - start.Y + source.TranslatePoint(default, list)!.Value.Y, translation.Y, 1);
@@ -149,7 +149,7 @@ public class GuiTests
             if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } modDragDirectory)
             {
                 window.CaptureRenderedFrame()?.Dispose();
-                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(modDragDirectory, "DragMod.png"));
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(modDragDirectory, "DragMod.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
             }
             window.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
             window.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
@@ -275,7 +275,7 @@ public class GuiTests
             if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } screenshotDirectory)
             {
                 window.CaptureRenderedFrame()?.Dispose(); Directory.CreateDirectory(screenshotDirectory);
-                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(screenshotDirectory, "Groups.png"));
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(screenshotDirectory, "Groups.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
             }
             window.CaptureRenderedFrame()?.Dispose();
             var groupView = Assert.Single(window.GetVisualDescendants().OfType<ProfileGroupView>());
@@ -329,7 +329,7 @@ public class GuiTests
                 }
                 global::System.Runtime.InteropServices.Marshal.Copy(pixels, 0, buffer.Address, pixels.Length);
             }
-            bitmap.Save(Path.Combine(source, "images", name + ".png"));
+            bitmap.Save(Path.Combine(source, "images", name + ".png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
         }
         await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), """
             {"Version":1,"Name":"Preview variants","Options":[
@@ -368,7 +368,7 @@ public class GuiTests
             if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } screenshotDirectory)
             {
                 Directory.CreateDirectory(screenshotDirectory);
-                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(screenshotDirectory, "Options.png"));
+                using var frame = window.CaptureRenderedFrame(); frame?.Save(Path.Combine(screenshotDirectory, "Options.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
             }
             combo.IsDropDownOpen = true; window.CaptureRenderedFrame()?.Dispose();
             var popup = combo.GetVisualDescendants().OfType<Avalonia.Controls.Primitives.Popup>().Single();
@@ -498,7 +498,7 @@ public class GuiTests
         await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), """{"Version":1,"Name":"Icon mod","ModVersion":"v2","Description":"First paragraph.\n\nSecond paragraph.","IconPath":"icon.png"}""");
         using (var bitmap = new Avalonia.Media.Imaging.WriteableBitmap(new PixelSize(32, 32), new Vector(96, 96),
             Avalonia.Platform.PixelFormat.Bgra8888, Avalonia.Platform.AlphaFormat.Premul))
-            bitmap.Save(Path.Combine(source, "icon.png"));
+            bitmap.Save(Path.Combine(source, "icon.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
         await f.Services.Session.ImportAsync(source, CancellationToken.None);
         var longSource = f.Source("Long mod");
         await File.WriteAllTextAsync(Path.Combine(longSource, "manifest.json"), global::System.Text.Json.JsonSerializer.Serialize(new
@@ -683,7 +683,7 @@ public class GuiTests
                 Assert.DoesNotContain(window.GetVisualDescendants().OfType<TextBlock>(), text => text.Text?.Contains("Welcome to Quartermaster!") == true);
                 if (Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } output)
                 {
-                    Directory.CreateDirectory(output); frame.Save(Path.Combine(output, page + ".png"));
+                    Directory.CreateDirectory(output); frame.Save(Path.Combine(output, page + ".png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
                     File.WriteAllLines(Path.Combine(output, page + ".layout.txt"), window.GetVisualDescendants()
                         .OfType<Control>().Where(c => c is UserControl or ContentControl or ScrollViewer or StackPanel or Grid || c is TextBlock { Classes: var classes } && classes.Contains("pageTitle"))
                         .Select(c => $"{c.GetType().Name} {c.Name} bounds={c.Bounds} position={c.TranslatePoint(new(0, 0), window)} margin={c.Margin}"));
@@ -1089,7 +1089,7 @@ public class GuiTests
             {
                 if (frame is not null && Environment.GetEnvironmentVariable("QUARTERMASTER_GUI_SCREENSHOTS") is { } output)
                 {
-                    Directory.CreateDirectory(output); frame.Save(Path.Combine(output, "ProfileDialog.png"));
+                    Directory.CreateDirectory(output); frame.Save(Path.Combine(output, "ProfileDialog.png"), new Avalonia.Media.Imaging.PngBitmapEncoderOptions());
                 }
             }
             var popup = Assert.Single(owner.GetVisualDescendants().OfType<TextInputDialog>());
