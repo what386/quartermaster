@@ -20,7 +20,8 @@ public static class ProfilePatches
         var mods = state.Mods.ToDictionary(m => m.Id);
         var patches = ProfileEditor.InDeploymentOrder(profile).Where(e => e.Enabled)
             .SelectMany(e => PatchSelection.Select(mods[e.ModId], e).Select(p =>
-                new SelectedPatch(e.ModId, p.Id, p.Archive, p.Files.ToArray(), p.Resources.ToArray()))).ToArray();
+                new SelectedPatch(e.ModId, p.Id, p.Archive, p.Files.ToArray(), p.Resources.ToArray())
+                { SelectionHash = PatchSelection.OptionsHash(mods[e.ModId], e) })).ToArray();
         return new(profile.Id, patches) { SelectionName = profile.Name };
     }
 }
@@ -44,11 +45,12 @@ public static class DeploymentTracking
     {
         var deployed = ledger.Files.Where(f => f.SourceId == modId).ToArray();
         var selected = plan.Patches.Where(p => p.SourceId == modId).SelectMany(p => p.Files.Select(f =>
-            (Name: PatchFiles.Name(p.Archive, p.Slot, f.Kind), p.PatchSetId, f.Kind, f.Sha256))).ToArray();
+            (Name: PatchFiles.Name(p.Archive, p.Slot, f.Kind), p.PatchSetId, f.Kind, f.Sha256, p.SelectionHash))).ToArray();
         if (deployed.Length == 0) return ModDeploymentStatus.NotDeployed;
         if (ledger.Status != DeploymentStatus.Complete || deployed.Any(f => health.All(h => h.Name != f.Name || h.Status != ManagedFileStatus.Present))) return ModDeploymentStatus.Damaged;
         return selected.Length == deployed.Length && selected.All(s => deployed.Any(f => f.Name == s.Name && f.PatchSetId == s.PatchSetId &&
-            f.Kind == s.Kind && f.SourceSha256.Equals(s.Sha256, StringComparison.OrdinalIgnoreCase)))
+            f.Kind == s.Kind && f.SourceSha256.Equals(s.Sha256, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(f.SelectionHash, s.SelectionHash, StringComparison.OrdinalIgnoreCase)))
             ? ModDeploymentStatus.Deployed : ModDeploymentStatus.DifferentSelection;
     }
 }

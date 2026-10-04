@@ -99,7 +99,7 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                     }
                     if (staged is null) throw new IOException("Staged file disappeared.");
                     files.Add(new(name, patch.Archive, patch.Slot, patch.SourceId, patch.PatchSetId, source.Kind,
-                        staged.Size, staged.Sha256, source.Sha256));
+                        staged.Size, staged.Sha256, source.Sha256) { SelectionHash = patch.SelectionHash });
                 }
             }
             var ledger = new DeploymentLedger(1, workspace.TargetDirectory, plan.SelectionId == Guid.Empty ? null : plan.SelectionId,
@@ -149,7 +149,8 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
         foreach (var file in ledger.Files)
             if (!names.Add(file.Name) || !PatchNames.TryParse(file.Name, out var archive, out var slot, out var kind) ||
                 file.Name != PatchFiles.Name(archive, slot, kind) || file.Archive != archive || file.Slot != slot || file.Kind != kind ||
-                file.Size < 0 || !PatchValidation.IsHash(file.Sha256) || !PatchValidation.IsHash(file.SourceSha256))
+                file.Size < 0 || !PatchValidation.IsHash(file.Sha256) || !PatchValidation.IsHash(file.SourceSha256) ||
+                file.SelectionHash is { } selection && !PatchValidation.IsHash(selection))
                 throw new InvalidDataException("Invalid owned-file ledger entry.");
     }
 }

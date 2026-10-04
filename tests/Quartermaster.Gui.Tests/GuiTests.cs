@@ -14,6 +14,7 @@ using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Settings;
 using Quartermaster.Gui.Shared;
 using Quartermaster.Library.Profiles;
+using Quartermaster.Core.Deployment;
 using Xunit;
 
 namespace Quartermaster.Gui.Tests;
@@ -712,6 +713,46 @@ public class GuiTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task AppliedOptionsTurnOutlineYellowEvenWhenChoicesUseIdenticalFiles()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var source = f.OptionsSource();
+        File.WriteAllText(Path.Combine(source, "manifest.json"), """
+            {"version":1,"name":"Same files","options":[{"name":"Appearance","include":["common"],"subOptions":[
+              {"name":"First","include":["blue"]},{"name":"Second","include":["blue"]}]}]}
+            """);
+        await f.Services.Session.ImportAsync(source, CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await f.Services.Session.SetRepatchModeAsync(RepatchMode.Never, CancellationToken.None);
+        await profiles.DeployCommand.ExecuteAsync();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            void Check(ModDeploymentState state, string color)
+            {
+                Assert.Equal(state, Assert.Single(profiles.Entries).DeploymentState);
+                window.CaptureRenderedFrame()?.Dispose();
+                var border = window.GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("modTile"));
+                Assert.Equal(Avalonia.Media.Color.Parse(color), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(border.BorderBrush).Color);
+            }
+            Check(ModDeploymentState.Loaded, "#4AB98A");
+            var signature = f.Services.Session.Inspection!.Ledger.Signature;
+            var initial = ProfilePatches.Resolve(f.Services.Session.State, profiles.SelectedProfile!);
+            profiles.Options!.Options[0].ChoiceIndex = 1; await profiles.ApplyOptionsCommand.ExecuteAsync();
+            var changed = ProfilePatches.Resolve(f.Services.Session.State, profiles.SelectedProfile!);
+            Assert.Equal(initial.Patches.Select(patch => patch.PatchSetId), changed.Patches.Select(patch => patch.PatchSetId));
+            Assert.NotEqual(signature, DeploymentPlanner.Create(changed).Signature);
+            Check(ModDeploymentState.Warning, "#E2C457");
+            await f.Services.Session.ReloadAsync(CancellationToken.None); Check(ModDeploymentState.Warning, "#E2C457");
+            profiles.Options!.Options[0].ChoiceIndex = 0; await profiles.ApplyOptionsCommand.ExecuteAsync();
+            Check(ModDeploymentState.Loaded, "#4AB98A");
+            profiles.Options!.Options[0].ChoiceIndex = 1; await profiles.ApplyOptionsCommand.ExecuteAsync();
+            await profiles.DeployCommand.ExecuteAsync(); Check(ModDeploymentState.Loaded, "#4AB98A");
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        }
+        finally { window.Close(); }
+    }
     [AvaloniaFact]
     public async Task ChangedOptionsAndIncompleteDeploymentShowWarningInsteadOfLoaded()
     {

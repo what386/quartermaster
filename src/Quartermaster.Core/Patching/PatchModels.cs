@@ -6,7 +6,10 @@ public readonly record struct ResourceKey(ulong Id, ulong Type);
 
 /// <summary>A patch and its opaque content-source identity; later entries have higher priority.</summary>
 public sealed record SelectedPatch(Guid SourceId, Guid PatchSetId, string Archive,
-    IReadOnlyList<PatchFile> Files, IReadOnlyList<ResourceKey> Resources);
+    IReadOnlyList<PatchFile> Files, IReadOnlyList<ResourceKey> Resources)
+{
+    public string? SelectionHash { get; init; }
+}
 
 /// <summary>An ordered selection prepared by a caller. Core does not interpret the selection identity.</summary>
 public sealed record DeploymentRequest(Guid SelectionId, IReadOnlyList<SelectedPatch> Patches)
@@ -29,6 +32,7 @@ public static class PatchValidation
         {
             if (patch.SourceId == Guid.Empty || patch.PatchSetId == Guid.Empty || !ids.Add((patch.SourceId, patch.PatchSetId)) || !IsArchive(patch.Archive))
                 throw new ArgumentException("Invalid or duplicate selected patch.");
+            if (patch.SelectionHash is { } selection && !IsHash(selection)) throw new ArgumentException("Invalid source selection hash.");
             ValidateFiles(patch.Files);
         }
     }

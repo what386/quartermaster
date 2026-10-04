@@ -131,6 +131,16 @@ public sealed record OptionSelection(Guid OptionId, bool Enabled = true, int Cho
 
 public static class PatchSelection
 {
+    public static string? OptionsHash(Mod mod, ProfileEntry entry)
+    {
+        if (entry.ModId != mod.Id) throw new ArgumentException("Entry belongs to another mod.");
+        if (mod.Options.Count == 0) return null;
+        var selections = entry.Options.ToDictionary(option => option.OptionId);
+        var normalized = mod.Options.OrderBy(option => option.Id)
+            .Select(option => selections.GetValueOrDefault(option.Id) ?? new OptionSelection(option.Id)).ToArray();
+        return Convert.ToHexString(global::System.Security.Cryptography.SHA256.HashData(
+            global::System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(normalized))).ToLowerInvariant();
+    }
     public static IReadOnlyList<PatchSet> Select(Mod mod, ProfileEntry entry)
     {
         if (entry.ModId != mod.Id) throw new ArgumentException("Entry belongs to another mod.");
