@@ -12,10 +12,3 @@
 - [ ] test windows literally at all
       @created 2026-10-04 21:12
 
-
-## Completed
-
-- [x] change tests: no longer opens browser live
-      @created 2026-10-04 21:19
-      @completed 2026-10-04 21:20
-

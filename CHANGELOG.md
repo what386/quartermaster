@@ -7,5 +7,6 @@
 ### Changes
 
 - initial release
+- change tests: no longer opens browser live
 
 
