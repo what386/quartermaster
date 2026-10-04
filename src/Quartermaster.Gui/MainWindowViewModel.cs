@@ -41,6 +41,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ? ConflictAnalyzer.Analyze(ProfilePatches.Resolve(services.Session.State, profile)).Resources.Count.ToString() : "0";
     public ObservableCollection<SidebarProfile> SidebarProfiles { get; } = [];
     public AsyncCommand AddProfileCommand { get; }
+    public AsyncCommand ImportProfileCommand { get; }
     private readonly AppServices services;
     public MainWindowViewModel(AppServices services)
     {
@@ -62,6 +63,13 @@ public sealed class MainWindowViewModel : ViewModelBase
             await services.Session.SaveProfileAsync(ProfileEditor.Create(name.Trim()), true, ct);
             Navigate(PageKind.Profiles);
         });
+        ImportProfileCommand = Operations.CreateCommand("Importing profile", async ct =>
+        {
+            var path = await services.Dialogs.PickProfileZipAsync();
+            if (path is null) return;
+            await services.Session.ImportProfileAsync(path, ct);
+            Navigate(PageKind.Profiles);
+        });
         services.Session.Changed += (_, _) =>
         {
             RefreshProfiles(); NotifyStatus();
@@ -72,7 +80,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (e.PropertyName != nameof(OperationState.IsBusy)) return;
             foreach (var entry in SidebarProfiles)
-            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); }
+            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); }
         };
         RefreshProfiles();
         ((ProfilesViewModel)pages[PageKind.Profiles]).PropertyChanged += (_, e) =>
@@ -111,7 +119,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                     Navigate(PageKind.Profiles);
                 }, () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
-                new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
+                new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => ExportProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
             { IsDeployed = deployed });
         }
     }
@@ -163,6 +172,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);
         if (await services.Dialogs.ConfirmAsync("Delete profile", $"Delete {profile.Name}? Your imported mods and deployed game files will remain.", "Delete"))
             await services.Session.DeleteProfileAsync(id, ct);
+    });
+    private Task ExportProfileAsync(Guid id) => Operations.RunAsync("Exporting profile", async ct =>
+    {
+        var profile = services.Session.State.Profiles.Single(item => item.Id == id);
+        var name = string.Concat(profile.Name.Select(c => Path.GetInvalidFileNameChars().Contains(c) || c == '/' || c == '\\' ? '_' : c));
+        var path = await services.Dialogs.SaveProfileZipAsync(name + "-profile.zip");
+        if (path is not null) await services.Session.ExportProfileAsync(id, path, ct);
     });
     public void Navigate(PageKind page) => SelectedNavigation = NavigationItems.Single(n => n.Page == page);
     public Task InitializeAsync() => Operations.RunAsync("Loading library", services.Session.InitializeAsync);

@@ -31,6 +31,9 @@ internal sealed class FakeDialogs : IDialogService
     { InitialInputText = initialValue; return Task.FromResult(InputText); }
     public List<(string Title, string Message)> Confirmations { get; } = [];
     public Task<string?> PickModZipAsync() => Task.FromResult(ZipPath);
+    public Task<string?> PickProfileZipAsync() => Task.FromResult(ZipPath);
+    public Task<string?> SaveProfileZipAsync(string suggestedName)
+    { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(FolderPath);
     public Task<bool> ConfirmAsync(string title, string message, string acceptLabel)
     { Confirmations.Add((title, message)); return Task.FromResult(Confirm); }

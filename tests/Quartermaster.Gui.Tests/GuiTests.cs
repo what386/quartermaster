@@ -23,6 +23,58 @@ public class GuiTests
     { fixture.Shell.Navigate(page); return Assert.IsType<T>(fixture.Shell.CurrentPage); }
 
     [AvaloniaFact]
+    public async Task SidebarProfileArchivesExportClickedProfileAndImportSelectsNewProfileWithoutDuplicatingMods()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.OptionsSource(), CancellationToken.None);
+        await f.Services.Session.ImportAsync(f.Source("Disabled cape"), CancellationToken.None);
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles);
+        await profiles.AddCommand.ExecuteAsync(); await profiles.AddCommand.ExecuteAsync();
+        var original = profiles.SelectedProfile!;
+        var variants = f.Services.Session.State.Mods.Single(mod => mod.Name == "Armor variants");
+        var cape = f.Services.Session.State.Mods.Single(mod => mod.Name == "Disabled cape");
+        original = ProfileEditor.SetOptions(original, variants, [new(variants.Options[0].Id, true, 1)]);
+        original = ProfileEditor.SetEnabled(original, cape.Id, false);
+        original = ProfileEditor.AddGroup(original, "Equipment", [variants.Id]);
+        await f.Services.Session.SaveProfileAsync(original, true, CancellationToken.None);
+        f.Dialogs.InputText = "Other"; await f.Shell.AddProfileCommand.ExecuteAsync();
+        var otherId = f.Services.Session.ActiveProfile!.Id;
+        var destination = Path.Combine(f.Root, "loadout.zip"); f.Dialogs.SavePath = destination;
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var button = window.GetVisualDescendants().OfType<Button>().Single(item => item.DataContext is SidebarProfile profile && profile.Profile.Id == original.Id);
+            var menu = button.ContextMenu!; menu.Open(button); Dispatcher.UIThread.RunJobs();
+            var export = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Export profile ZIP"));
+            await Assert.IsType<AsyncCommand>(export.Command).ExecuteAsync(); menu.Close();
+            Assert.True(File.Exists(destination)); Assert.Equal("Default-profile.zip", f.Dialogs.SuggestedSaveName);
+            Assert.Equal(otherId, f.Services.Session.ActiveProfile!.Id);
+            var plus = window.FindControl<Button>("AddProfileButton")!;
+            menu = plus.ContextMenu!; menu.Open(plus); Dispatcher.UIThread.RunJobs();
+            var import = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Import profile ZIP"));
+            f.Dialogs.ZipPath = destination;
+            await Assert.IsType<AsyncCommand>(import.Command).ExecuteAsync(); menu.Close();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Assert.Equal(2, f.Services.Session.State.Mods.Count); Assert.Equal(3, f.Shell.SidebarProfiles.Count);
+            var imported = f.Services.Session.ActiveProfile!;
+            Assert.NotEqual(original.Id, imported.Id); Assert.Equal("Default", imported.Name);
+            Assert.Equal(original.Entries.Select(entry => (entry.ModId, entry.Enabled)), imported.Entries.Select(entry => (entry.ModId, entry.Enabled)));
+            Assert.Equal(1, imported.Entries.Single(entry => entry.ModId == variants.Id).Options[0].ChoiceIndex);
+            Assert.Equal("Equipment", Assert.Single(imported.Groups).Name);
+            Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
+            Assert.Equal(imported.Id, profiles.SelectedProfile!.Id);
+            Assert.DoesNotContain(Directory.GetFiles(f.Game), file => file.Contains(".patch_"));
+            f.Dialogs.ZipPath = null; await f.Shell.ImportProfileCommand.ExecuteAsync();
+            Assert.Equal(3, f.Shell.SidebarProfiles.Count);
+            f.Dialogs.ZipPath = f.Zip("Not a profile"); await f.Shell.ImportProfileCommand.ExecuteAsync();
+            Assert.True(f.Services.Operations.IsError); Assert.Equal(3, f.Shell.SidebarProfiles.Count);
+            Assert.Equal(2, f.Services.Session.State.Mods.Count);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task LibraryMultiSelectionContextActionsPreserveSelectionAndSkipProfileDuplicates()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

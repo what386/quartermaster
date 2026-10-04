@@ -10,7 +10,7 @@ using Quartermaster.Library.Importing;
 namespace Quartermaster.Gui.Services;
 
 /// <summary>Shared loaded state. Backend work runs on workers; notifications return to the UI caller.</summary>
-public sealed class LibrarySession(LibraryService library, IDeploymentStorage storage, ModContentStore contents, SettingsStore settingsStore,
+public sealed class LibrarySession(LibraryService library, ProfileArchives archives, IDeploymentStorage storage, ModContentStore contents, SettingsStore settingsStore,
     Func<IReadOnlyList<string>> discover) : ViewModelBase
 {
     public event EventHandler? Changed;
@@ -76,6 +76,22 @@ public sealed class LibrarySession(LibraryService library, IDeploymentStorage st
     {
         await Task.Run(() => library.ImportAsync(source, cancellationToken: ct), ct);
         await ReloadAsync(CancellationToken.None);
+    }
+    public async Task ImportProfileAsync(string source, CancellationToken ct)
+    {
+        var profile = await Task.Run(() => archives.ImportAsync(source, ct), ct);
+        await Task.Run(() => library.SaveProfileAsync(profile, true, CancellationToken.None));
+        await ReloadAsync(CancellationToken.None);
+    }
+    public Task ExportProfileAsync(Guid profileId, string destination, CancellationToken ct)
+    {
+        if (GameDirectory != "")
+        {
+            var relative = Path.GetRelativePath(GameDirectory, Path.GetFullPath(destination));
+            if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
+                throw new ArgumentException("Export outside the game directory.");
+        }
+        return Task.Run(() => archives.ExportAsync(profileId, destination, ct), ct);
     }
     public async Task ImportDropsAsync(IReadOnlyList<string> sources, Guid? profileId, CancellationToken ct)
     {

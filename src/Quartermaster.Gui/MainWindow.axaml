@@ -31,11 +31,17 @@
                     <Button.ContextMenu><ContextMenu>
                       <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
                       <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+                      <Separator />
+                      <MenuItem Header="Export profile ZIP" Command="{Binding ExportCommand}" />
                     </ContextMenu></Button.ContextMenu>
                   </Button>
                 </DataTemplate></ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Button x:Name="AddProfileButton" Classes="profileButton" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center" />
+              <Button x:Name="AddProfileButton" Classes="profileButton" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile · Right-click to import" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center">
+                <Button.ContextMenu><ContextMenu>
+                  <MenuItem Header="Import profile ZIP" Command="{Binding ImportProfileCommand}" />
+                </ContextMenu></Button.ContextMenu>
+              </Button>
             </StackPanel>
           </ScrollViewer>
           <ItemsControl Grid.Row="3" ItemsSource="{Binding UtilityNavigationItems}" Margin="0,12">

@@ -2,6 +2,7 @@ using Quartermaster.Library;
 using Quartermaster.Library.Importing;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Storage;
+using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Shared;
 
 namespace Quartermaster.Gui.Services;
@@ -21,7 +22,8 @@ public sealed class AppServices
         LaunchGame = launchGame ?? (() => global::System.Diagnostics.Process.Start(
             new global::System.Diagnostics.ProcessStartInfo("steam://rungameid/553850") { UseShellExecute = true }));
         var content = new ModContentStore(DataDirectory);
-        Session = new(new LibraryService(new JsonLibraryStore(DataDirectory), content),
+        var store = new JsonLibraryStore(DataDirectory);
+        Session = new(new LibraryService(store, content), new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));
     }

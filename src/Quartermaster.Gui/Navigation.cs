@@ -17,7 +17,7 @@ public sealed class NavigationItem(PageKind page, string label, string iconFile)
 }
 
 public sealed class SidebarProfile(Profile profile, bool isActive, AsyncCommand selectCommand,
-    AsyncCommand renameCommand, AsyncCommand deleteCommand) : ViewModelBase
+    AsyncCommand renameCommand, AsyncCommand deleteCommand, AsyncCommand exportCommand) : ViewModelBase
 {
     private Profile profile = profile;
     private bool active = isActive;
@@ -32,6 +32,7 @@ public sealed class SidebarProfile(Profile profile, bool isActive, AsyncCommand 
     public AsyncCommand SelectCommand { get; } = selectCommand;
     public AsyncCommand RenameCommand { get; } = renameCommand;
     public AsyncCommand DeleteCommand { get; } = deleteCommand;
+    public AsyncCommand ExportCommand { get; } = exportCommand;
     public string Name => Profile.Name;
     public string Monogram => string.Concat(Profile.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
     public string Summary => $"{Name} · {ModPresentation.Count(Profile.Entries.Count(e => e.Enabled), "enabled mod")}{(IsDeployed ? " · Deployed" : "")}";
