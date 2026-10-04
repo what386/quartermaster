@@ -29,7 +29,13 @@ Nexus's MD5 lookup and imports it automatically. Browser downloads are left in
 place. The Library's **Downloads** popup has **Open download page**, **Retry**,
 and **Cancel** actions. Only ZIP archives are currently supported.
 Use the dedicated **Search** page to find Helldivers 2 Nexus mods and add them
-through the same file-selection flow.
+through the same file-selection flow. Choose a provider from the dropdown (Nexus
+by default), then press Enter or click Search. The page reports loading, no
+matches, and search errors, including missing API-key configuration.
+Search results show provider thumbnails in larger cards. The file chooser's
+**Open download page** action explains the browser download flow before opening
+it. A floating activity spinner tracks pending downloads across pages; open its
+**Downloads** popup to reopen a page, retry, or cancel a request.
 
 Choose **Register nxm links** in Settings to make Quartermaster your user account's
 `nxm://` handler on Linux or Windows. Nexus's **Download with manager** action can

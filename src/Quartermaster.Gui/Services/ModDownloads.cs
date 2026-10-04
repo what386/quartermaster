@@ -13,6 +13,19 @@ public sealed class ModDownloads : ViewModelBase
     private readonly Dictionary<Guid, DownloadRow> rows = [];
     public event EventHandler? Changed;
     public IReadOnlyList<DownloadRow> Jobs { get; private set; } = [];
+    public bool HasPendingDownloads => Jobs.Any(row => row.IsActive);
+    public string PendingSummary
+    {
+        get
+        {
+            var waiting = Jobs.Count(row => row.IsWaiting);
+            return waiting > 0 ? $"Waiting for {ModPresentation.Count(waiting, "browser download")}" :
+                $"Processing {ModPresentation.Count(Jobs.Count(row => row.IsActive), "download")}";
+        }
+    }
+    public string PendingExplanation => Jobs.Any(row => row.IsWaiting)
+        ? "Finish the download in your browser. Quartermaster watches your download folder and imports verified files automatically."
+        : "Quartermaster is downloading or importing your mods. You can keep using the app.";
     public ModDownloads(AppServices services)
     {
         this.services = services;
@@ -33,7 +46,8 @@ public sealed class ModDownloads : ViewModelBase
             if (!rows.TryGetValue(job.Id, out var row)) rows[job.Id] = row = new DownloadRow(job, services);
             row.Update(job); return row;
         }).ToArray();
-        Notify(nameof(Jobs)); Changed?.Invoke(this, EventArgs.Empty);
+        Notify(nameof(Jobs)); Notify(nameof(HasPendingDownloads)); Notify(nameof(PendingSummary)); Notify(nameof(PendingExplanation));
+        Changed?.Invoke(this, EventArgs.Empty);
     }
     public async Task AddAsync(CancellationToken ct, Guid? profileId = null)
     {
@@ -84,7 +98,9 @@ public sealed class DownloadRow : ViewModelBase
 {
     private DownloadJob job;
     public string Name => job.File.Name + (job.File.Version is null ? "" : " · " + job.File.Version);
-    public string Status => job.Status + (job.Error is null ? "" : " · " + job.Error);
+    public bool IsWaiting => job.Status == DownloadStatus.Waiting;
+    public bool IsActive => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing;
+    public string Status => (IsWaiting ? "Waiting for your browser download" : job.Status.ToString()) + (job.Error is null ? "" : " · " + job.Error);
     public AsyncCommand OpenCommand { get; }
     public AsyncCommand RetryCommand { get; }
     public AsyncCommand CancelCommand { get; }
@@ -99,5 +115,5 @@ public sealed class DownloadRow : ViewModelBase
             () => this.job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading);
     }
     public void Update(DownloadJob value)
-    { job = value; Notify(nameof(Name)); Notify(nameof(Status)); RetryCommand.Refresh(); CancelCommand.Refresh(); }
+    { job = value; Notify(nameof(Name)); Notify(nameof(Status)); Notify(nameof(IsWaiting)); Notify(nameof(IsActive)); RetryCommand.Refresh(); CancelCommand.Refresh(); }
 }

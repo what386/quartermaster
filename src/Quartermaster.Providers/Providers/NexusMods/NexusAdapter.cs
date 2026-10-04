@@ -8,6 +8,7 @@ public sealed class NexusAdapter(NexusClient client) : IModProvider
 {
     public const string ProviderId = "nexusmods";
     public string Id => ProviderId;
+    public string DisplayName => "Nexus Mods";
     public bool CanHandle(Uri link) => link.IsAbsoluteUri &&
         (link.Scheme == "https" && link.Host is "www.nexusmods.com" or "nexusmods.com" || link.Scheme == "nxm" && link.Host == NexusLink.Game);
     public bool IsDownloadLink(Uri link) => CanHandle(link) && link.Scheme == "nxm";

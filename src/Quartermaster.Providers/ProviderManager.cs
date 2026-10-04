@@ -16,6 +16,7 @@ public sealed class ProviderManager(LibraryService library, DownloadStore store,
     public DownloadState State { get; private set; } = new([], []);
     public event EventHandler? Changed;
     public event EventHandler? LibraryChanged;
+    public IReadOnlyList<IModProvider> AvailableProviders => providers.Values.ToArray();
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {

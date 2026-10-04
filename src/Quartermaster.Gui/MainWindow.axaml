@@ -64,8 +64,17 @@
       </Border>
     </Grid>
     <shared:DialogHost x:Name="DialogOverlay" />
-    <Border x:Name="ProgressOverlay" IsVisible="{Binding Operations.IsProgressVisible}"
-            HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24" MinWidth="360" MaxWidth="620"
+    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24" MaxWidth="620" Spacing="8">
+    <Border x:Name="DownloadProgressOverlay" IsVisible="{Binding Downloads.HasPendingDownloads}"
+            Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}"
+            BorderThickness="1" CornerRadius="8" Padding="16,12">
+      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+        <shared:BusySpinner IsVisible="{Binding Downloads.HasPendingDownloads}" VerticalAlignment="Center" />
+        <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{Binding Downloads.PendingSummary}" FontWeight="SemiBold" /><TextBlock Text="{Binding Downloads.PendingExplanation}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+        <Button Grid.Column="2" Content="Downloads" VerticalAlignment="Center"><Button.Flyout><Flyout Placement="TopEdgeAlignedRight"><mods:DownloadQueueView DataContext="{Binding Downloads}" /></Flyout></Button.Flyout></Button>
+      </Grid>
+    </Border>
+    <Border x:Name="ProgressOverlay" IsVisible="{Binding Operations.IsProgressVisible}" MinWidth="360"
             Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}"
             BorderThickness="1" CornerRadius="8" Padding="16,12">
       <Grid ColumnDefinitions="*,Auto,Auto">
@@ -74,5 +83,6 @@
         <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
       </Grid>
     </Border>
+    </StackPanel>
   </Grid>
 </Window>

@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public NavigationItem LibraryNavigation => NavigationItems.Single(item => item.Page == PageKind.Mods);
     public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Settings).ToArray();
     public OperationState Operations { get; }
+    public ModDownloads Downloads => services.Downloads;
     public NavigationItem SelectedNavigation
     {
         get => selected;

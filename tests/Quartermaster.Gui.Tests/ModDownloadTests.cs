@@ -1,15 +1,19 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Quartermaster.Gui.Mods;
 using Quartermaster.Gui.Profiles;
 using Quartermaster.Gui.Search;
 using Quartermaster.Gui.Settings;
+using Quartermaster.Gui.Shared;
+using Avalonia.Media.Imaging;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Providers.Downloads;
 using Xunit;
@@ -84,8 +88,125 @@ public sealed class ModDownloadTests
         try
         {
             window.CaptureRenderedFrame()?.Dispose(); Assert.Single(window.GetVisualDescendants().OfType<SearchView>());
+            var image = Assert.Single(window.GetVisualDescendants().OfType<RemoteImage>());
+            Assert.Equal(104, image.GetVisualAncestors().OfType<Border>().First().Bounds.Height);
+            Assert.Contains(image.GetVisualAncestors().OfType<Border>(), border => border.MinHeight == 120);
             await result.AddCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
             Assert.Equal(Assert.Single(f.Services.Providers.State.Jobs).File.DownloadPage, opened);
+        }
+        finally { window.Close(); }
+    }
+    [AvaloniaFact]
+    public async Task SearchTextboxSubmitsWithEnterAndButtonAndSelectsNexusByDefault()
+    {
+        var requests = 0;
+        using var api = new HttpClient(new Handler(_ =>
+        {
+            requests++;
+            return Json(new { data = new { mods = new { nodes = new[] { new { modId = 123, name = "Example mod", summary = "Description", version = "2" } } } } });
+        }));
+        using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        var search = (SearchViewModel)Navigate(f, PageKind.Search);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = Assert.Single(window.GetVisualDescendants().OfType<SearchView>());
+            var input = view.FindControl<TextBox>("SearchInput")!;
+            var button = view.FindControl<Button>("SearchButton")!;
+            var selector = view.FindControl<ComboBox>("ProviderSelector")!;
+            Assert.Equal("nexusmods", Assert.IsType<SearchProvider>(selector.SelectedItem).Id);
+            Assert.Same(search.SearchCommand, button.Command);
+            Assert.False(button.IsEffectivelyEnabled);
+            input.Text = "Example"; Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Example", search.Query); Assert.True(button.IsEffectivelyEnabled);
+            var enter = new KeyEventArgs { RoutedEvent = InputElement.KeyDownEvent, Key = Key.Enter };
+            input.RaiseEvent(enter); Assert.True(enter.Handled);
+            await f.Services.Operations.WhenIdle; Dispatcher.UIThread.RunJobs();
+            Assert.Single(search.Results); Assert.Equal("1 results", view.FindControl<TextBlock>("SearchFeedback")!.Text);
+            Assert.Equal(1, requests);
+            input.Text = "Another"; Dispatcher.UIThread.RunJobs();
+            window.CaptureRenderedFrame()?.Dispose();
+            var point = button.TranslatePoint(new Avalonia.Point(button.Bounds.Width / 2, button.Bounds.Height / 2), window)!.Value;
+            window.MouseMove(point); window.MouseDown(point, MouseButton.Left); window.MouseUp(point, MouseButton.Left);
+            await f.Services.Operations.WhenIdle; Dispatcher.UIThread.RunJobs();
+            Assert.Single(search.Results); Assert.False(f.Services.Operations.IsError); Assert.Equal(2, requests);
+        }
+        finally { window.Close(); }
+    }
+    [AvaloniaFact]
+    public async Task SearchShowsProgressEmptyResultsAndFailuresOnThePage()
+    {
+        var response = new TaskCompletionSource<HttpResponseMessage>();
+        var started = new TaskCompletionSource();
+        using var api = new HttpClient(new AsyncHandler(_ => { started.SetResult(); return response.Task; }));
+        using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        var search = (SearchViewModel)Navigate(f, PageKind.Search); search.Query = "Example";
+        var task = search.SearchCommand.ExecuteAsync();
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("Searching Nexus Mods…", search.ResultSummary);
+        response.SetResult(Json(new { data = new { mods = new { nodes = Array.Empty<object>() } } }));
+        await task;
+        Assert.Empty(search.Results); Assert.Equal("No matching mods.", search.ResultSummary);
+        search.SelectedProvider = null;
+        Assert.False(search.SearchCommand.CanExecute(null));
+        search.SelectedProvider = search.Providers[0];
+        await f.Services.Keys.SetAsync("nexusmods", null);
+        await search.SearchCommand.ExecuteAsync();
+        Assert.Contains("Search failed:", search.ResultSummary); Assert.Contains("Settings", search.ResultSummary);
+        Assert.Empty(search.Results); Assert.True(f.Services.Operations.IsError);
+    }
+    private sealed class AsyncHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
+    { protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => send(request).WaitAsync(ct); }
+    [AvaloniaFact]
+    public async Task RemoteThumbnailLoadsWithoutCredentialsAndReleasesBitmapOnDetach()
+    {
+        using var pixels = new WriteableBitmap(new PixelSize(24, 24), new Vector(96, 96));
+        using var bytes = new MemoryStream(); pixels.Save(bytes, new PngBitmapEncoderOptions());
+        var requests = 0;
+        using var http = new HttpClient(new Handler(request =>
+        {
+            requests++; Assert.False(request.Headers.Contains("apikey")); Assert.Null(request.Headers.Authorization);
+            return new(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes.ToArray()) };
+        }));
+        var image = new RemoteImage(http) { SourceUri = new("https://images.example/mod.png"), Width = 104, Height = 104 };
+        var loaded = new TaskCompletionSource();
+        image.PropertyChanged += (_, e) => { if (e.Property == Image.SourceProperty && image.Source is not null) loaded.TrySetResult(); };
+        var window = new Window { Content = image }; window.Show();
+        try
+        {
+            await loaded.Task.WaitAsync(TimeSpan.FromSeconds(5)); Assert.IsType<Bitmap>(image.Source);
+            window.Content = null; Assert.Null(image.Source);
+            image.SourceUri = new("file:///tmp/unsafe.png"); window.Content = image;
+            Assert.Null(image.Source); Assert.Equal(1, requests);
+        }
+        finally { window.Close(); }
+    }
+    [AvaloniaFact]
+    public async Task BrowserDownloadSpinnerTracksMultipleJobsWithoutBlockingTheApp()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var first = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "First", "first.zip", "1",
+            new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
+        var a = await f.Services.Providers.QueueAsync(first);
+        var b = await f.Services.Providers.QueueAsync(first with { FileId = "457", Name = "Second", FileName = "second.zip",
+            DownloadPage = new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=457") });
+        Dispatcher.UIThread.RunJobs();
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var overlay = window.FindControl<Border>("DownloadProgressOverlay")!;
+            Assert.True(overlay.IsVisible); Assert.Single(overlay.GetVisualDescendants().OfType<BusySpinner>(), spinner => spinner.IsVisible);
+            Assert.Equal("Waiting for 2 browser downloads", f.Services.Downloads.PendingSummary);
+            Assert.Contains("Finish the download in your browser", f.Services.Downloads.PendingExplanation);
+            Assert.False(f.Services.Operations.IsBusy);
+            await f.Services.Providers.CancelAsync(a.Id); Dispatcher.UIThread.RunJobs();
+            Assert.True(overlay.IsVisible); Assert.Equal("Waiting for 1 browser download", f.Services.Downloads.PendingSummary);
+            await f.Services.Providers.CancelAsync(b.Id); Dispatcher.UIThread.RunJobs();
+            Assert.False(overlay.IsVisible); Assert.False(f.Services.Downloads.HasPendingDownloads);
+            var dialog = new ModFilesDialog(new("123", "Example", "Description", "1", first.DownloadPage, [first]));
+            Assert.Equal("Open download page", dialog.FindControl<Button>("AcceptButton")!.Content);
         }
         finally { window.Close(); }
     }

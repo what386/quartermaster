@@ -77,18 +77,38 @@ public sealed class NexusTests
         using var client = Client(api); Assert.Equal(UpdateStatus.Unknown, (await new NexusAdapter(client).CheckUpdateAsync(new("nexusmods", "123", "1"))).Status);
     }
     [Fact]
-    public async Task SearchConstrainsGameAndUsesVariables()
+    public async Task SearchUsesTokenMatchingSoBingusFindsBingusSharedLoader()
     {
         using var api = new HttpClient(new Handler(async request =>
         {
             Assert.Equal("/v2/graphql", request.RequestUri!.AbsolutePath);
             using var data = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            Assert.Contains("thumbnailUrl pictureUrl", data.RootElement.GetProperty("query").GetString());
             var filter = data.RootElement.GetProperty("variables").GetProperty("filter");
             Assert.Equal("helldivers2", filter.GetProperty("gameDomainName")[0].GetProperty("value").GetString());
-            Assert.Equal("*test*", filter.GetProperty("name")[0].GetProperty("value").GetString());
-            return Json(new { data = new { mods = new { nodes = new[] { new { modId = 123, name = "Test", summary = "Summary", version = "1" } } } } });
+            Assert.False(filter.TryGetProperty("name", out _));
+            var name = filter.GetProperty("nameStemmed")[0];
+            Assert.Equal("bingus", name.GetProperty("value").GetString());
+            Assert.Equal("MATCHES", name.GetProperty("op").GetString());
+            return Json(new { data = new { mods = new { nodes = new[] { new { modId = 16292, name = "Bingus Shared Loader", summary = "Standalone mod loader", version = "18", thumbnailUrl = "https://images.nexusmods.com/thumb.jpg", pictureUrl = "https://images.nexusmods.com/full.jpg" } } } } });
         }));
-        using var client = Client(api); Assert.Equal("123", Assert.Single(await client.SearchAsync("test")).ModId);
+        using var client = Client(api);
+        var mod = Assert.Single(await client.SearchAsync(" bingus "));
+        Assert.Equal("16292", mod.ModId); Assert.Equal("Bingus Shared Loader", mod.Name);
+        Assert.Equal("https://www.nexusmods.com/helldivers2/mods/16292", mod.Page.AbsoluteUri);
+        Assert.Equal("https://images.nexusmods.com/thumb.jpg", mod.Thumbnail!.AbsoluteUri);
+    }
+    [Theory]
+    [InlineData(null, "https://images.nexusmods.com/full.jpg", "https://images.nexusmods.com/full.jpg")]
+    [InlineData("invalid", null, null)]
+    [InlineData("file:///tmp/image.png", "https://images.nexusmods.com/full.jpg", "https://images.nexusmods.com/full.jpg")]
+    public async Task SearchHandlesMissingOrInvalidThumbnails(string? thumbnail, string? picture, string? expected)
+    {
+        using var api = Http(_ => Json(new { data = new { mods = new { nodes = new[] {
+            new { modId = 123, name = "Example", summary = "Description", version = "1", thumbnailUrl = thumbnail, pictureUrl = picture }
+        } } } }));
+        using var client = Client(api);
+        Assert.Equal(expected, Assert.Single(await client.SearchAsync("example")).Thumbnail?.AbsoluteUri);
     }
     [Fact]
     public async Task FreeSignedLinkDownloadsWithoutSendingApiKeyToCdn()

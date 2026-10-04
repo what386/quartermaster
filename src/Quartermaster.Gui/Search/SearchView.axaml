@@ -1,20 +1,30 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:vm="clr-namespace:Quartermaster.Gui.Search" x:Class="Quartermaster.Gui.Search.SearchView" x:DataType="vm:SearchViewModel">
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Search" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+             xmlns:converters="clr-namespace:Avalonia.Data.Converters;assembly=Avalonia.Base" x:Class="Quartermaster.Gui.Search.SearchView" x:DataType="vm:SearchViewModel">
   <Grid RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
-    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,8">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
       <TextBlock Text="Search" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
-      <TextBox Text="{Binding Query}" Grid.Column="1" PlaceholderText="Search Helldivers 2 mods on Nexus…" />
-      <Button Grid.Column="2" Content="Search" Classes="primary" Command="{Binding SearchCommand}" Margin="8,0,0,0" />
+      <TextBox x:Name="SearchInput" Text="{Binding Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" PlaceholderText="Search Helldivers 2 mods…" KeyDown="SearchKeyDown" />
+      <ComboBox x:Name="ProviderSelector" Grid.Column="2" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" MinWidth="150" Margin="8,0,0,0" AutomationProperties.Name="Search provider">
+        <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:SearchProvider"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
+      </ComboBox>
+      <Button x:Name="SearchButton" Grid.Column="3" Content="Search" Classes="primary" Command="{Binding SearchCommand}" Margin="8,0,0,0" />
     </Grid>
-    <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="NEXUS MODS" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding ResultSummary}" /></Grid></Border>
+    <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Text="{Binding SelectedProvider.Name}" FontWeight="SemiBold" /><TextBlock x:Name="SearchFeedback" Grid.Column="1" Text="{Binding ResultSummary}" TextWrapping="Wrap" /></Grid></Border>
     <ScrollViewer Grid.Row="2">
       <ItemsControl ItemsSource="{Binding Results}">
         <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:SearchModItem">
-          <Border Classes="card" Margin="0,0,0,8">
-            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12">
-              <StackPanel Spacing="2"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
-              <Button Grid.Column="1" Content="Open page" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
-              <Button Grid.Column="2" Content="Add mod" Command="{Binding AddCommand}" Classes="primary" VerticalAlignment="Center" />
+          <Border Classes="card" Margin="0,0,0,8" MinHeight="120">
+            <Grid ColumnDefinitions="104,*,Auto,Auto" ColumnSpacing="12">
+              <Border Width="104" Height="104" CornerRadius="6" ClipToBounds="True" Background="{DynamicResource SidebarBackground}">
+                <Grid>
+                  <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/library.svg" Width="32" Height="32" Foreground="{DynamicResource LineBrush}" IsVisible="{Binding Source, ElementName=ResultThumbnail, Converter={x:Static converters:ObjectConverters.IsNull}}" />
+                  <shared:RemoteImage x:Name="ResultThumbnail" SourceUri="{Binding Thumbnail}" Width="104" Height="104" Stretch="UniformToFill" />
+                </Grid>
+              </Border>
+              <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+              <Button Grid.Column="2" Content="Open page" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Content="Add mod" Command="{Binding AddCommand}" Classes="primary" VerticalAlignment="Center" />
             </Grid>
           </Border>
         </DataTemplate></ItemsControl.ItemTemplate>

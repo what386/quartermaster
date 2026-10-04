@@ -48,11 +48,11 @@ public sealed class NexusClient : IDisposable
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int offset = 0, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length > 200 || offset < 0) throw new ArgumentException("Enter a search term and a valid offset.");
-        const string document = "query($filter: ModsFilter!, $offset: Int!) { mods(filter: $filter, offset: $offset, count: 20) { nodes { modId name summary version } } }";
+        const string document = "query($filter: ModsFilter!, $offset: Int!) { mods(filter: $filter, offset: $offset, count: 20) { nodes { modId name summary version thumbnailUrl pictureUrl } } }";
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.nexusmods.com/v2/graphql")
         {
             Content = JsonContent.Create(new { query = document, variables = new
-            { filter = new { gameDomainName = new[] { new { value = NexusLink.Game, op = "EQUALS" } }, name = new[] { new { value = "*" + query.Trim() + "*", op = "WILDCARD" } } }, offset } })
+            { filter = new { gameDomainName = new[] { new { value = NexusLink.Game, op = "EQUALS" } }, nameStemmed = new[] { new { value = query.Trim(), op = "MATCHES" } } }, offset } })
         };
         using var response = await SendAsync(request, ct);
         using var result = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
@@ -60,8 +60,12 @@ public sealed class NexusClient : IDisposable
         return result.RootElement.GetProperty("data").GetProperty("mods").GetProperty("nodes").EnumerateArray()
             .Select(node => new SearchResult(node.GetProperty("modId").GetInt64().ToString(), node.GetProperty("name").GetString()!,
                 node.GetProperty("summary").GetString()!, node.GetProperty("version").GetString()!,
-                new Uri($"https://www.nexusmods.com/{NexusLink.Game}/mods/{node.GetProperty("modId").GetInt64()}"))).ToArray();
+                new Uri($"https://www.nexusmods.com/{NexusLink.Game}/mods/{node.GetProperty("modId").GetInt64()}"),
+                ImageUrl(node, "thumbnailUrl") ?? ImageUrl(node, "pictureUrl"))).ToArray();
     }
+    private static Uri? ImageUrl(JsonElement node, string field) => node.TryGetProperty(field, out var value) &&
+        value.ValueKind == JsonValueKind.String && Uri.TryCreate(value.GetString(), UriKind.Absolute, out var uri) &&
+        uri is { Scheme: "https", UserInfo: "" } ? uri : null;
     public async Task DownloadAsync(NexusLink link, long fileId, string destination, CancellationToken ct = default)
     {
         if (link.FileId is { } selected && selected != fileId) throw new ArgumentException("Download grant belongs to a different file.");
