@@ -12,10 +12,3 @@
 - [ ] test windows literally at all
       @created 2026-10-04 21:12
 
-
-## Completed
-
-- [x] initial release
-      @created 2026-10-04 21:14
-      @completed 2026-10-04 21:14
-
