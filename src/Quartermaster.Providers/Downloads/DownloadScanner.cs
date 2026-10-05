@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 using System.Diagnostics;
-using Quartermaster.Providers.Providers;
+using Quartermaster.Providers.Clients;
 
 namespace Quartermaster.Providers.Downloads;
 

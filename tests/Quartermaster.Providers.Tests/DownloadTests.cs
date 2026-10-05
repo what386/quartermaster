@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Library.Tests;
 using Quartermaster.Providers.Downloads;
-using Quartermaster.Providers.Providers;
+using Quartermaster.Providers.Clients;
 using Quartermaster.Providers.Protocol;
 using Xunit;
 

@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Quartermaster.Library.Storage;
-using Quartermaster.Providers.Providers;
+using Quartermaster.Providers.Clients;
 
 namespace Quartermaster.Providers.Downloads;
 

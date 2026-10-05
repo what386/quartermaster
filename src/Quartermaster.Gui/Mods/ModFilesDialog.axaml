@@ -1,5 +1,5 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:p="clr-namespace:Quartermaster.Providers.Providers;assembly=Quartermaster.Providers"
+             xmlns:p="clr-namespace:Quartermaster.Providers.Clients;assembly=Quartermaster.Providers"
              x:Class="Quartermaster.Gui.Mods.ModFilesDialog" x:DataType="p:ProviderMod" Width="500">
   <StackPanel Spacing="16">
     <TextBlock Text="{Binding Name}" Classes="pageTitle" TextWrapping="Wrap" />

@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 using Quartermaster.Library.Mods;
 using Quartermaster.Providers.Downloads;
 
-namespace Quartermaster.Providers.Providers.NexusMods;
+namespace Quartermaster.Providers.Clients.NexusMods;
 
 public sealed class NexusAdapter(NexusClient client) : IModProvider
 {

@@ -4,8 +4,8 @@ using System.Text.Json;
 using Quartermaster.Library.Mods;
 using Quartermaster.Providers.Downloads;
 using Quartermaster.Library.Tests;
-using Quartermaster.Providers.Providers;
-using Quartermaster.Providers.Providers.NexusMods;
+using Quartermaster.Providers.Clients;
+using Quartermaster.Providers.Clients.NexusMods;
 using Xunit;
 
 namespace Quartermaster.Providers.Tests;

@@ -3,7 +3,7 @@ using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
 using Quartermaster.Library.Storage;
-using Quartermaster.Providers.Providers.NexusMods;
+using Quartermaster.Providers.Clients.NexusMods;
 
 namespace Quartermaster.Providers.Protocol;
 

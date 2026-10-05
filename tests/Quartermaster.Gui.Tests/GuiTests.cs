@@ -44,7 +44,7 @@ public class GuiTests
         var mods = Page<ModsViewModel>(f, PageKind.Mods);
         var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
         await f.Services.Providers.SetDirectoriesAsync([folder]);
-        var file = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "Test mod", "mod.zip", "1",
+        var file = new Quartermaster.Providers.Clients.ProviderFile("nexusmods", "123", "456", "Test mod", "mod.zip", "1",
             new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
         var job = await f.Services.Providers.QueueAsync(file); Dispatcher.UIThread.RunJobs();
         Assert.False(f.Services.Operations.IsBusy); var row = Assert.Single(mods.Downloads.Jobs);

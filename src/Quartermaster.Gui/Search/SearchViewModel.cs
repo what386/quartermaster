@@ -1,6 +1,6 @@
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Shared;
-using Quartermaster.Providers.Providers;
+using Quartermaster.Providers.Clients;
 
 namespace Quartermaster.Gui.Search;
 

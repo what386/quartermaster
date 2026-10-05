@@ -338,7 +338,7 @@ public sealed class ModDownloadTests
     public async Task BrowserDownloadSpinnerTracksMultipleJobsWithoutBlockingTheApp()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
-        var first = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "First", "first.zip", "1",
+        var first = new Quartermaster.Providers.Clients.ProviderFile("nexusmods", "123", "456", "First", "first.zip", "1",
             new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
         var a = await f.Services.Providers.QueueAsync(first);
         var b = await f.Services.Providers.QueueAsync(first with
@@ -372,7 +372,7 @@ public sealed class ModDownloadTests
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         await f.Services.Providers.SetDirectoriesAsync([Path.Combine(f.Root, "empty")]);
-        var file = new Quartermaster.Providers.Providers.ProviderFile("nexusmods", "123", "456", "Already downloaded", "expected.zip", "1",
+        var file = new Quartermaster.Providers.Clients.ProviderFile("nexusmods", "123", "456", "Already downloaded", "expected.zip", "1",
             new("https://www.nexusmods.com/helldivers2/mods/123?tab=files&file_id=456"));
         await f.Services.Providers.QueueAsync(file, f.Services.Session.ActiveProfile!.Id); Dispatcher.UIThread.RunJobs();
         var row = Assert.Single(f.Services.Downloads.Jobs); f.Shell.Navigate(PageKind.Downloads);

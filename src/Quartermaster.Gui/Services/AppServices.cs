@@ -11,11 +11,11 @@ public sealed class AppServices : IAsyncDisposable
 {
     public bool IsDisposed { get; private set; }
     public ModDownloads Downloads { get; }
-    public Func<string, CancellationToken, Task<Quartermaster.Providers.Providers.NexusMods.NexusUser>> ValidateNexusKeyAsync { get; }
+    public Func<string, CancellationToken, Task<Quartermaster.Providers.Clients.NexusMods.NexusUser>> ValidateNexusKeyAsync { get; }
     public Quartermaster.Providers.ProviderManager Providers { get; }
     public Quartermaster.Providers.ApiKeyStore Keys { get; }
-    public Quartermaster.Providers.Providers.NexusMods.NexusClient Nexus { get; }
-    public Quartermaster.Providers.Providers.GitHub.GitHubProvider GitHub { get; }
+    public Quartermaster.Providers.Clients.NexusMods.NexusClient Nexus { get; }
+    public Quartermaster.Providers.Clients.GitHub.GitHubProvider GitHub { get; }
     public Quartermaster.Library.Mods.LibraryService Library { get; }
     public string DataDirectory { get; }
     public LibrarySession Session { get; }
@@ -43,11 +43,11 @@ public sealed class AppServices : IAsyncDisposable
         Nexus = new(ct => Keys.GetAsync("nexusmods", ct), nexusApi, nexusDownloads);
         ValidateNexusKeyAsync = async (key, ct) =>
         {
-            using var client = new Quartermaster.Providers.Providers.NexusMods.NexusClient(_ => Task.FromResult<string?>(key), nexusApi);
+            using var client = new Quartermaster.Providers.Clients.NexusMods.NexusClient(_ => Task.FromResult<string?>(key), nexusApi);
             return await client.ValidateAsync(ct);
         };
         GitHub = new(githubApi, githubDownloads, ct => Keys.GetAsync("github", ct));
-        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Providers.NexusMods.NexusAdapter(Nexus), GitHub], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
+        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Clients.NexusMods.NexusAdapter(Nexus), GitHub], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));

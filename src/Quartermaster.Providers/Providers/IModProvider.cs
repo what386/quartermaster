@@ -1,7 +1,7 @@
 using Quartermaster.Library.Mods;
 using Quartermaster.Providers.Downloads;
 
-namespace Quartermaster.Providers.Providers;
+namespace Quartermaster.Providers.Clients;
 
 public sealed record ProviderFile(string Provider, string ModId, string FileId, string Name, string FileName,
     string? Version, Uri DownloadPage, bool IsPrimary = false, long? Size = null, string? Sha256 = null, string? Md5 = null);

@@ -19,10 +19,10 @@ public static class TestAppBuilder
 internal sealed class FakeDialogs : IDialogService
 {
     public Quartermaster.Gui.Mods.ModImportRequest? ModImport { get; set; }
-    public Quartermaster.Providers.Providers.ProviderFile? ModFile { get; set; }
+    public Quartermaster.Providers.Clients.ProviderFile? ModFile { get; set; }
     public bool CancelModFile { get; set; }
     public Task<Quartermaster.Gui.Mods.ModImportRequest?> RequestModImportAsync() => Task.FromResult(ModImport);
-    public Task<Quartermaster.Providers.Providers.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Providers.ProviderMod mod) => Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault());
+    public Task<Quartermaster.Providers.Clients.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Clients.ProviderMod mod) => Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault());
     public string? ZipPath { get; set; }
     public string? FolderPath { get; set; }
     public string? SavePath { get; set; }

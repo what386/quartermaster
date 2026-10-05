@@ -1,7 +1,7 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Quartermaster.Gui.Mods;
-using Quartermaster.Providers.Providers;
+using Quartermaster.Providers.Clients;
 
 namespace Quartermaster.Gui.Shared;
 

@@ -1,7 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Serialization;
 
-namespace Quartermaster.Providers.Providers.NexusMods;
+namespace Quartermaster.Providers.Clients.NexusMods;
 
 public sealed record NexusUser([property: JsonPropertyName("user_id")] long Id, string Name,
     [property: JsonPropertyName("is_premium")] bool IsPremium);

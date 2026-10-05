@@ -1,4 +1,4 @@
-namespace Quartermaster.Providers.Providers.GitHub;
+namespace Quartermaster.Providers.Clients.GitHub;
 
 public sealed record GitHubLink(string Repository, string? Tag = null, string? AssetName = null)
 {

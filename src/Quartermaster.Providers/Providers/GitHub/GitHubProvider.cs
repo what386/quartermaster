@@ -5,7 +5,7 @@ using System.Security.Cryptography;
 using Quartermaster.Library.Mods;
 using Quartermaster.Providers.Downloads;
 
-namespace Quartermaster.Providers.Providers.GitHub;
+namespace Quartermaster.Providers.Clients.GitHub;
 
 /// <summary>Public GitHub releases and their uploaded ZIP assets; source archives are excluded.</summary>
 public sealed class GitHubProvider : IModProvider, IDisposable

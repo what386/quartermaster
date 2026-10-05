@@ -1,8 +1,8 @@
 using Quartermaster.Gui.Shared;
 using Quartermaster.Providers.Downloads;
-using Quartermaster.Providers.Providers.NexusMods;
+using Quartermaster.Providers.Clients.NexusMods;
 using Quartermaster.Providers.Protocol;
-using Quartermaster.Providers.Providers.GitHub;
+using Quartermaster.Providers.Clients.GitHub;
 
 namespace Quartermaster.Gui.Settings;
 

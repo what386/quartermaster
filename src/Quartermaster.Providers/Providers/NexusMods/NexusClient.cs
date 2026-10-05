@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 
-namespace Quartermaster.Providers.Providers.NexusMods;
+namespace Quartermaster.Providers.Clients.NexusMods;
 
 public sealed class NexusApiException(HttpStatusCode status, TimeSpan? retryAfter = null) : Exception(status switch
 {

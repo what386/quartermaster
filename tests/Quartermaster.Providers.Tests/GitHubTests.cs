@@ -6,7 +6,7 @@ using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Library.Tests;
 using Quartermaster.Providers.Downloads;
-using Quartermaster.Providers.Providers.GitHub;
+using Quartermaster.Providers.Clients.GitHub;
 using Xunit;
 
 namespace Quartermaster.Providers.Tests;
@@ -145,10 +145,10 @@ public sealed class GitHubTests
             ? Json(Asset(10, oldName, "v1")) : Json(Release(Asset(20, newName), Asset(21, "other.zip"))));
         using var provider = new GitHubProvider(api);
         var update = await provider.CheckUpdateAsync(new("github", "owner/mod", "10", "v1"));
-        Assert.Equal(available ? Quartermaster.Providers.Providers.UpdateStatus.Available : Quartermaster.Providers.Providers.UpdateStatus.Unknown, update.Status);
+        Assert.Equal(available ? Quartermaster.Providers.Clients.UpdateStatus.Available : Quartermaster.Providers.Clients.UpdateStatus.Unknown, update.Status);
         if (available) Assert.Equal("20", update.File!.FileId);
         else Assert.NotNull(update.Reason);
-        Assert.Equal(Quartermaster.Providers.Providers.UpdateStatus.Current, (await provider.CheckUpdateAsync(new("github", "owner/mod", "20", "v2"))).Status);
+        Assert.Equal(Quartermaster.Providers.Clients.UpdateStatus.Current, (await provider.CheckUpdateAsync(new("github", "owner/mod", "20", "v2"))).Status);
     }
 
     [Fact]
