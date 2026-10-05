@@ -101,7 +101,7 @@ internal sealed class Fixture : IDisposable
             """);
         return folder;
     }
-    public string UnitSource(string name, bool compatible = false, bool missing = false)
+    public string UnitSource(string name, bool compatible = false, bool missing = false, bool customLod = false)
     {
         const ulong unitType = 16187218042980615487;
         byte[] Unit(int lodSize)
@@ -115,7 +115,9 @@ internal sealed class Fixture : IDisposable
         }
         File.WriteAllBytes(Path.Combine(Game, Archive), Patch(1, unitType, Unit(16)));
         var folder = Source(name);
-        File.WriteAllBytes(Path.Combine(folder, Archive + ".patch_7"), Patch(missing ? 2UL : 1UL, unitType, Unit(compatible ? 16 : 8)));
+        var modUnit = Unit(compatible && !customLod ? 16 : 8);
+        if (!compatible) BinaryPrimitives.WriteUInt32LittleEndian(modUnit.AsSpan(0x2c), 0xA4CD35);
+        File.WriteAllBytes(Path.Combine(folder, Archive + ".patch_7"), Patch(missing ? 2UL : 1UL, unitType, modUnit));
         return folder;
     }
     private static byte[] Patch(ulong resource) => Patch(resource, 0x1122334455667788, [(byte)resource, 0, 0, 0]);

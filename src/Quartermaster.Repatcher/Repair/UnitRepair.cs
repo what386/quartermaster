@@ -16,6 +16,17 @@ internal static class UnitRepair
             throw new InvalidDataException("Invalid unit LOD offsets.");
         BinaryData.Slice(mod, lodOffset, (long)jointOffset - lodOffset);
         var lod = BinaryData.Slice(original, gameLodOffset, (long)gameJointOffset - gameLodOffset);
+        for (var i = 0; i < 16; i++)
+        {
+            var offset = BinaryData.U32(mod, 0x34 + i * 4);
+            if (offset > mod.Length || (offset > lodOffset && offset < jointOffset))
+                throw new InvalidDataException("Unit offset points outside data or inside the replaced LOD block.");
+        }
+        // LOD tables describe the mod's own meshes. Different bytes or sizes do not
+        // imply an outdated format; substituting vanilla mesh indices can crash the game.
+        if (BinaryData.U32(mod, 0x2c) == BinaryData.U32(original, 0x2c))
+            return mod.ToArray();
+
         var working = mod.ToArray();
         if (BinaryData.U32(mod, 0x2c) < 0xA4CD36)
         {
@@ -49,8 +60,6 @@ internal static class UnitRepair
             var field = 0x34 + i * 4;
             var offset = BinaryData.U32(mod, field);
             if (offset == 0) continue;
-            if (offset > mod.Length || (offset > lodOffset && offset < jointOffset))
-                throw new InvalidDataException("Unit offset points outside data or inside the replaced LOD block.");
             if (offset > lodOffset) BinaryData.Put32(result, field, checked((uint)(offset + delta)));
         }
         return result;

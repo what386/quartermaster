@@ -53,7 +53,10 @@ reopen the archive index after game updates.
 - Read-only indexing of legacy, compressed DSAR, and bundled/slim installations.
 - Bounds-checked little-endian patch/type/resource tables with 64-bit IDs/offsets.
 - Raw and LZ4 DSAR chunks, including resource reads across chunk and bundle boundaries.
-- Current unit version and LOD replacement from installed game resources.
+- Units already matching the installed format version are preserved byte for byte,
+  including custom LOD tables and mesh references. LOD differences alone do not
+  indicate that a mod needs repatching.
+- Unit version and LOD replacement from installed game resources when versions differ.
 - Upstream's pre-`0xA4CD36` vertex-format upgrade (`format > 16` becomes `format + 4`).
 - Adjustment of the sixteen unit offset fields starting at `0x34`.
 - Removal of TOC entries for units absent from the installed game's index,
@@ -66,6 +69,7 @@ after LOD replacement, truncates shrinking output correctly, validates the entir
 type table, and keeps game/archive state scoped to an instance. Unknown TOC fields,
 companion offsets, and unaffected bytes are preserved. Conflicting duplicate
 installed units fail indexing instead of choosing an arbitrary copy.
+`RepairedUnits` counts units whose bytes actually changed.
 
 ## Validation and limits
 

@@ -57,11 +57,14 @@ public sealed partial class Repatcher(IUnitResourceSource resources)
                     continue;
                 }
                 var original = resources.ReadUnit(record.FileId, cancellationToken);
-                var replacement = UnitRepair.Repair(BinaryData.Slice(data, BinaryData.Length(record.DataOffset), record.DataSize), original);
+                var unit = BinaryData.Slice(data, BinaryData.Length(record.DataOffset), record.DataSize);
+                var replacement = UnitRepair.Repair(unit, original);
+                if (unit.SequenceEqual(replacement)) { retained.Add(record); continue; }
                 edits.Add(new(BinaryData.Length(record.DataOffset), BinaryData.Length(record.DataSize), replacement));
                 retained.Add(record with { DataSize = (uint)replacement.Length });
                 repaired++;
             }
+            if (edits.Count == 0) return new(RepairStatus.Updated, data.ToArray());
             edits.Sort((a, b) => a.Offset.CompareTo(b.Offset));
             using var output = new MemoryStream();
             var cursor = 0;

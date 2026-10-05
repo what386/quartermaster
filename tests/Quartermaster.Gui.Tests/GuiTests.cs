@@ -1675,6 +1675,30 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task CurrentCustomMeshesStayUnchangedEvenWhenAnotherModNeedsRepatching()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var currentSource = f.UnitSource("Custom arrow", compatible: true, customLod: true);
+        await f.Services.Session.ImportAsync(currentSource, CancellationToken.None);
+        var original = File.ReadAllBytes(Path.Combine(currentSource, Fixture.Archive + ".patch_7"));
+        var profiles = Page<ProfilesViewModel>(f, PageKind.Profiles); await profiles.AddCommand.ExecuteAsync();
+        await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        Assert.DoesNotContain(f.Dialogs.Confirmations, c => c.Title == "Repatch required");
+        Assert.Equal(original, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+
+        await f.Services.Session.ImportAsync(f.UnitSource("Outdated armor"), CancellationToken.None);
+        await profiles.AddCommand.ExecuteAsync();
+        f.Dialogs.Confirmations.Clear();
+        await profiles.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        var prompt = Assert.Single(f.Dialogs.Confirmations, c => c.Title == "Repatch required");
+        Assert.Contains("Outdated armor", prompt.Message);
+        Assert.DoesNotContain("Custom arrow", prompt.Message);
+        var deployed = Directory.GetFiles(f.Game, "*.patch_*").Select(File.ReadAllBytes).ToArray();
+        Assert.Contains(deployed, bytes => bytes.AsSpan().SequenceEqual(original));
+        Assert.Contains(deployed, bytes => !bytes.AsSpan().SequenceEqual(original));
+    }
+
+    [AvaloniaFact]
     public async Task LibraryExportsRepatchedZipWithoutDeploymentAndHandlesSaveCancellation()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
