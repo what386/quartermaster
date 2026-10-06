@@ -2,6 +2,14 @@
 
 *Generated on 2026-10-06*
 
+## 0.3.0 — 2026-10-06
+
+### Changes
+
+- feat: improve config menu significantly
+- feat: supervised manual updates for unsupported providers
+
+
 ## 0.2.2 — 2026-10-06
 
 ### Changes
