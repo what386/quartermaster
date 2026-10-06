@@ -22,6 +22,10 @@ internal sealed class FakeDialogs : IDialogService
     public Quartermaster.Providers.Clients.ProviderFile? ModFile { get; set; }
     public bool CancelModFile { get; set; }
     public Task<Quartermaster.Gui.Mods.ModImportRequest?> RequestModImportAsync() => Task.FromResult(ModImport);
+    public Quartermaster.Gui.Mods.LocalModImportOptions? ImportOptions { get; set; } = new();
+    public List<string> ImportConfirmations { get; } = [];
+    public Task<Quartermaster.Gui.Mods.LocalModImportOptions?> ConfirmModImportAsync(string source)
+    { ImportConfirmations.Add(source); return Task.FromResult(ImportOptions); }
     public Task<Quartermaster.Providers.Clients.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Clients.ProviderMod mod) => Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault());
     public string? ZipPath { get; set; }
     public string? FolderPath { get; set; }
@@ -37,14 +41,14 @@ internal sealed class FakeDialogs : IDialogService
     public string? InitialInputText { get; private set; }
     public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null)
     { InitialInputText = initialValue; return Task.FromResult(InputText); }
-    public List<(string Title, string Message)> Confirmations { get; } = [];
+    public List<(string Title, string Message, string AcceptLabel, string CancelLabel)> Confirmations { get; } = [];
     public Task<string?> PickModZipAsync() => Task.FromResult(ZipPath);
     public Task<string?> PickProfileZipAsync() => Task.FromResult(ZipPath);
     public Task<string?> SaveProfileZipAsync(string suggestedName)
     { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(FolderPath);
-    public Task<bool> ConfirmAsync(string title, string message, string acceptLabel)
-    { Confirmations.Add((title, message)); return Task.FromResult(Confirm); }
+    public Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel")
+    { Confirmations.Add((title, message, acceptLabel, cancelLabel)); return Task.FromResult(Confirm); }
 }
 
 internal sealed class Fixture : IDisposable

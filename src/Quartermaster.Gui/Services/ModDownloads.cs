@@ -7,14 +7,14 @@ using Quartermaster.Providers.Downloads;
 namespace Quartermaster.Gui.Services;
 
 /// <summary>Coordinates link imports, update actions and background downloads for all pages.</summary>
-public sealed class ModDownloads : ViewModelBase
+public sealed partial class ModDownloads : ViewModelBase
 {
     private readonly AppServices services;
     private readonly Dictionary<Guid, DownloadRow> rows = [];
     public event EventHandler? Changed;
     public IReadOnlyList<DownloadRow> Jobs { get; private set; } = [];
     private string search = "";
-    public string Search { get => search; set { if (Set(ref search, value)) NotifyList(); } }
+    public string Search { get => search; set { if (Set(ref search, value)) { NotifyList(); Notify(nameof(VisibleManualChecks)); Notify(nameof(HasManualChecks)); } } }
     public IReadOnlyList<DownloadRow> VisibleJobs => Jobs.Where(row => row.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
     public bool HasVisibleJobs => VisibleJobs.Count > 0;
     public string EmptyMessage => Jobs.Count == 0 ? "No downloads queued." : "No downloads match your search.";
@@ -26,16 +26,22 @@ public sealed class ModDownloads : ViewModelBase
         get
         {
             var waiting = Jobs.Count(row => row.IsWaiting);
+            if (waiting > 0 && Jobs.Where(row => row.IsWaiting).All(row => row.IsManual))
+                return $"Waiting for {ModPresentation.Count(waiting, "matching ZIP")}";
             return waiting > 0 ? $"Waiting for {ModPresentation.Count(waiting, "browser download")}" :
                 $"Processing {ModPresentation.Count(Jobs.Count(row => row.IsActive), "download")}";
         }
     }
-    public string PendingExplanation => Jobs.Any(row => row.IsWaiting)
+    public string PendingExplanation => Jobs.Any(row => row.IsWaiting && row.IsManual)
+        ? "Watching your download folder for matching ZIPs."
+        : Jobs.Any(row => row.IsWaiting)
         ? "Finish the download in your browser. Quartermaster watches your download folder and imports verified files automatically."
         : "Quartermaster is downloading or importing your mods. You can keep using the app.";
     public ModDownloads(AppServices services)
     {
         this.services = services;
+        RestartManualChecksCommand = new(() => ShowManualChecks(), () => Operations.CanInteract);
+        services.Session.Changed += (_, _) => RefreshManualChecks();
         services.Providers.DownloadFailed += job => Dispatcher.UIThread.Post(() =>
         {
             if (!services.IsDisposed) services.Operations.ShowErrorNotification($"Could not import {job.File.Name}: {job.Error}");
@@ -59,6 +65,7 @@ public sealed class ModDownloads : ViewModelBase
         }).ToArray();
         foreach (var id in rows.Keys.Where(id => !services.Providers.State.Jobs.Any(job => job.Id == id)).ToArray()) rows.Remove(id);
         Notify(nameof(Jobs)); NotifyList(); Notify(nameof(HasPendingDownloads)); Notify(nameof(PendingSummary)); Notify(nameof(PendingExplanation));
+        RefreshManualChecks();
         Changed?.Invoke(this, EventArgs.Empty);
     }
     private void NotifyList()
@@ -93,6 +100,12 @@ public sealed class ModDownloads : ViewModelBase
             (modIds is null || modIds.Contains(check.ModId))).ToArray();
         if (errors.Length > 0) throw new InvalidOperationException($"Could not check {ModPresentation.Count(errors.Length, "mod")}: " +
             string.Join(" ", errors.Select(check => check.Error).Distinct().Take(3)));
+        var manualMods = services.Session.State.Mods.Where(mod => !mod.Superseded &&
+            (modIds is null || modIds.Contains(mod.Id)) && !services.Providers.IsTracked(mod)).ToArray();
+        if (manualMods.Length > 0 && await services.Dialogs.ConfirmAsync("Manual update checks",
+            $"{ModPresentation.Count(manualMods.Length, "mod")} {(manualMods.Length == 1 ? "needs" : "need")} a manual update check. Open the checklist now?",
+            "Open manual checks", "Not now"))
+            ShowManualChecks(manualMods.Select(mod => mod.Id).ToArray());
     }
     public UpdateCheck? AvailableUpdate(Mod mod) => services.Session.State.UpdateChecks.FirstOrDefault(check =>
         check.ModId == mod.Id && check.Error is null && check.AvailableFileId is not null &&
@@ -115,16 +128,20 @@ public sealed class DownloadRow : ViewModelBase
     public string Name => job.File.Name + (job.File.Version is null ? "" : " · " + job.File.Version);
     public bool IsWaiting => job.Status == DownloadStatus.Waiting && !downloadsDirectly;
     public bool IsActive => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing;
-    public string Status => (IsWaiting ? "Waiting for your browser download" : job.Status == DownloadStatus.Waiting ? "Queued" : job.Status.ToString()) + (job.Error is null ? "" : " · " + job.Error);
+    public string Status => (CanConfirm ? "Review update" : IsManual && IsWaiting ? "Waiting for a matching ZIP filename" : IsWaiting ? "Waiting for your browser download" : job.Status == DownloadStatus.Waiting ? "Queued" : job.Status.ToString()) + (job.Error is null ? "" : " · " + job.Error) + (job.Warning is null ? "" : " · " + job.Warning);
     public AsyncCommand OpenCommand { get; }
     public AsyncCommand RetryCommand { get; }
     public AsyncCommand CancelCommand { get; }
     public AsyncCommand AttachCommand { get; }
+    public AsyncCommand ConfirmCommand { get; }
+    public bool CanConfirm => job.Status == DownloadStatus.NeedsConfirmation;
     public AsyncCommand RemoveCommand { get; }
-    public bool CanAttach => job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled;
-    public bool CanCancel => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading;
-    public bool CanRetry => job.Status is DownloadStatus.Failed or DownloadStatus.Cancelled;
-    public bool CanRemove => job.Status is DownloadStatus.Complete or DownloadStatus.Failed or DownloadStatus.Cancelled;
+    public bool IsManual => job.File.Provider == "manual";
+    public string OpenLabel => IsManual ? "Open mod page" : "Open download page";
+    public bool CanAttach => job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled or DownloadStatus.NeedsConfirmation;
+    public bool CanCancel => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.NeedsConfirmation;
+    public bool CanRetry => job.Status is DownloadStatus.Failed or DownloadStatus.Cancelled or DownloadStatus.NeedsConfirmation;
+    public bool CanRemove => job.Status is DownloadStatus.Complete or DownloadStatus.Failed or DownloadStatus.Cancelled or DownloadStatus.NeedsConfirmation;
     public DownloadRow(DownloadJob job, AppServices services)
     {
         this.job = job;
@@ -132,7 +149,12 @@ public sealed class DownloadRow : ViewModelBase
         OpenCommand = services.Operations.CreateCommand("Opening download page", _ =>
         { services.Providers.OpenDownloadPage(job.Id); return Task.CompletedTask; });
         RetryCommand = services.Operations.CreateCommand("Retrying download", ct => services.Providers.RetryAsync(job.Id, ct),
-            () => this.job.Status is DownloadStatus.Failed or DownloadStatus.Cancelled);
+            () => CanRetry);
+        ConfirmCommand = services.Operations.CreateCommand("Importing mod update", async ct =>
+        {
+            await services.Providers.ConfirmManualUpdateAsync(job.Id, ct);
+            await services.Session.ReloadAsync(ct);
+        }, () => CanConfirm);
         AttachCommand = services.Operations.CreateCommand("Attaching mod ZIP", async ct =>
         {
             var path = await services.Dialogs.PickModZipAsync();
@@ -147,6 +169,7 @@ public sealed class DownloadRow : ViewModelBase
     {
         job = value; Notify(nameof(Name)); Notify(nameof(Status)); Notify(nameof(IsWaiting)); Notify(nameof(IsActive));
         Notify(nameof(CanAttach)); Notify(nameof(CanCancel)); Notify(nameof(CanRetry)); Notify(nameof(CanRemove));
+        Notify(nameof(CanConfirm)); ConfirmCommand.Refresh();
         RetryCommand.Refresh(); CancelCommand.Refresh(); AttachCommand.Refresh(); RemoveCommand.Refresh();
     }
 }

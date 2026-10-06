@@ -954,7 +954,8 @@ public class GuiTests
             var routes = new (PageKind Page, Type View)[]
             {
                 (PageKind.Mods, typeof(ModsView)), (PageKind.Profiles, typeof(ProfilesView)),
-                (PageKind.Search, typeof(SearchView)), (PageKind.Downloads, typeof(DownloadsView)), (PageKind.Settings, typeof(SettingsView))
+                (PageKind.Search, typeof(SearchView)), (PageKind.Downloads, typeof(DownloadsView)),
+                (PageKind.ManualChecks, typeof(ManualChecksView)), (PageKind.Settings, typeof(SettingsView))
             };
             foreach (var (page, view) in routes)
             {
@@ -968,6 +969,8 @@ public class GuiTests
                 {
                     var menu = Assert.Single(window.GetVisualDescendants().OfType<Button>(),
                         button => button.DataContext is NavigationItem item && item.Page == page);
+                    if (page == PageKind.ManualChecks)
+                        Assert.EndsWith("checklist.svg", Assert.IsType<NavigationItem>(menu.DataContext).IconSource);
                     menu.Command!.Execute(null);
                 }
                 Dispatcher.UIThread.RunJobs();

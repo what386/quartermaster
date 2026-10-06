@@ -3,9 +3,15 @@
   <Grid ColumnDefinitions="180,*">
     <StackPanel Spacing="4"><TextBlock Text="GitHub" FontWeight="SemiBold" /><TextBlock Text="{Binding GitHubAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
     <StackPanel Grid.Column="1" Spacing="8">
-      <TextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken}" PasswordChar="●" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="Optional personal access token, then Save" />
-      <CheckBox Content="Remove saved token" IsChecked="{Binding RemoveGitHubToken}" IsVisible="{Binding HasSavedGitHubToken}" />
-      <TextBlock Text="A token increases your GitHub API rate limit. Create one in GitHub Settings → Developer settings → Personal access tokens. The saved token is kept separately from profile exports; public downloads work without it." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="760" HorizontalAlignment="Left">
+        <TextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken}" PasswordChar="●" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="Optional personal access token" MinWidth="260" VerticalAlignment="Center" />
+        <CheckBox Grid.Column="1" x:Name="RemoveGitHubTokenInput" Content="Remove saved token" IsChecked="{Binding RemoveGitHubToken, Mode=TwoWay}" IsEnabled="{Binding HasSavedGitHubToken}" VerticalAlignment="Center" />
+      </Grid>
+      <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
+        <Run Text="A token increases your GitHub API rate limit. Create one in " />
+        <InlineUIContainer><HyperlinkButton x:Name="GitHubTokenSettingsLink" Content="GitHub Settings → Developer settings → Personal access tokens" Command="{Binding OpenGitHubTokenSettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
+        <Run Text=", you do not need any extra permissions beyond read-only." />
+      </TextBlock>
     </StackPanel>
   </Grid>
 </UserControl>

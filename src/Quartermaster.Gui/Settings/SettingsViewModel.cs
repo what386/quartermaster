@@ -33,21 +33,26 @@ public sealed partial class SettingsViewModel : SessionViewModel
         {
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
-                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(ShowAppearance), nameof(HasMatches) }) Notify(name);
+                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(ShowAppearance),
+                nameof(ShowDownloads), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
         }
     }
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || keywords.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
-    public bool ShowInstallation => Matches("Helldivers 2 game installation folder Steam path");
-    public bool ShowPriority => Matches("Profile load priority earlier later entries order " + ActiveProfileName);
-    public bool ShowRepatch => Matches("Repatching repair automatic ask never patches");
-    public bool ShowStorage => Matches("Library storage directory originals profiles " + LibraryDirectory);
-    public bool ShowVersion => Matches("Quartermaster app application version build " + ApplicationVersion);
-    public bool ShowPlatform => Matches("Operating system platform architecture " + PlatformInformation);
-    public bool ShowRuntime => Matches("Runtime .NET " + RuntimeVersion);
-    public bool ShowLogs => Matches("Log file diagnostics troubleshooting " + LogFilePath);
-    public bool ShowConfiguration => Matches("Settings configuration file " + ConfigurationFilePath);
-    public bool HasMatches => ShowInstallation || ShowPriority || ShowRepatch || ShowStorage ||
-        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration || ShowNexus || ShowGitHub || ShowAppearance;
+    public bool ShowInstallation => Matches("Game and deployment Helldivers 2 installation folder Steam path");
+    public bool ShowPriority => Matches("Game and deployment Profile load priority earlier later entries order " + ActiveProfileName);
+    public bool ShowRepatch => Matches("Game and deployment Repatching repair automatic ask never patches");
+    public bool ShowStorage => Matches("App information Library storage directory originals profiles " + LibraryDirectory);
+    public bool ShowVersion => Matches("App information Quartermaster application version build " + ApplicationVersion);
+    public bool ShowPlatform => Matches("App information Operating system platform architecture " + PlatformInformation);
+    public bool ShowRuntime => Matches("App information Runtime .NET " + RuntimeVersion);
+    public bool ShowLogs => Matches("App information Log file diagnostics troubleshooting " + LogFilePath);
+    public bool ShowConfiguration => Matches("App information Settings configuration file " + ConfigurationFilePath);
+    public bool ShowDownloads => Matches("Downloads download scanning browser ZIP watch folder directory manual updates");
+    public bool ShowAppSettings => ShowAppearance;
+    public bool ShowGameSettings => ShowInstallation || ShowPriority || ShowRepatch;
+    public bool ShowProviderSettings => ShowNexus || ShowGitHub;
+    public bool ShowAppInformation => ShowStorage || ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
+    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowProviderSettings || ShowAppInformation;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;
@@ -121,6 +126,6 @@ public sealed partial class SettingsViewModel : SessionViewModel
             RefreshAppearance(saved);
             saved = Session.Settings; profileId = Session.ActiveProfile?.Id; savedPriority = currentPriority;
         }
-        Notify(nameof(ActiveProfileName)); Notify(nameof(HasProfile)); Notify(nameof(ShowPriority)); Notify(nameof(HasMatches)); SaveCommand.Refresh();
+        Notify(nameof(ActiveProfileName)); Notify(nameof(HasProfile)); Notify(nameof(ShowPriority)); Notify(nameof(ShowGameSettings)); Notify(nameof(HasMatches)); SaveCommand.Refresh();
     }
 }

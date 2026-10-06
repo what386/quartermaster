@@ -11,7 +11,7 @@ namespace Quartermaster.Gui.Services;
 
 /// <summary>Shared loaded state. Backend work runs on workers; notifications return to the UI caller.</summary>
 public sealed class LibrarySession(LibraryService library, ProfileArchives archives, IDeploymentStorage storage, ModContentStore contents, SettingsStore settingsStore,
-    Func<IReadOnlyList<string>> discover) : ViewModelBase
+    Func<IReadOnlyList<string>> discover, IDialogService dialogs) : ViewModelBase
 {
     public event EventHandler? Changed;
     public LibraryState State { get; private set; } = LibraryState.Empty;
@@ -74,8 +74,16 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     }
     public async Task ImportAsync(string source, CancellationToken ct, Guid? profileId = null)
     {
-        await Task.Run(() => library.ImportAsync(source, cancellationToken: ct, profileId: profileId), ct);
+        await ImportLocalAsync(source, ct, profileId);
         await ReloadAsync(CancellationToken.None);
+    }
+    private async Task ImportLocalAsync(string source, CancellationToken ct, Guid? profileId)
+    {
+        ct.ThrowIfCancellationRequested();
+        var options = await dialogs.ConfirmModImportAsync(source);
+        if (options is null) return;
+        var page = ModLinks.ValidatePage(options.PageLink);
+        await Task.Run(() => library.ImportAsync(source, cancellationToken: ct, profileId: profileId, pageLink: page), ct);
     }
     public async Task ImportProfileAsync(string source, CancellationToken ct)
     {
@@ -98,20 +106,21 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         Guid? importedProfileId = null;
         try
         {
-            await Task.Run(async () =>
+            foreach (var source in sources)
             {
-                foreach (var source in sources)
+                ct.ThrowIfCancellationRequested();
+                if (allowProfiles && (!allowMods || ProfileArchives.IsProfileArchive(source)))
                 {
-                    ct.ThrowIfCancellationRequested();
-                    if (allowProfiles && (!allowMods || ProfileArchives.IsProfileArchive(source)))
+                    var profile = await Task.Run(async () =>
                     {
-                        var profile = await archives.ImportAsync(source, ct);
-                        await library.SaveProfileAsync(profile, true, CancellationToken.None);
-                        importedProfileId = profile.Id;
-                    }
-                    else await library.ImportAsync(source, profileId: profileId, cancellationToken: ct);
+                        var imported = await archives.ImportAsync(source, ct);
+                        await library.SaveProfileAsync(imported, true, CancellationToken.None);
+                        return imported;
+                    }, ct);
+                    importedProfileId = profile.Id;
                 }
-            }, ct);
+                else await ImportLocalAsync(source, ct, profileId);
+            }
         }
         finally { await ReloadAsync(CancellationToken.None); }
         return importedProfileId;

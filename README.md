@@ -63,6 +63,20 @@ The **Downloads** page shows pending and failed requests. You can attach a ZIP
 manually if you already have it or download recognition misses it, retry a failed
 request, or cancel it.
 
+For mods without provider tracking, set a **Mod page** link in mod details.
+You can also enter the page URL in the confirmation dialog when importing a local
+ZIP or folder, including drag-and-drop imports.
+**Check updates** offers to open a **Manual checks** list for these mods. You can
+also open the list using the checklist icon beside Downloads in the sidebar.
+Open a page to check for a newer ZIP; Quartermaster matches new downloads by name
+and version, using token and fuzzy similarity for differing names. When versions
+cannot be compared, a strong name match needs a newer creation or modification
+timestamp. Parenthesized numbers such as `(2)` are not versions. Existing downloads
+are ignored. Apparently lower versions show a warning with an **Import anyway**
+option; uncertain matches need an explicit **Attach ZIP**. Updates keep the
+mod's position, group, and compatible options in profiles. **Mark checked** ends
+the watch when there is no update. Downloaded ZIPs remain in your browser's folder.
+
 ## Provider credentials
 
 Configure credentials in **Settings**, then click **Save**.

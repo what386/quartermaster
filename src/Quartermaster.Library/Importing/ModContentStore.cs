@@ -226,7 +226,8 @@ public sealed class ModContentStore : IModContentStore
             var (manifest, options) = await ManifestReader.ReadAsync(temporary, files, sets, cancellationToken).ConfigureAwait(false);
             var displayName = name ?? manifest?.Name ?? (Directory.Exists(source) ? new DirectoryInfo(source).Name : Path.GetFileNameWithoutExtension(source));
             var mod = new Mod(id, displayName.Trim(), manifest?.Description ?? "", manifest?.ModVersion,
-                Guid.TryParse(manifest?.Guid, out var manifestId) ? manifestId : null, DateTimeOffset.UtcNow, sets.ToArray(), options, []);
+                Guid.TryParse(manifest?.Guid, out var manifestId) ? manifestId : null, DateTimeOffset.UtcNow, sets.ToArray(), options, [])
+            { ImportedFileName = Directory.Exists(source) ? null : Path.GetFileName(source) };
             StateValidation.Validate(LibraryState.Empty with { Mods = [mod] });
             cancellationToken.ThrowIfCancellationRequested();
             Directory.Move(temporary, GetModDirectory(id));

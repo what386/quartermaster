@@ -1,16 +1,19 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.SettingsView" x:DataType="vm:SettingsViewModel">
-  <Grid RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+  <Grid RowDefinitions="Auto,*" IsEnabled="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
       <TextBlock Text="Settings" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
       <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search settings…" Margin="0,0,8,0" />
       <Button Grid.Column="2" Content="Reset" Command="{Binding ResetCommand}" ToolTip.Tip="Restore defaults. Click Save to keep them." Margin="0,0,8,0" />
       <Button Grid.Column="3" Content="Save" Classes="primary" Command="{Binding SaveCommand}" />
     </Grid>
-    <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><TextBlock Text="PREFERENCES" FontWeight="SemiBold" /></Border>
-    <ScrollViewer Grid.Row="2"><StackPanel Spacing="12">
-      <Border Classes="card" IsVisible="{Binding HasMatches}"><StackPanel Spacing="16">
+    <ScrollViewer Grid.Row="1"><StackPanel Spacing="12">
+      <Border x:Name="AppSettingsSection" Classes="card" IsVisible="{Binding ShowAppSettings}"><StackPanel Spacing="16">
+        <TextBlock Text="App settings" Classes="sectionTitle" />
         <vm:AppearanceSettingsView IsVisible="{Binding ShowAppearance}" />
+      </StackPanel></Border>
+      <Border x:Name="GameSettingsSection" Classes="card" IsVisible="{Binding ShowGameSettings}"><StackPanel Spacing="16">
+        <TextBlock Text="Game and deployment" Classes="sectionTitle" />
         <Grid x:Name="InstallationSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowInstallation}">
           <StackPanel Spacing="4"><TextBlock Text="Game folder" FontWeight="SemiBold" /><TextBlock Text="Installation or data folder" Classes="muted" FontSize="11" /></StackPanel>
           <StackPanel Grid.Column="1" Spacing="8">
@@ -30,8 +33,24 @@
           <StackPanel Spacing="4"><TextBlock Text="Repatching" FontWeight="SemiBold" /><TextBlock Text="Before deployment" Classes="muted" FontSize="11" /></StackPanel>
           <ComboBox Grid.Column="1" ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
         </Grid>
+      </StackPanel></Border>
+      <Border x:Name="DownloadsSettingsSection" Classes="card" IsVisible="{Binding ShowDownloads}"><StackPanel Spacing="16">
+        <TextBlock Text="Downloads" Classes="sectionTitle" />
+        <Grid ColumnDefinitions="180,*">
+          <StackPanel Spacing="4"><TextBlock Text="Download folder" FontWeight="SemiBold" /><TextBlock Text="Used for download scanning" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
+          <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+            <TextBox x:Name="DownloadFolderInput" Text="{Binding DownloadFolder, Mode=TwoWay}" PlaceholderText="Browser download folder" />
+            <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDownloadsCommand}" />
+          </Grid>
+        </Grid>
+      </StackPanel></Border>
+      <Border x:Name="ProviderSettingsSection" Classes="card" IsVisible="{Binding ShowProviderSettings}"><StackPanel Spacing="16">
+        <TextBlock Text="Providers" Classes="sectionTitle" />
         <vm:NexusSettingsView IsVisible="{Binding ShowNexus}" />
         <vm:GitHubSettingsView IsVisible="{Binding ShowGitHub}" />
+      </StackPanel></Border>
+      <Border x:Name="AppInformationSection" Classes="card" IsVisible="{Binding ShowAppInformation}"><StackPanel Spacing="16">
+        <TextBlock Text="App information" Classes="sectionTitle" />
         <Grid x:Name="StorageSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowStorage}">
           <TextBlock Text="Library storage" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" />

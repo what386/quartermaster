@@ -10,6 +10,7 @@
     <DataTemplate DataType="{x:Type profiles:ProfilesViewModel}"><profiles:ProfilesView /></DataTemplate>
     <DataTemplate DataType="{x:Type search:SearchViewModel}"><search:SearchView /></DataTemplate>
     <DataTemplate DataType="{x:Type services:ModDownloads}"><downloads:DownloadsView /></DataTemplate>
+    <DataTemplate DataType="{x:Type downloads:ManualChecksPageViewModel}" x:DataType="downloads:ManualChecksPageViewModel"><downloads:ManualChecksView DataContext="{Binding Downloads}" /></DataTemplate>
     <DataTemplate DataType="{x:Type settings:SettingsViewModel}"><settings:SettingsView /></DataTemplate>
   </Window.DataTemplates>
   <Grid>
@@ -47,14 +48,17 @@
               </Button>
             </StackPanel>
           </ScrollViewer>
-          <ItemsControl Grid.Row="3" ItemsSource="{Binding UtilityNavigationItems}" Margin="0,12">
-            <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:NavigationItem">
-              <Button Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
-                <shared:SvgIcon Source="{Binding IconSource}" Width="24" Height="24" Foreground="{Binding $parent[Button].Foreground}" />
-              </Button>
-            </DataTemplate></ItemsControl.ItemTemplate>
-          </ItemsControl>
+          <StackPanel Grid.Row="3" Margin="0,12">
+            <Border Height="1" Background="{DynamicResource LineBrush}" Margin="12,0,12,12" />
+            <ItemsControl ItemsSource="{Binding UtilityNavigationItems}">
+              <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:NavigationItem">
+                <Button Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
+                  <shared:SvgIcon Source="{Binding IconSource}" Width="24" Height="24" Foreground="{Binding $parent[Button].Foreground}" />
+                </Button>
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
         </Grid>
       </Border>
       <Border Grid.Column="1" Padding="12" ClipToBounds="True">

@@ -134,11 +134,25 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                 if (existing is not null)
                 {
                     await contents.DeleteAsync(imported.Id, CancellationToken.None).ConfigureAwait(false);
+                    existing = existing with
+                    {
+                        PageLink = existing.PageLink ?? ModLinks.PageFor(original),
+                        ImportedFileName = existing.ImportedFileName ?? original.ImportedFileName
+                    };
+                    mods[mods.FindIndex(mod => mod.Id == existing.Id)] = existing;
                     created.Remove(imported.Id); mapping.Add(original.Id, existing);
                 }
                 else
                 {
-                    imported = imported with { Description = original.Description, Version = original.Version, Sources = original.Sources };
+                    imported = imported with
+                    {
+                        Description = original.Description,
+                        Version = original.Version,
+                        Sources = original.Sources,
+                        PageLink = original.PageLink,
+                        ImportedFileName = original.ImportedFileName,
+                        Superseded = original.Superseded
+                    };
                     mods.Add(imported); mapping.Add(original.Id, imported);
                 }
             }

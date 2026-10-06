@@ -19,7 +19,7 @@ public abstract class DownloadScanner(TimeSpan? pollInterval = null, long maxByt
         else Process.Start(new ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true });
     }
 
-    public async Task WaitForDownloadAsync(ProviderFile expected, Func<IReadOnlyList<string>> directories,
+    public async Task<string> WaitForDownloadAsync(ProviderFile expected, Func<IReadOnlyList<string>> directories,
         string destination, CancellationToken ct = default)
     {
         if (interval <= TimeSpan.Zero || maxBytes <= 0) throw new ArgumentException("Invalid scanning limits.");
@@ -71,7 +71,7 @@ public abstract class DownloadScanner(TimeSpan? pollInterval = null, long maxByt
                         { rejected.Add((path, stamp.Size, stamp.LastWrite)); continue; }
                         ct.ThrowIfCancellationRequested();
                         File.Move(temporary, destination, overwrite: true);
-                        return;
+                        return info.Name;
                     }
                     catch (IOException) when (openingSource) { observed.Remove(path); }
                     catch (UnauthorizedAccessException) when (openingSource) { observed.Remove(path); }

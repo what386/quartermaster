@@ -10,6 +10,7 @@ public sealed record ProfileCreationRequest(string? Name = null, bool FromFile =
 public interface IDialogService
 {
     Task<ModImportRequest?> RequestModImportAsync();
+    Task<LocalModImportOptions?> ConfirmModImportAsync(string source);
     Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod);
     Task<string?> PickModZipAsync();
     Task<string?> SaveModZipAsync(string suggestedName);
@@ -17,13 +18,14 @@ public interface IDialogService
     Task<string?> SaveProfileZipAsync(string suggestedName);
     Task<ProfileCreationRequest?> RequestProfileCreationAsync();
     Task<string?> PickFolderAsync(string title);
-    Task<bool> ConfirmAsync(string title, string message, string acceptLabel);
+    Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel");
     Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null);
 }
 
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
     public Task<ModImportRequest?> RequestModImportAsync() => owner().ShowDialogAsync<ModImportRequest?>(new AddModDialog());
+    public Task<LocalModImportOptions?> ConfirmModImportAsync(string source) => owner().ShowDialogAsync<LocalModImportOptions?>(new ModImportDialog(source));
     public Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod) => owner().ShowDialogAsync<ProviderFile?>(new ModFilesDialog(mod));
     public async Task<ProfileCreationRequest?> RequestProfileCreationAsync()
     {
@@ -69,6 +71,6 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
         var folders = await owner().StorageProvider.OpenFolderPickerAsync(new() { Title = title, AllowMultiple = false });
         return folders.FirstOrDefault()?.TryGetLocalPath();
     }
-    public Task<bool> ConfirmAsync(string title, string message, string acceptLabel) =>
-        owner().ShowDialogAsync<bool>(new ConfirmationDialog(title, message, acceptLabel));
+    public Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel") =>
+        owner().ShowDialogAsync<bool>(new ConfirmationDialog(title, message, acceptLabel, cancelLabel));
 }

@@ -7,22 +7,28 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
 {
     public Task<LibraryState> LoadAsync(CancellationToken cancellationToken = default) => store.LoadAsync(cancellationToken);
 
-    public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default, Guid? profileId = null)
+    public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default, Guid? profileId = null, string? pageLink = null)
     {
+        pageLink = ModLinks.ValidatePage(pageLink);
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
         var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
         var target = profileId is null ? null : state.Profiles.SingleOrDefault(p => p.Id == profileId)
             ?? throw new KeyNotFoundException("Profile does not exist.");
         var mod = await contents.ImportAsync(source, name, cancellationToken).ConfigureAwait(false);
+        if (pageLink is not null) mod = mod with { PageLink = pageLink };
         var identity = ModIdentity.GetKey(mod);
         var existing = state.Mods.FirstOrDefault(item => ModIdentity.GetKey(item) == identity);
         if (existing is not null)
         {
             await contents.DeleteAsync(mod.Id, CancellationToken.None).ConfigureAwait(false);
-            if (target is not null && target.Entries.All(entry => entry.ModId != existing.Id))
-                await store.SaveAsync(state with
-                { Profiles = state.Profiles.Select(p => p.Id == target.Id ? ProfileEditor.Add(p, existing) : p).ToArray() }, cancellationToken).ConfigureAwait(false);
-            return existing;
+            var updatedExisting = pageLink is null ? existing : existing with { PageLink = pageLink };
+            var duplicateState = state;
+            if (updatedExisting != existing) duplicateState = duplicateState with
+            { Mods = state.Mods.Select(item => item.Id == existing.Id ? updatedExisting : item).ToArray() };
+            if (target is not null && target.Entries.All(entry => entry.ModId != existing.Id)) duplicateState = duplicateState with
+            { Profiles = state.Profiles.Select(p => p.Id == target.Id ? ProfileEditor.Add(p, updatedExisting) : p).ToArray() };
+            if (duplicateState != state) await store.SaveAsync(duplicateState, cancellationToken).ConfigureAwait(false);
+            return updatedExisting;
         }
         var updated = state with { Mods = [.. state.Mods, mod] };
         if (target is not null) updated = updated with
@@ -95,7 +101,33 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
         var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
         if (state.Mods.All(m => m.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
-        await store.SaveAsync(state with { Mods = state.Mods.Select(m => m.Id == modId ? m with { Sources = sources.ToArray() } : m).ToArray() }, cancellationToken).ConfigureAwait(false);
+        await store.SaveAsync(state with
+        {
+            Mods = state.Mods.Select(m => m.Id == modId ? m with
+            { Sources = sources.ToArray(), PageLink = m.PageLink ?? ModLinks.PageFor(m with { Sources = sources }) } : m).ToArray()
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task SetPageLinkAsync(Guid modId, string? link, CancellationToken ct = default)
+    {
+        link = ModLinks.ValidatePage(link);
+        await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
+        var state = await store.LoadAsync(ct).ConfigureAwait(false);
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        await store.SaveAsync(state with { Mods = state.Mods.Select(mod => mod.Id == modId ? mod with { PageLink = link } : mod).ToArray() }, ct).ConfigureAwait(false);
+    }
+
+    public async Task SetDownloadMetadataAsync(Guid modId, string filename, string? page, CancellationToken ct = default)
+    {
+        page = ModLinks.ValidatePage(page);
+        await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
+        var state = await store.LoadAsync(ct).ConfigureAwait(false);
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        await store.SaveAsync(state with
+        {
+            Mods = state.Mods.Select(mod => mod.Id == modId ? mod with
+            { ImportedFileName = filename, PageLink = page ?? mod.PageLink } : mod).ToArray()
+        }, ct).ConfigureAwait(false);
     }
 
     /// <summary>Updates profile references while preserving order, groups and compatible option selections.</summary>
@@ -123,6 +155,8 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         }
         await store.SaveAsync(state with
         {
+            Mods = state.Mods.Select(mod => mod.Id == oldId ? mod with { Superseded = true } :
+                mod.Id == newId ? mod with { Superseded = false, PageLink = oldMod.PageLink ?? mod.PageLink } : mod).ToArray(),
             Profiles = state.Profiles.Select(profile => profile.Entries.Any(e => e.ModId == oldId)
                 ? profile with { Entries = profile.Entries.Where(e => e.ModId != newId).Select(e => e.ModId == oldId ? Replace(e) : e).ToArray() }
                 : profile).ToArray()

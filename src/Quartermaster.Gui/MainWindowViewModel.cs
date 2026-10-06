@@ -7,6 +7,7 @@ using Quartermaster.Gui.Search;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Settings;
 using Quartermaster.Gui.Shared;
+using Quartermaster.Gui.Downloads;
 
 namespace Quartermaster.Gui;
 
@@ -18,10 +19,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         [new(PageKind.Mods, "Library", "library.svg"),
          new(PageKind.Profiles, "Profiles", "sliders.svg"),
          new(PageKind.Search, "Search", "search.svg"),
+         new(PageKind.ManualChecks, "Manual checks", "checklist.svg"),
          new(PageKind.Downloads, "Downloads", "downloads.svg"),
          new(PageKind.Settings, "Settings", "gear.svg")];
     public NavigationItem LibraryNavigation => NavigationItems.Single(item => item.Page == PageKind.Mods);
-    public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Downloads or PageKind.Settings).ToArray();
+    public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Downloads or PageKind.ManualChecks or PageKind.Settings).ToArray();
     public OperationState Operations { get; }
     public ModDownloads Downloads => services.Downloads;
     public bool ShowDownloadProgress => Downloads.HasPendingDownloads && SelectedNavigation.Page != PageKind.Downloads;
@@ -50,6 +52,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         this.services = services; Operations = services.Operations;
         services.Downloads.Changed += (_, _) => Notify(nameof(ShowDownloadProgress));
+        services.Downloads.ManualChecksRequested += (_, _) => Navigate(PageKind.ManualChecks);
         selected = NavigationItems.Single(item => item.Page == PageKind.Profiles); selected.IsActive = true;
         foreach (var item in NavigationItems) item.OpenCommand = new(() => Navigate(item.Page));
         pages = new()
@@ -58,6 +61,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             [PageKind.Profiles] = new ProfilesViewModel(services),
             [PageKind.Search] = new SearchViewModel(services),
             [PageKind.Downloads] = services.Downloads,
+            [PageKind.ManualChecks] = new ManualChecksPageViewModel(services.Downloads),
             [PageKind.Settings] = new SettingsViewModel(services)
         };
         AddProfileCommand = Operations.CreateCommand("Creating profile", async ct =>
