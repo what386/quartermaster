@@ -276,30 +276,30 @@ public sealed class ProviderManager(
     {
         var state = await library.LoadAsync(ct);
         foreach (var mod in state.Mods.Where(m => modIds is null || modIds.Contains(m.Id)))
-        foreach (var source in mod.Sources.Where(s => providers.ContainsKey(s.Provider)))
-        {
-            ProviderUpdate? update = null;
-            string? error = null;
-            try
+            foreach (var source in mod.Sources.Where(s => providers.ContainsKey(s.Provider)))
             {
-                update = await GetProvider(source.Provider).CheckUpdateAsync(source, ct);
+                ProviderUpdate? update = null;
+                string? error = null;
+                try
+                {
+                    update = await GetProvider(source.Provider).CheckUpdateAsync(source, ct);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    error = ex.Message;
+                }
+                await library.RecordUpdateCheckAsync(
+                    new(
+                        mod.Id,
+                        source.Provider,
+                        DateTimeOffset.UtcNow,
+                        update?.File?.Version,
+                        update?.File?.FileId,
+                        error ?? update?.Reason
+                    ),
+                    ct
+                );
             }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                error = ex.Message;
-            }
-            await library.RecordUpdateCheckAsync(
-                new(
-                    mod.Id,
-                    source.Provider,
-                    DateTimeOffset.UtcNow,
-                    update?.File?.Version,
-                    update?.File?.FileId,
-                    error ?? update?.Reason
-                ),
-                ct
-            );
-        }
     }
 
     public async Task<DownloadJob> QueueUpdateAsync(Guid modId, CancellationToken ct = default)
