@@ -16,7 +16,7 @@
       <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
     </StackPanel>
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-      <Button x:Name="UpdateModButton" Content="Update" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"
+      <Button x:Name="UpdateModButton" Content="Update" Classes="primary" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"
               ToolTip.Tip="{Binding UpdateDescription}" AutomationProperties.Name="Update mod" Padding="8,4" MinHeight="0" />
       <Border BorderBrush="{DynamicResource ClashBrush}" BorderThickness="1" CornerRadius="3" Padding="5,2" IsVisible="{Binding HasConflict}"><TextBlock Text="CLASH" Foreground="{DynamicResource ClashBrush}" FontSize="9" /></Border>
       <Button x:Name="ModOptionsButton" Width="28" Height="28" MinHeight="0" Padding="5" Background="Transparent" BorderThickness="0"

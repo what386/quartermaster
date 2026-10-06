@@ -9,9 +9,7 @@ public sealed partial class ModDownloads
     private IReadOnlyCollection<Guid>? manualScope;
     private readonly HashSet<Guid> reviewed = [];
     private readonly HashSet<Guid> completedManualJobs = [];
-    private int selectedTab;
     public Command RestartManualChecksCommand { get; }
-    public int SelectedTab { get => selectedTab; set => Set(ref selectedTab, value); }
     public IReadOnlyList<ManualCheckRow> ManualChecks { get; private set; } = [];
     public IReadOnlyList<ManualCheckRow> VisibleManualChecks => ManualChecks.Where(row => row.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
     public bool HasManualChecks => VisibleManualChecks.Count > 0;
@@ -23,7 +21,7 @@ public sealed partial class ModDownloads
         completedManualJobs.UnionWith(services.Providers.State.Jobs.Where(job => job.File.Provider == "manual" &&
             job.Status == DownloadStatus.Complete).Select(job => job.Id));
         reviewed.Clear(); Search = "";
-        RefreshManualChecks(); SelectedTab = 1;
+        RefreshManualChecks();
         ManualChecksRequested?.Invoke(this, EventArgs.Empty);
     }
     private void RefreshManualChecks()

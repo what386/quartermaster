@@ -11,7 +11,7 @@
           <mods:ModPageLinkView DataContext="{Binding Details}" />
           <TextBlock Text="Options" FontWeight="SemiBold" />
           <mods:ModOptionsView DataContext="{Binding Options}" PreviewRequested="OpenPreview" />
-          <Button Content="Apply options" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
+          <Button Content="Apply options" Classes="primary" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
           <TextBlock Text="Choose variants above, then apply them to this profile." Classes="muted" FontSize="11" TextWrapping="Wrap" />
           <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,6,0,0" Padding="0,12,0,0"><StackPanel Spacing="10">
             <TextBlock Text="COLLISIONS" Classes="eyebrow" />

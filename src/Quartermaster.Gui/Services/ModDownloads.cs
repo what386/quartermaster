@@ -98,10 +98,14 @@ public sealed partial class ModDownloads : ViewModelBase
         await services.Session.ReloadAsync(ct);
         var errors = services.Session.State.UpdateChecks.Where(check => check.CheckedAt >= started && check.Error is not null &&
             (modIds is null || modIds.Contains(check.ModId))).ToArray();
-        if (services.Session.State.Mods.Any(mod => !mod.Superseded && (modIds is null || modIds.Contains(mod.Id)) && !services.Providers.IsTracked(mod)))
-            ShowManualChecks(modIds);
         if (errors.Length > 0) throw new InvalidOperationException($"Could not check {ModPresentation.Count(errors.Length, "mod")}: " +
             string.Join(" ", errors.Select(check => check.Error).Distinct().Take(3)));
+        var manualMods = services.Session.State.Mods.Where(mod => !mod.Superseded &&
+            (modIds is null || modIds.Contains(mod.Id)) && !services.Providers.IsTracked(mod)).ToArray();
+        if (manualMods.Length > 0 && await services.Dialogs.ConfirmAsync("Manual update checks",
+            $"{ModPresentation.Count(manualMods.Length, "mod")} {(manualMods.Length == 1 ? "needs" : "need")} a manual update check. Open the checklist now?",
+            "Open manual checks", "Not now"))
+            ShowManualChecks(manualMods.Select(mod => mod.Id).ToArray());
     }
     public UpdateCheck? AvailableUpdate(Mod mod) => services.Session.State.UpdateChecks.FirstOrDefault(check =>
         check.ModId == mod.Id && check.Error is null && check.AvailableFileId is not null &&

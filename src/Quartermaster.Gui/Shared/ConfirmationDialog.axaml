@@ -4,7 +4,7 @@
     <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
     <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="Cancel" Click="CancelConfirmation" />
+      <Button x:Name="CancelButton" Content="Cancel" Click="CancelConfirmation" />
       <Button x:Name="AcceptButton" Classes="primary" Click="AcceptConfirmation" />
     </StackPanel>
   </StackPanel>

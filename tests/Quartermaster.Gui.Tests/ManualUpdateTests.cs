@@ -15,6 +15,44 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ManualUpdateTests
 {
     [AvaloniaTheory]
+    [InlineData(true, true)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(false, false)]
+    public async Task CheckingUpdatesOffersManualChecksAndPreservesThePageWhenDeclined(bool accept, bool profileScope)
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await f.Services.Session.ImportAsync(f.Zip("Profile mod"), CancellationToken.None, f.Services.Session.ActiveProfile!.Id);
+        await f.Services.Session.ImportAsync(f.Zip("Library mod", 2), CancellationToken.None);
+        f.Dialogs.Confirm = accept;
+        var page = profileScope ? PageKind.Profiles : PageKind.Mods;
+        f.Shell.NavigationItems.Single(item => item.Page == page).OpenCommand.Execute(null);
+        if (profileScope) await Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage).CheckUpdatesCommand.ExecuteAsync();
+        else await Assert.IsType<ModsViewModel>(f.Shell.CurrentPage).CheckUpdatesCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError);
+        var prompt = Assert.Single(f.Dialogs.Confirmations);
+        Assert.Equal("Manual update checks", prompt.Title);
+        Assert.Contains(profileScope ? "1 mod needs" : "2 mods need", prompt.Message);
+        Assert.Equal("Open manual checks", prompt.AcceptLabel); Assert.Equal("Not now", prompt.CancelLabel);
+        Assert.Equal(accept ? PageKind.ManualChecks : page, f.Shell.SelectedNavigation.Page);
+        if (accept)
+        {
+            Assert.Equal(profileScope ? 1 : 2, f.Services.Downloads.ManualChecks.Count);
+            if (profileScope) Assert.Equal("Profile mod", Assert.Single(f.Services.Downloads.ManualChecks).Name);
+        }
+        Assert.Empty(f.Services.Providers.State.Jobs); Assert.Empty(f.BrowserRequests);
+    }
+
+    [AvaloniaFact]
+    public async Task CheckingUpdatesWithoutManualModsDoesNotPrompt()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        await Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage).CheckUpdatesCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError); Assert.Empty(f.Dialogs.Confirmations);
+        Assert.Equal(PageKind.Profiles, f.Shell.SelectedNavigation.Page);
+    }
+
+    [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task AutomaticallyImportedZipFinishesTheCheckEvenWithIdenticalContents(bool identical)
@@ -90,14 +128,14 @@ public sealed class ManualUpdateTests
         var profiles = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
         Assert.Equal(details.PageLink, profiles.Details!.PageLink);
         await profiles.CheckUpdatesCommand.ExecuteAsync();
-        Assert.Equal(PageKind.Downloads, f.Shell.SelectedNavigation.Page);
-        Assert.Equal(1, f.Services.Downloads.SelectedTab);
+        Assert.Equal(PageKind.ManualChecks, f.Shell.SelectedNavigation.Page);
         Assert.Single(f.Services.Downloads.ManualChecks);
         var window = new MainWindow { DataContext = f.Shell }; window.Show();
         try
         {
             window.CaptureRenderedFrame()?.Dispose();
             Assert.Single(window.GetVisualDescendants().OfType<ManualChecksView>());
+            Assert.Empty(window.GetVisualDescendants().OfType<DownloadsView>());
             var row = Assert.Single(f.Services.Downloads.ManualChecks);
             await row.OpenCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
             Assert.Equal(2, f.BrowserRequests.Count);
@@ -106,9 +144,9 @@ public sealed class ManualUpdateTests
             Assert.True(overlay.IsVisible);
             Assert.Equal("Waiting for 1 matching ZIP", f.Services.Downloads.PendingSummary);
             Assert.Equal("Watching your download folder for matching ZIPs.", f.Services.Downloads.PendingExplanation);
-            f.Services.Downloads.SelectedTab = 0; Dispatcher.UIThread.RunJobs();
+            f.Shell.NavigationItems.Single(item => item.Page == PageKind.Downloads).OpenCommand.Execute(null); Dispatcher.UIThread.RunJobs();
             Assert.False(overlay.IsVisible);
-            f.Services.Downloads.SelectedTab = 1; Dispatcher.UIThread.RunJobs();
+            f.Shell.NavigationItems.Single(item => item.Page == PageKind.ManualChecks).OpenCommand.Execute(null); Dispatcher.UIThread.RunJobs();
             Assert.True(overlay.IsVisible);
             f.Shell.NavigationItems.Single(item => item.Page == PageKind.Mods).OpenCommand.Execute(null);
             Dispatcher.UIThread.RunJobs(); Assert.True(overlay.IsVisible);

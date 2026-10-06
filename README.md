@@ -74,7 +74,8 @@ request, or cancel it.
 For mods without provider tracking, set a **Mod page** link in mod details.
 You can also enter the page URL in the confirmation dialog when importing a local
 ZIP or folder, including drag-and-drop imports.
-**Check updates** opens a **Manual checks** list for these mods in Downloads.
+**Check updates** offers to open a **Manual checks** list for these mods. You can
+also open the list using the checklist icon beside Downloads in the sidebar.
 Open a page to check for a newer ZIP; Quartermaster matches new downloads by name
 and version, using token and fuzzy similarity for differing names. When versions
 cannot be compared, a strong name match needs a newer creation or modification

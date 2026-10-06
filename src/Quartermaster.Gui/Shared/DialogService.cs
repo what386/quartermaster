@@ -18,7 +18,7 @@ public interface IDialogService
     Task<string?> SaveProfileZipAsync(string suggestedName);
     Task<ProfileCreationRequest?> RequestProfileCreationAsync();
     Task<string?> PickFolderAsync(string title);
-    Task<bool> ConfirmAsync(string title, string message, string acceptLabel);
+    Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel");
     Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null);
 }
 
@@ -71,6 +71,6 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
         var folders = await owner().StorageProvider.OpenFolderPickerAsync(new() { Title = title, AllowMultiple = false });
         return folders.FirstOrDefault()?.TryGetLocalPath();
     }
-    public Task<bool> ConfirmAsync(string title, string message, string acceptLabel) =>
-        owner().ShowDialogAsync<bool>(new ConfirmationDialog(title, message, acceptLabel));
+    public Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel") =>
+        owner().ShowDialogAsync<bool>(new ConfirmationDialog(title, message, acceptLabel, cancelLabel));
 }

@@ -1,8 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:services="clr-namespace:Quartermaster.Gui.Services" xmlns:downloads="clr-namespace:Quartermaster.Gui.Downloads" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+             xmlns:services="clr-namespace:Quartermaster.Gui.Services" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              x:Class="Quartermaster.Gui.Downloads.DownloadsView" x:DataType="services:ModDownloads">
-  <TabControl SelectedIndex="{Binding SelectedTab, Mode=TwoWay}">
-    <TabItem Header="Downloads">
   <Grid RowDefinitions="Auto,Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
       <TextBlock Text="Downloads" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
@@ -19,7 +17,7 @@
                 <shared:BusySpinner IsVisible="{Binding IsActive}" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
                 <WrapPanel Grid.Column="2" MaxWidth="470" Orientation="Horizontal" VerticalAlignment="Center">
-                  <Button Content="{Binding OpenLabel}" Command="{Binding OpenCommand}" Margin="4" />
+                  <Button Content="{Binding OpenLabel}" Classes.primary="{Binding IsWaiting}" Command="{Binding OpenCommand}" Margin="4" />
                   <Button Content="Attach ZIP" Command="{Binding AttachCommand}" IsVisible="{Binding CanAttach}" Margin="4" />
                   <Button Content="Import anyway" Command="{Binding ConfirmCommand}" IsVisible="{Binding CanConfirm}" Margin="4" />
                   <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" Margin="4" />
@@ -34,7 +32,4 @@
       <TextBlock Text="{Binding EmptyMessage}" IsVisible="{Binding !HasVisibleJobs}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
     </Grid>
   </Grid>
-    </TabItem>
-    <TabItem Header="Manual checks"><downloads:ManualChecksView /></TabItem>
-  </TabControl>
 </UserControl>
