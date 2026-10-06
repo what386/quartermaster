@@ -1,6 +1,15 @@
 # Changelog — Untitled
 
-*Generated on 2026-10-05*
+*Generated on 2026-10-06*
+
+## 0.2.2 — 2026-10-06
+
+### Changes
+
+- change release format to zip
+- color theming support
+- change default colortheme
+
 
 ## 0.2.1 — 2026-10-05
 
