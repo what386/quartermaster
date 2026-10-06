@@ -22,13 +22,13 @@ public sealed partial class SettingsViewModel
     public bool RemoveGitHubToken { get => removeGitHubToken; set { if (Set(ref removeGitHubToken, value)) SaveCommand.Refresh(); } }
     public bool HasSavedGitHubToken { get => hasSavedGitHubToken; private set => Set(ref hasSavedGitHubToken, value); }
     public string GitHubAccount { get => githubAccount; private set => Set(ref githubAccount, value); }
-    public bool ShowGitHub => Matches("GitHub provider account API key personal access token authentication rate limits");
+    public bool ShowGitHub => Matches("GitHub providers account API key personal access token authentication rate limits");
     public string NexusApiKey { get => nexusApiKey; set { if (Set(ref nexusApiKey, value)) SaveCommand.Refresh(); } }
     public bool RemoveNexusKey { get => removeNexusKey; set { if (Set(ref removeNexusKey, value)) SaveCommand.Refresh(); } }
     public bool HasSavedNexusKey { get => hasSavedNexusKey; private set => Set(ref hasSavedNexusKey, value); }
     public string NexusAccount { get => nexusAccount; private set => Set(ref nexusAccount, value); }
     public string DownloadFolder { get => downloadFolder; set { if (Set(ref downloadFolder, value)) SaveCommand.Refresh(); } }
-    public bool ShowNexus => Matches("Nexus Mods provider account API key authentication nxm downloads browser folder");
+    public bool ShowNexus => Matches("Nexus Mods providers account API key authentication nxm");
     private bool ProviderDraftChanged => !string.IsNullOrWhiteSpace(NexusApiKey) || RemoveNexusKey && HasSavedNexusKey ||
         !string.IsNullOrWhiteSpace(GitHubToken) || RemoveGitHubToken && HasSavedGitHubToken || DownloadFolder != savedDownloadFolder;
     public AsyncCommand BrowseDownloadsCommand { get; private set; } = null!;

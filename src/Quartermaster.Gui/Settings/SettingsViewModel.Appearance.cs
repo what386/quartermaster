@@ -18,7 +18,7 @@ public sealed partial class SettingsViewModel
         get => accentColor;
         set { if (Set(ref accentColor, Color.FromRgb(value.R, value.G, value.B))) PreviewAppearance(); }
     }
-    public bool ShowAppearance => Matches("Appearance theme palette accent color dark slate light");
+    public bool ShowAppearance => Matches("App settings Appearance theme palette accent color dark slate light");
     private bool ValidAppearance => ThemeChoice >= 0 && ThemeChoice < ThemeChoices.Count;
     private bool AppearanceChanged => ThemeChoice != (int)Session.Settings.Theme ||
         ThemeManager.Format(AccentColor) != ThemeManager.Format(Color.Parse(Session.Settings.AccentColor));

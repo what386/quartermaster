@@ -3,14 +3,12 @@
   <Grid ColumnDefinitions="180,*">
     <StackPanel Spacing="4"><TextBlock Text="Nexus Mods" FontWeight="SemiBold" /><TextBlock Text="{Binding NexusAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
     <StackPanel Grid.Column="1" Spacing="8">
-      <TextBox Text="{Binding NexusApiKey}" PasswordChar="●" IsEnabled="{Binding !RemoveNexusKey}" PlaceholderText="Paste your personal API key, then Save" />
-      <CheckBox Content="Remove saved API key" IsChecked="{Binding RemoveNexusKey}" IsVisible="{Binding HasSavedNexusKey}" />
-      <TextBlock Text="Get your personal key from Nexus account settings → API. Your saved key is kept separately from profile exports." Classes="muted" FontSize="11" TextWrapping="Wrap" />
-      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-        <TextBox Text="{Binding DownloadFolder}" PlaceholderText="Browser download folder" />
-        <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDownloadsCommand}" />
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" MaxWidth="760" HorizontalAlignment="Left">
+        <TextBox x:Name="NexusApiKeyInput" Text="{Binding NexusApiKey}" PasswordChar="●" IsEnabled="{Binding !RemoveNexusKey}" PlaceholderText="Personal API key" MinWidth="260" VerticalAlignment="Center" />
+        <CheckBox Grid.Column="1" x:Name="RemoveNexusKeyInput" Content="Remove saved key" IsChecked="{Binding RemoveNexusKey, Mode=TwoWay}" IsEnabled="{Binding HasSavedNexusKey}" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Content="Register nxm links" Command="{Binding RegisterNxmCommand}" VerticalAlignment="Center" />
       </Grid>
-      <Button Content="Register nxm links" Command="{Binding RegisterNxmCommand}" HorizontalAlignment="Left" />
+      <TextBlock Text="Get your personal key from Nexus account settings → API, and scroll until you see a long string of characters." Classes="muted" FontSize="11" TextWrapping="Wrap" />
     </StackPanel>
   </Grid>
 </UserControl>

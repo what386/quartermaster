@@ -2,12 +2,10 @@
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.AppearanceSettingsView" x:DataType="vm:SettingsViewModel">
   <Grid ColumnDefinitions="180,*">
     <StackPanel Spacing="4"><TextBlock Text="Appearance" FontWeight="SemiBold" /><TextBlock Text="Preview changes before saving" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
-    <StackPanel Grid.Column="1" Spacing="8">
-      <ComboBox x:Name="ThemeSelector" ItemsSource="{Binding ThemeChoices}" SelectedIndex="{Binding ThemeChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
-      <StackPanel Orientation="Horizontal" Spacing="12">
-        <TextBlock Text="Accent color" VerticalAlignment="Center" />
-        <ColorPicker x:Name="AccentPicker" Color="{Binding AccentColor, Mode=TwoWay}" IsAlphaEnabled="False" />
-      </StackPanel>
-    </StackPanel>
+    <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,320" ColumnSpacing="12" HorizontalAlignment="Left">
+      <TextBlock Text="Accent color" VerticalAlignment="Center" />
+      <ColorPicker Grid.Column="1" x:Name="AccentPicker" Color="{Binding AccentColor, Mode=TwoWay}" IsAlphaEnabled="False" VerticalAlignment="Center" />
+      <ComboBox Grid.Column="2" x:Name="ThemeSelector" ItemsSource="{Binding ThemeChoices}" SelectedIndex="{Binding ThemeChoice, Mode=TwoWay}" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
+    </Grid>
   </Grid>
 </UserControl>

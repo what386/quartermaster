@@ -42,6 +42,8 @@ public sealed class ModDownloadTests
             window.CaptureRenderedFrame()?.Dispose();
             var view = Assert.Single(window.GetVisualDescendants().OfType<GitHubSettingsView>());
             Assert.Equal('●', view.FindControl<TextBox>("GitHubTokenInput")!.PasswordChar);
+            var remove = view.FindControl<CheckBox>("RemoveGitHubTokenInput")!;
+            Assert.True(remove.IsEffectivelyVisible); Assert.False(remove.IsEffectivelyEnabled);
             settings.GitHubToken = "personal-token"; Assert.True(settings.SaveCommand.CanExecute(null));
             await settings.SaveCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
             Assert.True(settings.HasSavedGitHubToken); Assert.Equal("diver", settings.GitHubAccount);
@@ -50,8 +52,13 @@ public sealed class ModDownloadTests
             Assert.DoesNotContain("personal-token", File.ReadAllText(Path.Combine(f.Data, "log.jsonl")));
             await settings.InitializeProviderSettingsAsync(CancellationToken.None);
             Assert.True(settings.HasSavedGitHubToken); Assert.Empty(settings.GitHubToken);
-            settings.RemoveGitHubToken = true; await settings.SaveCommand.ExecuteAsync();
+            Dispatcher.UIThread.RunJobs(); Assert.True(remove.IsEffectivelyEnabled);
+            remove.IsChecked = true; Dispatcher.UIThread.RunJobs();
+            Assert.True(settings.RemoveGitHubToken);
+            Assert.Equal("personal-token", await f.Services.Keys.GetAsync("github"));
+            await settings.SaveCommand.ExecuteAsync();
             Assert.False(f.Services.Operations.IsError); Assert.False(settings.HasSavedGitHubToken); Assert.Null(await f.Services.Keys.GetAsync("github"));
+            Dispatcher.UIThread.RunJobs(); Assert.True(remove.IsEffectivelyVisible); Assert.False(remove.IsEffectivelyEnabled);
         }
         finally { window.Close(); }
     }
