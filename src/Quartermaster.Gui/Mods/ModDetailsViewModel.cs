@@ -1,11 +1,35 @@
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Shared;
+using Quartermaster.Gui.Services;
 
 namespace Quartermaster.Gui.Mods;
 
-public sealed class ModDetailsViewModel(Mod mod) : ViewModelBase
+public sealed class ModDetailsViewModel : ViewModelBase
 {
+    private readonly Mod mod;
+    private string pageLink;
+    private string savedPage;
+    public string PageLink { get => pageLink; set { if (Set(ref pageLink, value)) { SavePageCommand.Refresh(); OpenPageCommand.Refresh(); } } }
+    public AsyncCommand SavePageCommand { get; }
+    public AsyncCommand OpenPageCommand { get; }
+    public ModDetailsViewModel(Mod mod, AppServices services)
+    {
+        this.mod = mod;
+        pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
+        SavePageCommand = services.Operations.CreateCommand("Saving mod page", async ct =>
+        {
+            await services.Library.SetPageLinkAsync(mod.Id, PageLink, ct);
+            savedPage = PageLink = ModLinks.ValidatePage(PageLink) ?? "";
+            await services.Session.ReloadAsync(ct);
+        }, () => PageLink.Trim() != savedPage);
+        OpenPageCommand = services.Operations.CreateCommand("Opening mod page", _ =>
+        {
+            var link = ModLinks.ValidatePage(PageLink);
+            if (link is not null) services.OpenBrowser(new Uri(link));
+            return Task.CompletedTask;
+        }, () => !string.IsNullOrWhiteSpace(PageLink));
+    }
     public string Name => mod.Name;
     public string Description => string.IsNullOrWhiteSpace(mod.Description) ? "No description provided." : mod.Description;
     public string Version => mod.Version ?? "Not specified";

@@ -7,7 +7,31 @@ public sealed record PatchSet(Guid Id, string Archive, int OriginalSlot, string 
     IReadOnlyList<PatchFile> Files, IReadOnlyList<ResourceKey> Resources);
 public sealed record Mod(Guid Id, string Name, string Description, string? Version, Guid? ManifestId,
     DateTimeOffset ImportedAt, IReadOnlyList<PatchSet> PatchSets, IReadOnlyList<ModOption> Options,
-    IReadOnlyList<SourceReference> Sources);
+    IReadOnlyList<SourceReference> Sources)
+{
+    public string? PageLink { get; init; }
+    public string? ImportedFileName { get; init; }
+    public bool Superseded { get; init; }
+}
+
+public static class ModLinks
+{
+    public static string? PageFor(Mod mod) => mod.PageLink ?? mod.Sources.Select(source => source.Provider switch
+    {
+        "nexusmods" when long.TryParse(source.ModId, out var id) && id > 0 => $"https://www.nexusmods.com/helldivers2/mods/{id}",
+        "github" when source.ModId.Split('/') is [var owner, var repo] && owner.Length > 0 && repo.Length > 0
+            => $"https://github.com/{Uri.EscapeDataString(owner)}/{Uri.EscapeDataString(repo)}",
+        _ => null
+    }).FirstOrDefault(link => link is not null);
+
+    public static string? ValidatePage(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return null;
+        if (!Uri.TryCreate(value.Trim(), UriKind.Absolute, out var uri) || uri.Scheme != "https" || uri.UserInfo != "" || !uri.IsDefaultPort)
+            throw new ArgumentException("Enter a public HTTPS mod page link.");
+        return uri.AbsoluteUri;
+    }
+}
 public sealed record ModOptionImages(Guid OptionId, string? ImagePath, IReadOnlyList<ModChoiceImage> Choices);
 public sealed record ModChoiceImage(string? ImagePath, string Description);
 public sealed record LibraryState(int SchemaVersion, IReadOnlyList<Mod> Mods,

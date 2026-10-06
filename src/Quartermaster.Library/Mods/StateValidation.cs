@@ -13,6 +13,9 @@ public static class StateValidation
         foreach (var mod in state.Mods)
         {
             if (string.IsNullOrWhiteSpace(mod.Name) || mod.PatchSets.Count == 0) throw new ArgumentException("Invalid mod metadata.");
+            ModLinks.ValidatePage(mod.PageLink);
+            if (mod.ImportedFileName is { } filename && (string.IsNullOrWhiteSpace(filename) || filename.IndexOfAny(['/', '\\']) >= 0))
+                throw new ArgumentException("Invalid imported filename.");
             Unique(mod.PatchSets.Select(p => p.Id)); Unique(mod.Options.Select(o => o.Id));
             if (mod.Sources.Any(s => string.IsNullOrWhiteSpace(s.Provider) || string.IsNullOrWhiteSpace(s.ModId)))
                 throw new ArgumentException("Invalid provider reference.");

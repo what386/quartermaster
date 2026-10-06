@@ -24,7 +24,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Downloads or PageKind.Settings).ToArray();
     public OperationState Operations { get; }
     public ModDownloads Downloads => services.Downloads;
-    public bool ShowDownloadProgress => Downloads.HasPendingDownloads && SelectedNavigation.Page != PageKind.Downloads;
+    public bool ShowDownloadProgress => Downloads.HasPendingDownloads &&
+        (SelectedNavigation.Page != PageKind.Downloads || Downloads.SelectedTab != 0);
     public NavigationItem SelectedNavigation
     {
         get => selected;
@@ -50,6 +51,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         this.services = services; Operations = services.Operations;
         services.Downloads.Changed += (_, _) => Notify(nameof(ShowDownloadProgress));
+        services.Downloads.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ModDownloads.SelectedTab)) Notify(nameof(ShowDownloadProgress));
+        };
+        services.Downloads.ManualChecksRequested += (_, _) => Navigate(PageKind.Downloads);
         selected = NavigationItems.Single(item => item.Page == PageKind.Profiles); selected.IsActive = true;
         foreach (var item in NavigationItems) item.OpenCommand = new(() => Navigate(item.Page));
         pages = new()

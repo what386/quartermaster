@@ -22,6 +22,10 @@ internal sealed class FakeDialogs : IDialogService
     public Quartermaster.Providers.Clients.ProviderFile? ModFile { get; set; }
     public bool CancelModFile { get; set; }
     public Task<Quartermaster.Gui.Mods.ModImportRequest?> RequestModImportAsync() => Task.FromResult(ModImport);
+    public Quartermaster.Gui.Mods.LocalModImportOptions? ImportOptions { get; set; } = new();
+    public List<string> ImportConfirmations { get; } = [];
+    public Task<Quartermaster.Gui.Mods.LocalModImportOptions?> ConfirmModImportAsync(string source)
+    { ImportConfirmations.Add(source); return Task.FromResult(ImportOptions); }
     public Task<Quartermaster.Providers.Clients.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Clients.ProviderMod mod) => Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault());
     public string? ZipPath { get; set; }
     public string? FolderPath { get; set; }

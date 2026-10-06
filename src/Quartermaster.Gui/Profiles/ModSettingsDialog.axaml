@@ -8,6 +8,7 @@
         <Border Classes="card"><ScrollViewer><StackPanel Spacing="12">
           <TextBlock Text="SELECTED MOD" Classes="eyebrow" />
           <TextBlock Text="{Binding SelectedModName}" Classes="sectionTitle" TextWrapping="Wrap" />
+          <mods:ModPageLinkView DataContext="{Binding Details}" />
           <TextBlock Text="Options" FontWeight="SemiBold" />
           <mods:ModOptionsView DataContext="{Binding Options}" PreviewRequested="OpenPreview" />
           <Button Content="Apply options" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />

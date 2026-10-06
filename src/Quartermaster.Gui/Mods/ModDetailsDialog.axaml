@@ -5,6 +5,7 @@
       <StackPanel Spacing="18">
         <TextBlock Text="{Binding Name}" Classes="sectionTitle" TextWrapping="Wrap" />
         <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+        <vm:ModPageLinkView />
         <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto"><TextBlock Text="Version" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding Version}" /><TextBlock Grid.Row="1" Text="Imported" Classes="muted" Margin="0,8,0,0" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ImportedAt}" Margin="0,8,0,0" /></Grid>
         <TextBlock Text="{Binding ResourceSummary}" TextWrapping="Wrap" />
         <TextBlock Text="This mod has options. Configure them in Profiles." IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />

@@ -51,7 +51,7 @@ public sealed class AppServices : IAsyncDisposable
         Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Clients.NexusMods.NexusAdapter(Nexus), GitHub], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
-            discover ?? (() => SteamGameDiscovery.FindInstallations()));
+            discover ?? (() => SteamGameDiscovery.FindInstallations()), Dialogs);
         Session.Changed += (_, _) => Theme.Load(Session.Settings);
         Downloads = new(this);
     }

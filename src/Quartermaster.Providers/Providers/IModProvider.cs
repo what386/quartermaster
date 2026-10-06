@@ -4,7 +4,10 @@ using Quartermaster.Providers.Downloads;
 namespace Quartermaster.Providers.Clients;
 
 public sealed record ProviderFile(string Provider, string ModId, string FileId, string Name, string FileName,
-    string? Version, Uri DownloadPage, bool IsPrimary = false, long? Size = null, string? Sha256 = null, string? Md5 = null);
+    string? Version, Uri DownloadPage, bool IsPrimary = false, long? Size = null, string? Sha256 = null, string? Md5 = null)
+{
+    public Uri? PageLink { get; init; }
+}
 public sealed record ProviderMod(string ModId, string Name, string Summary, string? Version, Uri Page, IReadOnlyList<ProviderFile> Files)
 {
     public bool DownloadsDirectly { get; init; }
@@ -22,6 +25,7 @@ public interface IModProvider
     string Id { get; }
     string DisplayName => Id;
     bool SupportsSearch => true;
+    bool SupportsUpdateChecks => true;
     bool DownloadsDirectly => false;
     bool CanHandle(Uri link);
     bool IsDownloadLink(Uri link) => false;

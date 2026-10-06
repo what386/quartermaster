@@ -10,6 +10,7 @@ public sealed record ProfileCreationRequest(string? Name = null, bool FromFile =
 public interface IDialogService
 {
     Task<ModImportRequest?> RequestModImportAsync();
+    Task<LocalModImportOptions?> ConfirmModImportAsync(string source);
     Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod);
     Task<string?> PickModZipAsync();
     Task<string?> SaveModZipAsync(string suggestedName);
@@ -24,6 +25,7 @@ public interface IDialogService
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
     public Task<ModImportRequest?> RequestModImportAsync() => owner().ShowDialogAsync<ModImportRequest?>(new AddModDialog());
+    public Task<LocalModImportOptions?> ConfirmModImportAsync(string source) => owner().ShowDialogAsync<LocalModImportOptions?>(new ModImportDialog(source));
     public Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod) => owner().ShowDialogAsync<ProviderFile?>(new ModFilesDialog(mod));
     public async Task<ProfileCreationRequest?> RequestProfileCreationAsync()
     {

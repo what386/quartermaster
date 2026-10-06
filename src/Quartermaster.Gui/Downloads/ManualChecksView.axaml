@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:Quartermaster.Gui.Services"
+             x:Class="Quartermaster.Gui.Downloads.ManualChecksView" x:DataType="services:ModDownloads">
+  <Grid RowDefinitions="Auto,Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,8">
+      <TextBlock Text="Manual checks" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search mods to check…" />
+      <Button Grid.Column="2" Content="All library mods" Command="{Binding RestartManualChecksCommand}" Margin="8,0,0,0" />
+    </Grid>
+    <TextBlock Grid.Row="1" Text="These mods need you to check their pages for updates. Opening a page starts watching your download folder and imports matching ZIPs automatically. Updated mods leave this list. Mark checked ends the watch when no update is available." Classes="muted" TextWrapping="Wrap" Margin="0,0,0,12" />
+    <Border Grid.Row="2" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="MODS TO CHECK" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding ManualCount}" /></Grid></Border>
+    <Grid Grid.Row="3">
+      <ScrollViewer>
+        <ItemsControl ItemsSource="{Binding VisibleManualChecks}">
+          <ItemsControl.ItemTemplate><DataTemplate x:DataType="services:ManualCheckRow">
+            <Border Classes="card" Margin="0,0,0,8">
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                <StackPanel VerticalAlignment="Center" Spacing="4">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding PageLink}" Classes="muted" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Filename}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding Warning}" IsVisible="{Binding CanConfirm}" TextWrapping="Wrap" />
+                </StackPanel>
+                <WrapPanel Grid.Column="1" MaxWidth="480" VerticalAlignment="Center">
+                  <Button Content="Set page" Command="{Binding SetPageCommand}" Margin="4" />
+                  <Button Content="Open page and watch" Classes="primary" Command="{Binding OpenCommand}" Margin="4" />
+                  <Button Content="Attach ZIP" Command="{Binding AttachCommand}" Margin="4" />
+                  <Button Content="Import anyway" Command="{Binding ConfirmCommand}" IsVisible="{Binding CanConfirm}" Margin="4" />
+                  <Button Content="Mark checked" Command="{Binding DoneCommand}" Margin="4" />
+                </WrapPanel>
+              </Grid>
+            </Border>
+          </DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+      <TextBlock Text="No mods need a manual check in this list." IsVisible="{Binding !HasManualChecks}" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+  </Grid>
+</UserControl>

@@ -11,6 +11,21 @@ namespace Quartermaster.Library.Tests;
 
 public class LibraryTests
 {
+    [Fact]
+    public async Task ImportPageIsSavedForNewAndDuplicateModsAndBlankPreservesIt()
+    {
+        using var f = new Fixture(); var source = f.Source("Mod");
+        await Assert.ThrowsAsync<ArgumentException>(() => f.Library.ImportAsync(source, pageLink: "not a URL"));
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+        var mod = await f.Library.ImportAsync(source, pageLink: "https://mods.example/first");
+        Assert.Equal("https://mods.example/first", mod.PageLink);
+        var duplicate = await f.Library.ImportAsync(source, pageLink: "https://mods.example/updated");
+        Assert.Equal(mod.Id, duplicate.Id); Assert.Equal("https://mods.example/updated", duplicate.PageLink);
+        var unchanged = await f.Library.ImportAsync(source, pageLink: " ");
+        Assert.Equal(duplicate.Id, unchanged.Id); Assert.Equal(duplicate.PageLink, unchanged.PageLink);
+        Assert.Equal("https://mods.example/updated", Assert.Single((await f.Library.LoadAsync()).Mods).PageLink);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

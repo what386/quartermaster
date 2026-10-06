@@ -72,10 +72,11 @@ public sealed partial class ProfilesViewModel : SessionViewModel
             if (value is not null || selectedListItem is ProfileModItem)
             { selectedListItem = value; Notify(nameof(SelectedListItem)); }
             Options = value is null ? null : new(value.Mod, value.Entry.Options, Session.GetOptionImages(value.Mod));
-            Notify(nameof(Options)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
+            Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
         }
     }
     public ModOptionsViewModel? Options { get; private set; }
+    public ModDetailsViewModel? Details => SelectedMod is null ? null : new(SelectedMod.Mod, Services);
     public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value)) AddCommand.Refresh(); } }
     public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
     public AsyncCommand MakeActiveCommand { get; }

@@ -77,7 +77,7 @@ public sealed class ModsViewModel : SessionViewModel
             if (value is not null) SelectedMods.Add(value);
         }
     }
-    public ModDetailsViewModel? Details => SelectedMods.Count == 1 ? new(SelectedMods[0].Mod) : null;
+    public ModDetailsViewModel? Details => SelectedMods.Count == 1 ? new(SelectedMods[0].Mod, Services) : null;
     public bool HasMods => Session.State.Mods.Count > 0;
     public bool HasVisibleMods => Mods.Count > 0;
     public string EmptyMessage => HasMods ? "No mods match your search." : "Add a mod link, ZIP or folder to your library.";

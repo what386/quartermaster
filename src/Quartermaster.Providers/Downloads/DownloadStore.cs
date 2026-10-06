@@ -4,9 +4,15 @@ using Quartermaster.Providers.Clients;
 
 namespace Quartermaster.Providers.Downloads;
 
-public enum DownloadStatus { Waiting, Downloading, Importing, Complete, Failed, Cancelled }
+public enum DownloadStatus { Waiting, Downloading, Importing, Complete, Failed, Cancelled, NeedsConfirmation }
 public sealed record DownloadJob(Guid Id, ProviderFile File, DownloadStatus Status = DownloadStatus.Waiting,
-    Guid? ProfileId = null, Guid? ReplacesModId = null, string? Error = null);
+    Guid? ProfileId = null, Guid? ReplacesModId = null, string? Error = null)
+{
+    public IReadOnlyList<DownloadFingerprint> ExistingFiles { get; init; } = [];
+    public string? Warning { get; init; }
+    public DownloadFingerprint? ConfirmationFile { get; init; }
+}
+public sealed record DownloadFingerprint(string Path, long Size, DateTime LastWrite);
 public sealed record DownloadState(IReadOnlyList<string> Directories, IReadOnlyList<DownloadJob> Jobs);
 
 public sealed class DownloadStore(string directory)

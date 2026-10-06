@@ -14,8 +14,9 @@ public sealed class ProviderManager(
     Action<Uri>? openBrowser = null
 ) : IAsyncDisposable
 {
-    private readonly Dictionary<string, IModProvider> providers = providers.ToDictionary(p => p.Id);
+    private readonly Dictionary<string, IModProvider> providers = providers.Append(new ManualDownloads()).ToDictionary(p => p.Id);
     private readonly SemaphoreSlim gate = new(1);
+    private readonly SemaphoreSlim imports = new(1);
     private readonly CancellationTokenSource lifetime = new();
     private readonly Dictionary<Guid, (CancellationTokenSource Cancellation, Task Task)> workers =
     [];
@@ -23,7 +24,19 @@ public sealed class ProviderManager(
     public event EventHandler? Changed;
     public event EventHandler? LibraryChanged;
     public event Action<DownloadJob>? DownloadFailed;
-    public IReadOnlyList<IModProvider> AvailableProviders => providers.Values.ToArray();
+    public IReadOnlyList<IModProvider> AvailableProviders => providers.Values.Where(p => p.Id != ManualDownloads.ProviderId).ToArray();
+    public bool IsTracked(Mod mod) => mod.Sources.Any(source => providers.TryGetValue(source.Provider, out var provider) && provider.SupportsUpdateChecks);
+
+    public async Task<DownloadJob> QueueManualUpdateAsync(Guid modId, CancellationToken ct = default)
+    {
+        var mod = (await library.LoadAsync(ct)).Mods.Single(mod => mod.Id == modId);
+        if (IsTracked(mod)) throw new InvalidOperationException("This mod has provider tracking. Use Check updates instead.");
+        var page = ModLinks.PageFor(mod) ?? throw new InvalidOperationException("Set this mod's page link before checking it manually.");
+        var file = new ProviderFile(ManualDownloads.ProviderId, modId.ToString(), "manual-update", mod.Name,
+            mod.ImportedFileName ?? mod.Name + ".zip", null, new Uri(page))
+        { PageLink = new Uri(page) };
+        return await QueueAsync(file, replacesModId: modId, ct: ct);
+    }
 
     public async Task InitializeAsync(CancellationToken ct = default)
     {
@@ -147,9 +160,12 @@ public sealed class ProviderManager(
                         is DownloadStatus.Waiting
                             or DownloadStatus.Downloading
                             or DownloadStatus.Importing
+                            or DownloadStatus.NeedsConfirmation
                 ) ?? new(Guid.NewGuid(), file, ProfileId: profileId, ReplacesModId: replacesModId);
             if (!State.Jobs.Any(j => j.Id == job.Id))
             {
+                if (file.Provider == ManualDownloads.ProviderId)
+                    job = job with { ExistingFiles = ManualDownloads.Snapshot(State.Directories) };
                 var updated = State with { Jobs = [.. State.Jobs, job] };
                 await store.SaveAsync(updated, ct);
                 State = updated;
@@ -267,6 +283,17 @@ public sealed class ProviderManager(
         }
     }
 
+    public async Task ConfirmManualUpdateAsync(Guid id, CancellationToken ct = default)
+    {
+        var job = State.Jobs.Single(job => job.Id == id);
+        if (job.File.Provider != ManualDownloads.ProviderId || job.Status != DownloadStatus.NeedsConfirmation || job.ConfirmationFile is not { } candidate)
+            throw new InvalidOperationException("This download is not awaiting confirmation.");
+        var file = new FileInfo(candidate.Path);
+        if (!file.Exists || file.Length != candidate.Size || file.LastWriteTimeUtc != candidate.LastWrite)
+            throw new InvalidOperationException("The ZIP changed after the warning. Retry the download check before importing.");
+        await AttachZipAsync(id, candidate.Path, ct);
+    }
+
     public Task CheckUpdatesAsync(CancellationToken ct = default) => CheckUpdatesAsync(null, ct);
 
     public async Task CheckUpdatesAsync(
@@ -276,7 +303,7 @@ public sealed class ProviderManager(
     {
         var state = await library.LoadAsync(ct);
         foreach (var mod in state.Mods.Where(m => modIds is null || modIds.Contains(m.Id)))
-            foreach (var source in mod.Sources.Where(s => providers.ContainsKey(s.Provider)))
+            foreach (var source in mod.Sources.Where(s => providers.TryGetValue(s.Provider, out var provider) && provider.SupportsUpdateChecks))
             {
                 ProviderUpdate? update = null;
                 string? error = null;
@@ -365,6 +392,7 @@ public sealed class ProviderManager(
         try
         {
             var provider = GetProvider(job.File.Provider);
+            var filename = archive is not null ? Path.GetFileName(archive) : job.File.FileName;
             if (archive is not null)
             {
                 await SetStatusAsync(job.Id, DownloadStatus.Importing, ct: ct);
@@ -386,9 +414,16 @@ public sealed class ProviderManager(
                 await input.CopyToAsync(output, ct);
             }
             else if (grant is null)
-                await provider
-                    .CreateScanner()
-                    .WaitForDownloadAsync(job.File, () => State.Directories, path, ct);
+            {
+                var scanner = provider.CreateScanner();
+                if (job.File.Provider == ManualDownloads.ProviderId)
+                {
+                    var mods = (await library.LoadAsync(ct)).Mods;
+                    scanner = new ManualDownloadScanner(job.ExistingFiles, mods.Where(mod => !mod.Superseded)
+                        .Select(mod => (mod.Id, mod.ImportedFileName ?? mod.Name + ".zip", mod.ImportedAt)).ToArray());
+                }
+                filename = await scanner.WaitForDownloadAsync(job.File, () => State.Directories, path, ct);
+            }
             else
             {
                 await SetStatusAsync(job.Id, DownloadStatus.Downloading, ct: ct);
@@ -399,24 +434,34 @@ public sealed class ProviderManager(
                     );
             }
             await SetStatusAsync(job.Id, DownloadStatus.Importing, ct: ct);
-            var mod = await library.ImportAsync(path, job.File.Name, ct, job.ProfileId);
-            await library.SetSourcesAsync(
-                mod.Id,
-                [
-                    .. mod.Sources.Where(s => s.Provider != job.File.Provider),
-                    new(job.File.Provider, job.File.ModId, job.File.FileId, job.File.Version),
-                ],
-                ct
-            );
-            if (job.ReplacesModId is { } old)
+            await imports.WaitAsync(ct);
+            try
             {
-                if (old != mod.Id)
-                    await library.ReplaceInProfilesAsync(old, mod.Id, ct);
-                await library.RecordUpdateCheckAsync(
-                    new(old, job.File.Provider, DateTimeOffset.UtcNow, null, null),
+                var importName = job.File.Provider == ManualDownloads.ProviderId &&
+                    (job.File.Name == DownloadNames.DisplayName(job.File.FileName) || job.File.Name == Path.GetFileNameWithoutExtension(job.File.FileName))
+                    ? DownloadNames.DisplayName(filename) : job.File.Name;
+                var mod = await library.ImportAsync(path, importName, ct, job.ProfileId);
+                if (job.File.Provider != ManualDownloads.ProviderId) await library.SetSourcesAsync(
+                    mod.Id,
+                    [
+                        .. mod.Sources.Where(s => s.Provider != job.File.Provider),
+                        new(job.File.Provider, job.File.ModId, job.File.FileId, job.File.Version),
+                    ],
                     ct
                 );
+                await library.SetDownloadMetadataAsync(mod.Id, filename, job.File.PageLink?.AbsoluteUri ??
+                    (job.File.Provider == ManualDownloads.ProviderId ? job.File.DownloadPage.AbsoluteUri : null), ct);
+                if (job.ReplacesModId is { } old)
+                {
+                    if (old != mod.Id)
+                        await library.ReplaceInProfilesAsync(old, mod.Id, ct);
+                    await library.RecordUpdateCheckAsync(
+                        new(old, job.File.Provider, DateTimeOffset.UtcNow, null, null),
+                        ct
+                    );
+                }
             }
+            finally { imports.Release(); }
             await SetStatusAsync(job.Id, DownloadStatus.Complete, ct: ct);
             LibraryChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -424,6 +469,17 @@ public sealed class ProviderManager(
         {
             if (archive is not null && !lifetime.IsCancellationRequested)
                 await SetStatusAsync(job.Id, DownloadStatus.Failed, "Attaching ZIP was cancelled.");
+        }
+        catch (ManualUpdateWarning warning)
+        {
+            await MutateAsync(state => state with
+            {
+                Jobs = state.Jobs.Select(item => item.Id == job.Id ? item with
+                {
+                    Status = DownloadStatus.NeedsConfirmation, Error = null,
+                    Warning = warning.Message, ConfirmationFile = warning.File
+                } : item).ToArray()
+            }, ct);
         }
         catch (Exception ex)
         {
@@ -473,7 +529,7 @@ public sealed class ProviderManager(
                 {
                     Jobs = state
                         .Jobs.Select(j =>
-                            j.Id == id ? j with { Status = status, Error = error } : j
+                            j.Id == id ? j with { Status = status, Error = error, Warning = null, ConfirmationFile = null } : j
                         )
                         .ToArray(),
                 },
@@ -522,6 +578,7 @@ public sealed class ProviderManager(
                                             DownloadStatus.Waiting
                                             or DownloadStatus.Downloading
                                             or DownloadStatus.Importing
+                                            or DownloadStatus.NeedsConfirmation
                                         )
                                 )
                                 .ToArray(),
