@@ -8,7 +8,11 @@
         <CheckBox Grid.Column="1" x:Name="RemoveNexusKeyInput" Content="Remove saved key" IsChecked="{Binding RemoveNexusKey, Mode=TwoWay}" IsEnabled="{Binding HasSavedNexusKey}" VerticalAlignment="Center" />
         <Button Grid.Column="2" Content="Register nxm links" Command="{Binding RegisterNxmCommand}" VerticalAlignment="Center" />
       </Grid>
-      <TextBlock Text="Get your personal key from Nexus account settings → API, and scroll until you see a long string of characters." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+      <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
+        <Run Text="Get your personal key from " />
+        <InlineUIContainer><HyperlinkButton x:Name="NexusKeySettingsLink" Content="Nexus account settings → API" Command="{Binding OpenNexusKeySettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
+        <Run Text=", and scroll until you see a long string of characters." />
+      </TextBlock>
     </StackPanel>
   </Grid>
 </UserControl>

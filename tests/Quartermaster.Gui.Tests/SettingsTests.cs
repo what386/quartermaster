@@ -10,6 +10,30 @@ namespace Quartermaster.Gui.Tests;
 public sealed class SettingsTests
 {
     [AvaloniaFact]
+    public async Task CredentialInstructionsOpenTheCorrespondingAccountSettings()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync(); f.Shell.Navigate(PageKind.Settings);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            Dispatcher.UIThread.RunJobs();
+            var nexus = Assert.Single(window.GetVisualDescendants().OfType<NexusSettingsView>());
+            var github = Assert.Single(window.GetVisualDescendants().OfType<GitHubSettingsView>());
+            var nexusLink = nexus.FindControl<HyperlinkButton>("NexusKeySettingsLink")!;
+            var githubLink = github.FindControl<HyperlinkButton>("GitHubTokenSettingsLink")!;
+            await Assert.IsType<Quartermaster.Gui.Shared.AsyncCommand>(nexusLink.Command).ExecuteAsync();
+            await Assert.IsType<Quartermaster.Gui.Shared.AsyncCommand>(githubLink.Command).ExecuteAsync();
+            Assert.Equal(new[]
+            {
+                new Uri("https://www.nexusmods.com/settings/api-keys"),
+                new Uri("https://github.com/settings/personal-access-tokens")
+            }, f.BrowserRequests);
+            Assert.False(f.Services.Operations.IsError);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task DownloadsHaveTheirOwnSectionAndSaveWithoutProviderCredentials()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

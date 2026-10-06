@@ -33,6 +33,8 @@ public sealed partial class SettingsViewModel
         !string.IsNullOrWhiteSpace(GitHubToken) || RemoveGitHubToken && HasSavedGitHubToken || DownloadFolder != savedDownloadFolder;
     public AsyncCommand BrowseDownloadsCommand { get; private set; } = null!;
     public AsyncCommand RegisterNxmCommand { get; private set; } = null!;
+    public AsyncCommand OpenNexusKeySettingsCommand { get; private set; } = null!;
+    public AsyncCommand OpenGitHubTokenSettingsCommand { get; private set; } = null!;
     private void InitializeProviderCommands()
     {
         BrowseDownloadsCommand = Operations.CreateCommand("Selecting download folder", async _ =>
@@ -41,6 +43,16 @@ public sealed partial class SettingsViewModel
             if (path is not null) DownloadFolder = path;
         });
         RegisterNxmCommand = Operations.CreateCommand("Registering nxm links", NxmProtocol.RegisterAsync);
+        OpenNexusKeySettingsCommand = Operations.CreateCommand("Opening Nexus API settings", _ =>
+        {
+            Services.OpenBrowser(new("https://www.nexusmods.com/settings/api-keys"));
+            return Task.CompletedTask;
+        });
+        OpenGitHubTokenSettingsCommand = Operations.CreateCommand("Opening GitHub token settings", _ =>
+        {
+            Services.OpenBrowser(new("https://github.com/settings/personal-access-tokens"));
+            return Task.CompletedTask;
+        });
     }
     public async Task InitializeProviderSettingsAsync(CancellationToken ct)
     {
