@@ -13,6 +13,11 @@ public abstract class ViewModelBase : INotifyPropertyChanged
         Notify(name);
         return true;
     }
+    protected void NotifyChanges(IEnumerable<(string Name, object? Before, object? After)> changes)
+    {
+        foreach (var (name, before, after) in changes)
+            if (!Equals(before, after)) Notify(name);
+    }
     protected void Notify([CallerMemberName] string? name = null) => PropertyChanged?.Invoke(this, new(name));
 }
 

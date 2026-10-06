@@ -34,6 +34,7 @@ internal sealed class FakeDialogs : IDialogService
     public Task<string?> SaveModZipAsync(string suggestedName)
     { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }
     public bool Confirm { get; set; } = true;
+    public Queue<bool> ConfirmationAnswers { get; } = new();
     public string? InputText { get; set; }
     public bool CreateProfileFromFile { get; set; }
     public Task<ProfileCreationRequest?> RequestProfileCreationAsync() => Task.FromResult(
@@ -48,7 +49,7 @@ internal sealed class FakeDialogs : IDialogService
     { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(FolderPath);
     public Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel")
-    { Confirmations.Add((title, message, acceptLabel, cancelLabel)); return Task.FromResult(Confirm); }
+    { Confirmations.Add((title, message, acceptLabel, cancelLabel)); return Task.FromResult(ConfirmationAnswers.TryDequeue(out var answer) ? answer : Confirm); }
 }
 
 internal sealed class Fixture : IDisposable

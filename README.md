@@ -54,7 +54,9 @@ page** to start an import. Quartermaster opens your browser and watches your
 configured download folder; once the ZIP finishes downloading, it imports the mod.
 
 **Check updates** in Library checks all tracked mods. In a profile, it checks
-that profile's mods. Mods with an available update show an **Update** button.
+that profile's mods. When updates are found, you can apply them from the prompt
+or use **Update all** in the library header later. Individual mods also show an
+**Update** button. The manual-check prompt follows separately.
 
 GitHub release ZIPs download directly; Nexus Mods updates use your browser.
 Updated mods keep their place in your profiles. After updates, you must redeploy.

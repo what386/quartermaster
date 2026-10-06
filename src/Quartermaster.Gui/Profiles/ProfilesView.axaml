@@ -16,7 +16,7 @@
     </DataTemplate>
     <DataTemplate DataType="{x:Type vm:ProfileGroupItem}"><vm:ProfileGroupView /></DataTemplate>
   </UserControl.DataTemplates>
-  <Grid Background="Transparent" RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
+  <Grid Background="Transparent" RowDefinitions="Auto,Auto,*" IsEnabled="{Binding !Operations.IsProgressVisible}" IsHitTestVisible="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBlock x:Name="ProfileTitle" Text="{Binding SelectedProfile.Name}" Classes="pageTitle" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedProfile.Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
       <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search mods in this profile…" Margin="0,0,8,0" />
@@ -43,7 +43,7 @@
     </Border>
     <Grid Grid.Row="2" RowDefinitions="24,*">
       <Border Background="{DynamicResource TableHeaderBackground}" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="106,0,0,0" /></Grid></Border>
-      <ListBox Grid.Row="1" x:Name="ProfileModsList" Focusable="True" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedListItem, Mode=TwoWay}" DoubleTapped="QueueModDetails">
+      <ListBox Grid.Row="1" x:Name="ProfileModsList" AutoScrollToSelectedItem="False" Focusable="True" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedListItem, Mode=TwoWay}" DoubleTapped="QueueModDetails">
         <ListBox.ContextMenu><ContextMenu>
           <MenuItem x:Name="ModDetailsMenuItem" Header="Mod details" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
           <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" />

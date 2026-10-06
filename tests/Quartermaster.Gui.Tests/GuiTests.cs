@@ -1262,7 +1262,7 @@ public class GuiTests
                 Assert.Contains(Assert.IsType<SidebarProfile>(button.DataContext), f.Shell.SidebarProfiles);
             }
             var notifications = 0;
-            f.Shell.CurrentPage.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ProfilesViewModel.Entries)) notifications++; };
+            f.Shell.CurrentPage.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(ProfilesViewModel.SelectedProfile)) notifications++; };
             await originalItems.Single(item => item.Name == "Alternate").SelectCommand.ExecuteAsync();
             Assert.Equal(1, notifications);
             Assert.Same(originalItems[0], f.Shell.SidebarProfiles[0]);

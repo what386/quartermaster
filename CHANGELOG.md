@@ -2,6 +2,14 @@
 
 *Generated on 2026-10-06*
 
+## 0.4.0 — 2026-10-06
+
+### Changes
+
+- Fix reorder UI flashing
+- Implement better confirmation prompts for view swaps
+
+
 ## 0.3.0 — 2026-10-06
 
 ### Changes

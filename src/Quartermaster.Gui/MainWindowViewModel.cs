@@ -97,7 +97,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         };
         Operations.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName != nameof(OperationState.IsBusy)) return;
+            if (e.PropertyName != nameof(OperationState.IsBusy) || Operations.IsBusy && !Operations.IsProgressVisible) return;
             foreach (var entry in SidebarProfiles)
             { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); entry.DuplicateCommand.Refresh(); }
         };

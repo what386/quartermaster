@@ -2,7 +2,9 @@
              x:Class="Quartermaster.Gui.Shared.ConfirmationDialog" Width="420">
   <StackPanel Spacing="20">
     <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
-    <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+    <ScrollViewer MaxHeight="320" HorizontalScrollBarVisibility="Disabled">
+      <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+    </ScrollViewer>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
       <Button x:Name="CancelButton" Content="Cancel" Click="CancelConfirmation" />
       <Button x:Name="AcceptButton" Classes="primary" Click="AcceptConfirmation" />
