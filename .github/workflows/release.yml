@@ -20,20 +20,10 @@ jobs:
           # Linux x64
           - os: ubuntu-latest
             rid: linux-x64
-            deployment: runtime
-            self_contained: false
-
-          - os: ubuntu-latest
-            rid: linux-x64
             deployment: bundled
             self_contained: true
 
           # Linux ARM64
-          - os: ubuntu-latest
-            rid: linux-arm64
-            deployment: runtime
-            self_contained: false
-
           - os: ubuntu-latest
             rid: linux-arm64
             deployment: bundled
@@ -42,20 +32,10 @@ jobs:
           # macOS x64
           - os: macos-latest
             rid: osx-x64
-            deployment: runtime
-            self_contained: false
-
-          - os: macos-latest
-            rid: osx-x64
             deployment: bundled
             self_contained: true
 
           # macOS ARM64
-          - os: macos-latest
-            rid: osx-arm64
-            deployment: runtime
-            self_contained: false
-
           - os: macos-latest
             rid: osx-arm64
             deployment: bundled
@@ -64,20 +44,10 @@ jobs:
           # Windows x64
           - os: windows-latest
             rid: win-x64
-            deployment: runtime
-            self_contained: false
-
-          - os: windows-latest
-            rid: win-x64
             deployment: bundled
             self_contained: true
 
           # Windows ARM64
-          - os: windows-latest
-            rid: win-arm64
-            deployment: runtime
-            self_contained: false
-
           - os: windows-latest
             rid: win-arm64
             deployment: bundled
@@ -153,17 +123,11 @@ jobs:
         run: |
           cd dist
           set -- \
-            Quartermaster-linux-x64-runtime.zip \
             Quartermaster-linux-x64-bundled.zip \
-            Quartermaster-linux-arm64-runtime.zip \
             Quartermaster-linux-arm64-bundled.zip \
-            Quartermaster-osx-x64-runtime.zip \
             Quartermaster-osx-x64-bundled.zip \
-            Quartermaster-osx-arm64-runtime.zip \
             Quartermaster-osx-arm64-bundled.zip \
-            Quartermaster-win-x64-runtime.zip \
             Quartermaster-win-x64-bundled.zip \
-            Quartermaster-win-arm64-runtime.zip \
             Quartermaster-win-arm64-bundled.zip
           for asset in "$@"; do
             test -f "$asset" || { echo "Missing release asset: $asset" >&2; exit 1; }
