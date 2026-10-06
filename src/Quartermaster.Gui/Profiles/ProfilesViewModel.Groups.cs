@@ -1,12 +1,31 @@
+using System.Collections.ObjectModel;
 using Quartermaster.Gui.Shared;
 using Quartermaster.Library.Profiles;
 
 namespace Quartermaster.Gui.Profiles;
 
 public interface IProfileListItem;
-public sealed record ProfileGroupItem(ProfileGroup Group, string Summary, bool IsExpanded,
-    AsyncCommand ToggleCommand, AsyncCommand RenameCommand, AsyncCommand RemoveCommand) : IProfileListItem
+public sealed class ProfileGroupItem(ProfileGroup Group, string Summary, bool IsExpanded,
+    AsyncCommand ToggleCommand, AsyncCommand RenameCommand, AsyncCommand RemoveCommand) : ViewModelBase, IProfileListItem
 {
+    public ProfileGroup Group { get; private set; } = Group;
+    public string Summary { get; private set; } = Summary;
+    public bool IsExpanded { get; private set; } = IsExpanded;
+    public AsyncCommand ToggleCommand { get; } = ToggleCommand;
+    public AsyncCommand RenameCommand { get; } = RenameCommand;
+    public AsyncCommand RemoveCommand { get; } = RemoveCommand;
+    public void Update(ProfileGroupItem value)
+    {
+        var changes = new (string Name, object? Before, object? After)[]
+        {
+            (nameof(Name), Name, value.Name),
+            (nameof(Summary), Summary, value.Summary),
+            (nameof(IsExpanded), IsExpanded, value.IsExpanded),
+            (nameof(Arrow), Arrow, value.Arrow)
+        };
+        Group = value.Group; Summary = value.Summary; IsExpanded = value.IsExpanded;
+        NotifyChanges(changes);
+    }
     public Guid Id => Group.Id;
     public string Name => Group.Name;
     public string Arrow => IsExpanded ? "▾" : "▸";
@@ -14,7 +33,7 @@ public sealed record ProfileGroupItem(ProfileGroup Group, string Summary, bool I
 
 public sealed partial class ProfilesViewModel
 {
-    public IReadOnlyList<IProfileListItem> VisibleItems { get; private set; } = [];
+    public ObservableCollection<IProfileListItem> VisibleItems { get; } = [];
     private IProfileListItem? selectedListItem;
     public IProfileListItem? SelectedListItem
     {
@@ -68,6 +87,7 @@ public sealed partial class ProfilesViewModel
     }
     private void RebuildVisibleItems()
     {
+        var existing = VisibleItems.OfType<ProfileGroupItem>().ToDictionary(row => row.Id);
         var items = new List<IProfileListItem>();
         items.AddRange(Entries.Where(entry => entry.Entry.GroupId is null && entry.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)));
         foreach (var group in Groups)
@@ -77,12 +97,16 @@ public sealed partial class ProfilesViewModel
                 group.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (Search != "" && matching.Length == 0 && !group.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)) continue;
             var expanded = group.IsExpanded || Search != "";
-            items.Add(new ProfileGroupItem(group, $"{members.Length} mods · {members.Count(entry => entry.IsEnabled)} on", expanded,
-                new AsyncCommand(() => ToggleGroupAsync(group.Id), () => Operations.CanInteract && Search == "", Operations.ReportError),
-                new AsyncCommand(() => RenameGroupAsync(group.Id), () => Operations.CanInteract, Operations.ReportError),
-                new AsyncCommand(() => RemoveGroupAsync(group.Id), () => Operations.CanInteract, Operations.ReportError)));
+            var row = new ProfileGroupItem(group, $"{members.Length} mods · {members.Count(entry => entry.IsEnabled)} on", expanded,
+                new AsyncCommand(() => ToggleGroupAsync(group.Id), () => !Operations.IsProgressVisible && Search == "", Operations.ReportError),
+                new AsyncCommand(() => RenameGroupAsync(group.Id), () => !Operations.IsProgressVisible, Operations.ReportError),
+                new AsyncCommand(() => RemoveGroupAsync(group.Id), () => !Operations.IsProgressVisible, Operations.ReportError));
+            if (existing.TryGetValue(group.Id, out var current)) { current.Update(row); row = current; }
+            items.Add(row);
             if (expanded) items.AddRange(matching);
         }
-        VisibleItems = items.ToArray(); Notify(nameof(VisibleItems)); Notify(nameof(Groups));
+        CollectionUpdates.Synchronize(VisibleItems, items); Notify(nameof(Groups));
+        if (!Operations.IsBusy)
+            foreach (var group in VisibleItems.OfType<ProfileGroupItem>()) group.ToggleCommand.Refresh();
     }
 }

@@ -34,7 +34,11 @@ public sealed class OperationState : ViewModelBase
     public AsyncCommand CreateCommand(string label, Func<CancellationToken, Task> action, Func<bool>? allowed = null)
     {
         var command = new AsyncCommand(() => RunAsync(label, action), () => CanInteract && (allowed?.Invoke() ?? true), ReportError);
-        PropertyChanged += (_, e) => { if (e.PropertyName == nameof(IsBusy)) command.Refresh(); };
+        PropertyChanged += (_, e) =>
+        {
+            // Silent edits still serialize execution, but must not flash disabled button styles.
+            if (e.PropertyName == nameof(IsBusy) && (!IsBusy || IsProgressVisible)) command.Refresh();
+        };
         return command;
     }
 

@@ -219,9 +219,14 @@ public partial class ProfilesView
             {
                 if (source is ProfileModItem && model.SelectedProfile?.Id == profile)
                 {
-                    ProfileModsList.SelectedItems?.Clear();
-                    foreach (var mod in model.VisibleItems.OfType<ProfileModItem>().Where(mod => selectedIds.Contains(mod.Mod.Id)))
-                        ProfileModsList.SelectedItems?.Add(mod);
+                    var selection = model.VisibleItems.OfType<ProfileModItem>().Where(mod => selectedIds.Contains(mod.Mod.Id)).ToArray();
+                    if (ProfileModsList.SelectedItems is { } selected)
+                    {
+                        for (var index = selected.Count - 1; index >= 0; index--)
+                            if (selected[index] is not ProfileModItem mod || !selection.Contains(mod)) selected.RemoveAt(index);
+                        foreach (var mod in selection)
+                            if (!selected.Contains(mod)) selected.Add(mod);
+                    }
                 }
                 AnimateDrop(positions, profile);
             }

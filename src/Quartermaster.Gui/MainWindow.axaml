@@ -27,7 +27,7 @@
           <Border Grid.Row="1" Background="{DynamicResource LineBrush}" Margin="12,0" />
           <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled">
             <StackPanel Spacing="12" Margin="0,12">
-              <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding Operations.CanInteract}">
+              <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding !Operations.IsProgressVisible}" IsHitTestVisible="{Binding Operations.CanInteract}">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
                   <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">

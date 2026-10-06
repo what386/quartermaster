@@ -22,6 +22,94 @@ namespace Quartermaster.Gui.Tests;
 
 public sealed class ModDownloadTests
 {
+    [AvaloniaTheory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task UpdatePromptAndManualPromptAreIndependentAndUpdateAllIgnoresSearch(bool apply, bool manual)
+    {
+        using var api = Api(); using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        foreach (var name in new[] { "Armor", "Cape", "Local mod" })
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        var tracked = f.Services.Session.State.Mods.Where(mod => mod.Name != "Local mod").ToArray();
+        foreach (var mod in tracked) await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", "123", "10", "1")]);
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var model = (ModsViewModel)Navigate(f, PageKind.Mods);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = window.GetVisualDescendants().OfType<ModsView>().Single();
+            Assert.Equal("LOCAL LIBRARY (3 mods)", view.FindControl<TextBlock>("LibraryHeader")!.Text);
+            Assert.False(view.FindControl<Button>("UpdateAllButton")!.IsVisible);
+            f.Dialogs.ConfirmationAnswers.Enqueue(apply); f.Dialogs.ConfirmationAnswers.Enqueue(manual);
+            await model.CheckUpdatesCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Assert.Equal(new[] { "Mod updates", "Manual update checks" }, f.Dialogs.Confirmations.Select(prompt => prompt.Title));
+            var prompt = f.Dialogs.Confirmations[0];
+            Assert.Contains("Found 2 updates:", prompt.Message);
+            Assert.Contains("• Armor → 2", prompt.Message); Assert.Contains("• Cape → 2", prompt.Message);
+            Assert.DoesNotContain("Local mod", prompt.Message);
+            Assert.Contains("Would you like to apply them now?", prompt.Message);
+            Assert.Equal("Update all", prompt.AcceptLabel); Assert.Equal("Not now", prompt.CancelLabel);
+            Assert.Equal(manual ? PageKind.ManualChecks : PageKind.Mods, f.Shell.SelectedNavigation.Page);
+            Assert.Equal(apply ? 2 : 0, f.Services.Providers.State.Jobs.Count);
+            Assert.Equal(apply ? 2 : 0, f.BrowserRequests.Count);
+            f.Shell.Navigate(PageKind.Mods); model.Search = "Armor";
+            window.CaptureRenderedFrame()?.Dispose();
+            view = window.GetVisualDescendants().OfType<ModsView>().Single();
+            var button = view.FindControl<Button>("UpdateAllButton")!;
+            Assert.True(button.IsVisible); Assert.Equal(!apply, button.IsEffectivelyEnabled);
+            if (!apply) await Assert.IsType<AsyncCommand>(button.Command).ExecuteAsync();
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal(2, f.Services.Providers.State.Jobs.Count); Assert.Equal(2, f.BrowserRequests.Count);
+            Assert.All(tracked, mod => Assert.Contains(f.Services.Providers.State.Jobs, job => job.ReplacesModId == mod.Id));
+            // Calling the batch again must not create jobs or reopen pages for pending updates.
+            await f.Services.Downloads.ApplyUpdatesAsync(CancellationToken.None);
+            Assert.Equal(2, f.Services.Providers.State.Jobs.Count); Assert.Equal(2, f.BrowserRequests.Count);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task FailedUpdateDoesNotPreventOtherUpdatesOrTheManualPrompt()
+    {
+        var fileRequests = 0;
+        using var api = Api(request => request.RequestUri!.AbsolutePath.EndsWith("files.json") && ++fileRequests == 3);
+        using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        foreach (var name in new[] { "Armor", "Cape", "Local mod" })
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        foreach (var mod in f.Services.Session.State.Mods.Where(mod => mod.Name != "Local mod"))
+            await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", "123", "10", "1")]);
+        await ((ModsViewModel)Navigate(f, PageKind.Mods)).CheckUpdatesCommand.ExecuteAsync();
+        Assert.True(f.Services.Operations.IsError);
+        Assert.Contains("Armor", f.Services.Operations.Message);
+        Assert.Equal(new[] { "Mod updates", "Manual update checks" }, f.Dialogs.Confirmations.Select(prompt => prompt.Title));
+        Assert.Equal(PageKind.ManualChecks, f.Shell.SelectedNavigation.Page);
+        Assert.Equal(f.Services.Session.State.Mods.Single(mod => mod.Name == "Cape").Id,
+            Assert.Single(f.Services.Providers.State.Jobs).ReplacesModId);
+    }
+
+    [AvaloniaFact]
+    public async Task ProfileUpdatePromptOnlyListsModsInTheCheckedProfile()
+    {
+        using var api = Api(); using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        foreach (var name in new[] { "Profile mod", "Other mod" })
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        foreach (var mod in f.Services.Session.State.Mods)
+            await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", "123", "10", "1")]);
+        var member = f.Services.Session.State.Mods.Single(mod => mod.Name == "Profile mod");
+        await f.Services.Session.SaveProfileAsync(ProfileEditor.Add(f.Services.Session.ActiveProfile!, member), false, CancellationToken.None);
+        f.Dialogs.Confirm = true;
+        await ((ProfilesViewModel)Navigate(f, PageKind.Profiles)).CheckUpdatesCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        var prompt = Assert.Single(f.Dialogs.Confirmations);
+        Assert.Contains("Found 1 update:", prompt.Message); Assert.Contains("Profile mod", prompt.Message);
+        Assert.DoesNotContain("Other mod", prompt.Message);
+        Assert.Equal(member.Id, Assert.Single(f.Services.Providers.State.Jobs).ReplacesModId);
+    }
+
     [AvaloniaFact]
     public async Task GitHubSettingsValidateSaveMaskAndRemoveOptionalToken()
     {
@@ -116,6 +204,7 @@ public sealed class ModDownloadTests
         var original = Assert.Single(f.Services.Session.State.Mods);
         Assert.Equal(original.Id, Assert.Single(f.Services.Session.ActiveProfile!.Entries).ModId);
         latest = 2;
+        f.Dialogs.Confirm = false;
         await profiles.CheckUpdatesCommand.ExecuteAsync();
         var entry = Assert.Single(profiles.Entries); Assert.True(entry.HasUpdate);
         await entry.UpdateCommand!.ExecuteAsync();
@@ -186,8 +275,9 @@ public sealed class ModDownloadTests
     private static HttpResponseMessage Json(object value) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(value), Encoding.UTF8, "application/json") };
     private static object ModInfo => new { mod_id = 123, name = "Example mod", summary = "Example description", version = "2", available = true };
     private static object ModFile(int id, int category = 1) => new { file_id = id, name = "Main file", file_name = "mod.zip", version = "2", category_id = category, is_primary = true };
-    private static HttpClient Api() => new(new Handler(request =>
+    private static HttpClient Api(Func<HttpRequestMessage, bool>? fail = null) => new(new Handler(request =>
     {
+        if (fail?.Invoke(request) == true) return new(HttpStatusCode.ServiceUnavailable);
         var path = request.RequestUri!.AbsolutePath;
         if (path.EndsWith("validate.json")) return Json(new { user_id = 7, name = "Example user", is_premium = false });
         if (path == "/v2/graphql") return Json(new { data = new { mods = new { nodes = new[] { new { modId = 123, name = "Example mod", summary = "Example description", version = "2" } } } } });
@@ -442,6 +532,7 @@ public sealed class ModDownloadTests
         profile = ProfileEditor.AddGroup(profile, "Equipment", [old.Id]); profile = ProfileEditor.SetEnabled(profile, old.Id, false);
         await f.Services.Session.SaveProfileAsync(profile, true, CancellationToken.None);
         var mods = (ModsViewModel)Navigate(f, PageKind.Mods); Assert.False(Assert.Single(mods.Mods).HasUpdate);
+        f.Dialogs.Confirm = false;
         await mods.CheckUpdatesCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
         Assert.True(Assert.Single(mods.Mods).HasUpdate); Assert.Empty(f.Services.Providers.State.Jobs); Assert.Null(opened);
         var profiles = (ProfilesViewModel)Navigate(f, PageKind.Profiles); Assert.True(Assert.Single(profiles.Entries).HasUpdate);

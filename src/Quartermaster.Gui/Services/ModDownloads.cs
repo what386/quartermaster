@@ -100,12 +100,45 @@ public sealed partial class ModDownloads : ViewModelBase
             (modIds is null || modIds.Contains(check.ModId))).ToArray();
         if (errors.Length > 0) throw new InvalidOperationException($"Could not check {ModPresentation.Count(errors.Length, "mod")}: " +
             string.Join(" ", errors.Select(check => check.Error).Distinct().Take(3)));
+        var updates = AvailableUpdates(modIds).Where(CanQueueUpdate).ToArray();
+        Exception? applyError = null;
+        if (updates.Length > 0 && await services.Dialogs.ConfirmAsync("Mod updates",
+            $"Found {ModPresentation.Count(updates.Length, "update")}:\n" +
+            string.Join("\n", updates.Select(mod => "• " + mod.Name +
+                (AvailableUpdate(mod)?.AvailableVersion is { } version ? $" → {version}" : ""))) +
+            "\n\nWould you like to apply them now?", "Update all", "Not now"))
+        {
+            try { await ApplyUpdatesAsync(ct, updates.Select(mod => mod.Id).ToArray()); }
+            catch (Exception ex) when (ex is not OperationCanceledException) { applyError = ex; }
+        }
+        ct.ThrowIfCancellationRequested();
         var manualMods = services.Session.State.Mods.Where(mod => !mod.Superseded &&
             (modIds is null || modIds.Contains(mod.Id)) && !services.Providers.IsTracked(mod)).ToArray();
         if (manualMods.Length > 0 && await services.Dialogs.ConfirmAsync("Manual update checks",
             $"{ModPresentation.Count(manualMods.Length, "mod")} {(manualMods.Length == 1 ? "needs" : "need")} a manual update check. Open the checklist now?",
             "Open manual checks", "Not now"))
             ShowManualChecks(manualMods.Select(mod => mod.Id).ToArray());
+        if (applyError is not null) throw applyError;
+    }
+    public IReadOnlyList<Mod> AvailableUpdates(IReadOnlyCollection<Guid>? modIds = null) => services.Session.State.Mods
+        .Where(mod => !mod.Superseded && (modIds is null || modIds.Contains(mod.Id)) && AvailableUpdate(mod) is not null)
+        .OrderBy(mod => mod.Name, StringComparer.OrdinalIgnoreCase).ToArray();
+    public bool CanQueueUpdate(Mod mod) => !services.Providers.State.Jobs.Any(job => job.ReplacesModId == mod.Id &&
+        job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing or DownloadStatus.NeedsConfirmation);
+    public async Task ApplyUpdatesAsync(CancellationToken ct, IReadOnlyCollection<Guid>? modIds = null)
+    {
+        var failures = new List<string>();
+        foreach (var mod in AvailableUpdates(modIds).Where(CanQueueUpdate).ToArray())
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                var job = await services.Providers.QueueUpdateAsync(mod.Id, ct);
+                if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException) { failures.Add($"{mod.Name}: {ex.Message}"); }
+        }
+        if (failures.Count > 0) throw new InvalidOperationException("Could not start updates:\n" + string.Join("\n", failures));
     }
     public UpdateCheck? AvailableUpdate(Mod mod) => services.Session.State.UpdateChecks.FirstOrDefault(check =>
         check.ModId == mod.Id && check.Error is null && check.AvailableFileId is not null &&
@@ -115,8 +148,7 @@ public sealed partial class ModDownloads : ViewModelBase
         {
             var job = await services.Providers.QueueUpdateAsync(mod.Id, ct);
             if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
-        }), () => services.Operations.CanInteract && !services.Providers.State.Jobs.Any(job =>
-            job.ReplacesModId == mod.Id && job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing), services.Operations.ReportError);
+        }), () => !services.Operations.IsProgressVisible && CanQueueUpdate(mod), services.Operations.ReportError);
     public string? UpdateDescription(Mod mod) => AvailableUpdate(mod) is { } check
         ? $"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Click Update to upgrade." : null;
 }

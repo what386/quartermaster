@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Quartermaster.Core.Deployment;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
@@ -9,10 +10,51 @@ namespace Quartermaster.Gui.Profiles;
 
 public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
-public sealed record ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : IModRow, IProfileListItem
+public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : ViewModelBase, IModRow, IProfileListItem
 {
-    public AsyncCommand? UpdateCommand { get; init; }
-    public string? UpdateDescription { get; init; }
+    public Mod Mod { get; private set; } = Mod;
+    public ProfileEntry Entry { get; private set; } = Entry;
+    public int Index { get; private set; } = Index;
+    public AsyncCommand EnableCommand { get; private set; } = EnableCommand;
+    public bool HasConflict { get; private set; } = HasConflict;
+    public string? IconPath { get; private set; } = IconPath;
+    public ModDeploymentState DeploymentState { get; private set; } = DeploymentState;
+    public AsyncCommand? UpdateCommand { get; private set; }
+    public void Update(ProfileModItem value)
+    {
+        var changes = new (string Name, object? Before, object? After)[]
+        {
+            (nameof(Name), Name, value.Name),
+            (nameof(Title), Title, value.Title),
+            (nameof(Number), Number, value.Number),
+            (nameof(Description), Description, value.Description),
+            (nameof(Monogram), Monogram, value.Monogram),
+            (nameof(HasConflict), HasConflict, value.HasConflict),
+            (nameof(IconPath), IconPath, value.IconPath),
+            (nameof(IsLoaded), IsLoaded, value.IsLoaded),
+            (nameof(IsUnloaded), IsUnloaded, value.IsUnloaded),
+            (nameof(HasDeploymentWarning), HasDeploymentWarning, value.HasDeploymentWarning),
+            (nameof(DeploymentDescription), DeploymentDescription, value.DeploymentDescription),
+            (nameof(HasOptions), HasOptions, value.HasOptions),
+            (nameof(IsGrouped), IsGrouped, value.IsGrouped),
+            (nameof(IsEnabled), IsEnabled, value.IsEnabled),
+            (nameof(KnobAlignment), KnobAlignment, value.KnobAlignment),
+            (nameof(ToggleDescription), ToggleDescription, value.ToggleDescription),
+            (nameof(Status), Status, value.Status),
+            (nameof(HasUpdate), HasUpdate, value.HasUpdate),
+            (nameof(UpdateDescription), UpdateDescription, value.UpdateDescription),
+        };
+        Mod = value.Mod; Entry = value.Entry; Index = value.Index;
+        HasConflict = value.HasConflict; IconPath = value.IconPath; DeploymentState = value.DeploymentState;
+        // Update commands act on the mod ID, so retain them while an update remains available.
+        if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
+        UpdateDescription = value.UpdateDescription;
+        NotifyChanges(changes);
+    }
+
+    public void SetUpdate(AsyncCommand? command, string? description) { UpdateCommand = command; UpdateDescription = description; }
+
+    public string? UpdateDescription { get; private set; }
     public bool HasUpdate => UpdateCommand is not null;
     public string Name => Mod.Name;
     public string Title => ModPresentation.Title(Mod);
@@ -46,7 +88,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     private Mod? modToAdd;
     private string search = "";
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
-    public IReadOnlyList<ProfileModItem> Entries { get; private set; } = [];
+    public ObservableCollection<ProfileModItem> Entries { get; } = [];
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
     public IReadOnlyList<string> Conflicts { get; private set; } = [];
     public string ArchiveSummary { get; private set; } = "";
@@ -71,13 +113,17 @@ public sealed partial class ProfilesViewModel : SessionViewModel
             if (!Set(ref selectedMod, value)) return;
             if (value is not null || selectedListItem is ProfileModItem)
             { selectedListItem = value; Notify(nameof(SelectedListItem)); }
-            Options = value is null ? null : new(value.Mod, value.Entry.Options, Session.GetOptionImages(value.Mod));
-            Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
+            RefreshSelectedMod();
         }
+    }
+    private void RefreshSelectedMod()
+    {
+        Options = SelectedMod is null ? null : new(SelectedMod.Mod, SelectedMod.Entry.Options, Session.GetOptionImages(SelectedMod.Mod));
+        Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
     }
     public ModOptionsViewModel? Options { get; private set; }
     public ModDetailsViewModel? Details => SelectedMod is null ? null : new(SelectedMod.Mod, Services);
-    public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value)) AddCommand.Refresh(); } }
+    public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value) && (!Operations.IsBusy || Operations.IsProgressVisible)) AddCommand.Refresh(); } }
     public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
     public AsyncCommand MakeActiveCommand { get; }
     public AsyncCommand AddCommand { get; }
@@ -126,7 +172,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         }, () => Session.GameDirectory != "");
         Operations.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName != nameof(OperationState.IsBusy)) return;
+            if (e.PropertyName != nameof(OperationState.IsBusy) || Operations.IsBusy && !Operations.IsProgressVisible) return;
             foreach (var row in Entries) { row.EnableCommand.Refresh(); row.UpdateCommand?.Refresh(); }
             foreach (var group in VisibleItems.OfType<ProfileGroupItem>())
             { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); }
@@ -154,18 +200,30 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     }
     private void RebuildEntries()
     {
+        var selection = SelectedListItem;
         var id = selectedMod?.Mod.Id;
+        var existing = Entries.ToDictionary(row => row.Mod.Id);
         var mods = Session.State.Mods.ToDictionary(m => m.Id);
         var report = SelectedProfile is null ? new ConflictReport([], []) : ConflictAnalyzer.Analyze(ProfilePatches.Resolve(Session.State, SelectedProfile));
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
-        Entries = SelectedProfile?.Entries.Select((e, index) => new ProfileModItem(mods[e.ModId], e, index,
-            new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !e.Enabled), ct)),
-                () => Operations.CanInteract, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e))
-        { UpdateCommand = Services.Downloads.CreateUpdateCommand(mods[e.ModId]), UpdateDescription = Services.Downloads.UpdateDescription(mods[e.ModId]) }).ToArray() ?? [];
+        var rows = SelectedProfile?.Entries.Select((e, index) =>
+        {
+            // Recycled controls retain their appearance during silent edits; RunAsync still prevents concurrent saves.
+            var row = new ProfileModItem(mods[e.ModId], e, index,
+            new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !Entries.Single(row => row.Mod.Id == e.ModId).IsEnabled), ct)),
+                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e));
+            row.SetUpdate(Services.Downloads.CreateUpdateCommand(mods[e.ModId]), Services.Downloads.UpdateDescription(mods[e.ModId]));
+            if (existing.TryGetValue(e.ModId, out var current)) { current.Update(row); return current; }
+            return row;
+        }).ToArray() ?? [];
+        CollectionUpdates.Synchronize(Entries, rows);
         AvailableMods = Session.State.Mods.Where(m => Entries.All(e => e.Mod.Id != m.Id)).ToArray();
-        Notify(nameof(Entries)); Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
+        Notify(nameof(VisibleEntries)); Notify(nameof(EntrySummary)); Notify(nameof(AvailableMods));
         RebuildVisibleItems();
-        SelectedMod = VisibleItems.OfType<ProfileModItem>().FirstOrDefault(e => e.Mod.Id == id) ?? VisibleItems.OfType<ProfileModItem>().FirstOrDefault();
+        SelectedListItem = selection is ProfileGroupItem group
+            ? VisibleItems.OfType<ProfileGroupItem>().FirstOrDefault(item => item.Id == group.Id)
+            : VisibleItems.OfType<ProfileModItem>().FirstOrDefault(e => e.Mod.Id == id) ?? VisibleItems.OfType<ProfileModItem>().FirstOrDefault();
+        RefreshSelectedMod();
         ModToAdd = AvailableMods.FirstOrDefault();
         Conflicts = report.Resources.Select(c => $"{c.Archive} · {c.Resource.Id:x16}/{c.Resource.Type:x16} · {mods[c.WinningSourceId].Name} wins").ToArray();
         ArchiveSummary = $"{ModPresentation.Count(report.Archives.Count, "shared archive")} · {ModPresentation.Count(Conflicts.Count, "overlapping resource")}";
@@ -195,6 +253,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     }
     private void RefreshCommands()
     {
+        if (Operations.IsBusy && !Operations.IsProgressVisible) return;
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
             ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand }) command.Refresh();
     }

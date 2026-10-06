@@ -216,19 +216,19 @@
       "quartermaster.core": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Repatcher": "[0.2.2, )"
+          "Quartermaster.Repatcher": "[0.3.0, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Core": "[0.2.2, )"
+          "Quartermaster.Core": "[0.3.0, )"
         }
       },
       "quartermaster.providers": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Library": "[0.2.2, )"
+          "Quartermaster.Library": "[0.3.0, )"
         }
       },
       "quartermaster.repatcher": {

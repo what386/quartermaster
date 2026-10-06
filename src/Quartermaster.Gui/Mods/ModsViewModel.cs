@@ -5,10 +5,35 @@ using System.Collections.ObjectModel;
 
 namespace Quartermaster.Gui.Mods;
 
-public sealed record ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null) : IModRow
+public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null) : ViewModelBase, IModRow
 {
-    public AsyncCommand? UpdateCommand { get; init; }
-    public string? UpdateDescription { get; init; }
+    public Mod Mod { get; private set; } = Mod;
+    public int Index { get; private set; } = Index;
+    public bool HasConflict { get; private set; } = HasConflict;
+    public string? IconPath { get; private set; } = IconPath;
+    public void Update(ModListItem value)
+    {
+        var changes = new (string Name, object? Before, object? After)[]
+        {
+            (nameof(Name), Name, value.Name),
+            (nameof(Title), Title, value.Title),
+            (nameof(Number), Number, value.Number),
+            (nameof(Description), Description, value.Description),
+            (nameof(Monogram), Monogram, value.Monogram),
+            (nameof(HasConflict), HasConflict, value.HasConflict),
+            (nameof(IconPath), IconPath, value.IconPath),
+            (nameof(HasOptions), HasOptions, value.HasOptions),
+            (nameof(HasUpdate), HasUpdate, value.HasUpdate),
+            (nameof(UpdateDescription), UpdateDescription, value.UpdateDescription),
+        };
+        Mod = value.Mod; Index = value.Index; HasConflict = value.HasConflict; IconPath = value.IconPath;
+        if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
+        UpdateDescription = value.UpdateDescription;
+        NotifyChanges(changes);
+    }
+
+    public AsyncCommand? UpdateCommand { get; set; }
+    public string? UpdateDescription { get; set; }
     public bool HasUpdate => UpdateCommand is not null;
     public string Name => Mod.Name;
     public string Title => ModPresentation.Title(Mod);
@@ -65,7 +90,7 @@ public sealed class ModsViewModel : SessionViewModel
     private string search = "";
     private ModListItem? selected;
     public ObservableCollection<ModListItem> SelectedMods { get; } = [];
-    public IReadOnlyList<ModListItem> Mods { get; private set; } = [];
+    public ObservableCollection<ModListItem> Mods { get; } = [];
     public string Search { get => search; set { if (Set(ref search, value)) Refresh(); } }
     public ModListItem? SelectedMod
     {
@@ -84,7 +109,10 @@ public sealed class ModsViewModel : SessionViewModel
     public bool HasSelection => SelectedMods.Count > 0;
     public bool HasSingleSelection => SelectedMods.Count == 1;
     public string CountLabel => $"{Mods.Count} mods";
+    public string LibraryHeader => $"LOCAL LIBRARY ({CountLabel})";
+    public bool HasUpdates => Downloads.AvailableUpdates().Count > 0;
     public ModDownloads Downloads => Services.Downloads;
+    public AsyncCommand UpdateAllCommand { get; }
     public AsyncCommand AddModCommand { get; }
     public AsyncCommand CheckUpdatesCommand { get; }
     public AsyncCommand ImportZipCommand { get; }
@@ -95,8 +123,11 @@ public sealed class ModsViewModel : SessionViewModel
     {
         AddModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct));
         CheckUpdatesCommand = Operations.CreateCommand("Checking mod updates", ct => Services.Downloads.CheckUpdatesAsync(ct));
-        Services.Downloads.Changed += (_, _) => { foreach (var row in Mods) row.UpdateCommand?.Refresh(); };
-        Operations.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OperationState.IsBusy)) foreach (var row in Mods) row.UpdateCommand?.Refresh(); };
+        UpdateAllCommand = Operations.CreateCommand("Updating mods", ct => Downloads.ApplyUpdatesAsync(ct),
+            () => Downloads.AvailableUpdates().Any(Downloads.CanQueueUpdate));
+        Services.Downloads.Changed += (_, _) =>
+        { foreach (var row in Mods) row.UpdateCommand?.Refresh(); Notify(nameof(HasUpdates)); UpdateAllCommand.Refresh(); };
+        Operations.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OperationState.IsBusy) && (!Operations.IsBusy || Operations.IsProgressVisible)) foreach (var row in Mods) row.UpdateCommand?.Refresh(); };
         ImportZipCommand = Operations.CreateCommand("Importing mod", async ct =>
         {
             var path = await Services.Dialogs.PickModZipAsync();
@@ -144,12 +175,20 @@ public sealed class ModsViewModel : SessionViewModel
         var ids = SelectedMods.Select(item => item.Mod.Id).ToHashSet();
         var collisions = Session.ActiveProfile is { } active ? Quartermaster.Core.Deployment.ConflictAnalyzer.Analyze(
             Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)).Resources.SelectMany(c => c.SourceIds).ToHashSet() : [];
-        Mods = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
+        var existing = Mods.ToDictionary(row => row.Mod.Id);
+        var rows = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
             .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m))
             { UpdateCommand = Services.Downloads.CreateUpdateCommand(m), UpdateDescription = Services.Downloads.UpdateDescription(m) }).ToArray();
-        Notify(nameof(Mods)); Notify(nameof(CountLabel)); Notify(nameof(HasMods)); Notify(nameof(HasVisibleMods)); Notify(nameof(EmptyMessage));
-        SelectedMods.Clear();
-        foreach (var item in Mods.Where(item => ids.Contains(item.Mod.Id))) SelectedMods.Add(item);
+        var desired = rows.Select(row =>
+        {
+            if (!existing.TryGetValue(row.Mod.Id, out var current)) return row;
+            current.Update(row); return current;
+        }).ToArray();
+        CollectionUpdates.Synchronize(Mods, desired);
+        Notify(nameof(CountLabel)); Notify(nameof(LibraryHeader)); Notify(nameof(HasUpdates));
+        if (!Operations.IsBusy || Operations.IsProgressVisible) UpdateAllCommand.Refresh();
+        Notify(nameof(HasMods)); Notify(nameof(HasVisibleMods)); Notify(nameof(EmptyMessage));
+        CollectionUpdates.Synchronize(SelectedMods, Mods.Where(item => ids.Contains(item.Mod.Id)).ToArray());
         if (SelectedMods.Count == 0 && Mods.FirstOrDefault() is { } first) SelectedMods.Add(first);
         SelectionChanged();
     }
