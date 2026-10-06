@@ -134,8 +134,11 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                 if (existing is not null)
                 {
                     await contents.DeleteAsync(imported.Id, CancellationToken.None).ConfigureAwait(false);
-                    existing = existing with { PageLink = existing.PageLink ?? ModLinks.PageFor(original),
-                        ImportedFileName = existing.ImportedFileName ?? original.ImportedFileName };
+                    existing = existing with
+                    {
+                        PageLink = existing.PageLink ?? ModLinks.PageFor(original),
+                        ImportedFileName = existing.ImportedFileName ?? original.ImportedFileName
+                    };
                     mods[mods.FindIndex(mod => mod.Id == existing.Id)] = existing;
                     created.Remove(imported.Id); mapping.Add(original.Id, existing);
                 }

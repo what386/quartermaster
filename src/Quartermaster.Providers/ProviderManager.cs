@@ -476,8 +476,10 @@ public sealed class ProviderManager(
             {
                 Jobs = state.Jobs.Select(item => item.Id == job.Id ? item with
                 {
-                    Status = DownloadStatus.NeedsConfirmation, Error = null,
-                    Warning = warning.Message, ConfirmationFile = warning.File
+                    Status = DownloadStatus.NeedsConfirmation,
+                    Error = null,
+                    Warning = warning.Message,
+                    ConfirmationFile = warning.File
                 } : item).ToArray()
             }, ct);
         }
