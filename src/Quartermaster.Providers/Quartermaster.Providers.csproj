@@ -4,4 +4,5 @@
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../Quartermaster.Library/Quartermaster.Library.csproj" /></ItemGroup>
+  <Import Project="../../build/AyakaMods.targets" />
 </Project>

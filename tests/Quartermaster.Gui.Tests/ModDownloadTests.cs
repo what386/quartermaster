@@ -23,6 +23,56 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDownloadTests
 {
     [AvaloniaFact]
+    public async Task AyakaIsRegisteredInSearchAndImportsAndUpdatesWithNoUserKeySetting()
+    {
+        byte[] initial = []; byte[] updated = []; var latest = 10;
+        object FileData(int version) => new { id = version + 1, filename = "reticle.zip", size = version == 10 ? initial.Length : updated.Length };
+        object VersionData(int version) => new { version_id = version, mod_id = 42, version_string = "v" + version, files = new[] { FileData(version) } };
+        using var api = new HttpClient(new Handler(request => request.RequestUri!.AbsolutePath switch
+        {
+            "/api/mod-games/" => Json(new { games = new[] { new { game_id = 3, title = "Helldivers 2" } } }),
+            "/api/mods/" => Json(new { mods = new[] { new { mod_id = 42, title = "Reticle", tag_line = "HUD", game_id = 3, mod_type = "download_local", view_url = "https://ayakamods.com/mods/reticle.42/" } } }),
+            "/api/mods/42/" => Json(new { mod = new { mod_id = 42, title = "Reticle", tag_line = "HUD", game_id = 3, mod_type = "download_local", view_url = "https://ayakamods.com/mods/reticle.42/" } }),
+            "/api/mods/42/versions/" => Json(new { versions = latest == 10 ? new[] { VersionData(10) } : new[] { VersionData(10), VersionData(20) } }),
+            "/api/mod-versions/10/" => Json(new { version = VersionData(10) }),
+            "/api/mod-versions/20/" => Json(new { version = VersionData(20) }),
+            _ => throw new Exception("Unexpected request")
+        }));
+        using var downloads = new HttpClient(new Handler(request => new(HttpStatusCode.OK)
+        { Content = new ByteArrayContent(request.RequestUri!.AbsolutePath.Contains("/10/") ? initial : updated) }));
+        using var f = new Fixture(ayakaApi: api, ayakaDownloads: downloads, ayakaKey: _ => Task.FromResult<string?>("test-key"), openBrowser: _ => throw new Exception("Unexpected browser launch"));
+        initial = File.ReadAllBytes(f.Zip("Initial Ayaka", 1)); updated = File.ReadAllBytes(f.Zip("Updated Ayaka", 2));
+        await f.Shell.InitializeAsync();
+        var search = (SearchViewModel)Navigate(f, PageKind.Search);
+        search.SelectedProvider = search.Providers.Single(provider => provider.Id == "ayakamods");
+        Assert.Equal("AyakaMods", search.SelectedProvider.Name);
+        search.Query = "reticle";
+        await search.SearchCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError); Assert.Single(search.Results);
+        var profiles = (ProfilesViewModel)Navigate(f, PageKind.Profiles);
+        f.Dialogs.ModImport = new(ModImportKind.Link, "https://ayakamods.com/mods/reticle.42/");
+        await profiles.ImportModCommand.ExecuteAsync();
+        var job = Assert.Single(f.Services.Providers.State.Jobs);
+        await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(5));
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        Assert.Equal(DownloadStatus.Complete, Assert.Single(f.Services.Providers.State.Jobs).Status);
+        var original = Assert.Single(f.Services.Session.State.Mods);
+        Assert.Equal(original.Id, Assert.Single(f.Services.Session.ActiveProfile!.Entries).ModId);
+        latest = 20;
+        await profiles.CheckUpdatesCommand.ExecuteAsync();
+        var entry = Assert.Single(profiles.Entries); Assert.True(entry.HasUpdate);
+        await entry.UpdateCommand!.ExecuteAsync();
+        var upgrade = f.Services.Providers.State.Jobs.Single(item => item.ReplacesModId == original.Id);
+        await f.Services.Providers.WaitForJobAsync(upgrade.Id).WaitAsync(TimeSpan.FromSeconds(5));
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        var installed = Assert.Single(f.Services.Session.ActiveProfile!.Entries);
+        Assert.NotEqual(original.Id, installed.ModId);
+        Assert.Equal("20:21", Assert.Single(f.Services.Session.State.Mods.Single(mod => mod.Id == installed.ModId).Sources).FileId);
+        Assert.False(Assert.Single(profiles.Entries).HasUpdate); Assert.Empty(f.BrowserRequests);
+        Assert.Null(await f.Services.Keys.GetAsync("ayakamods"));
+    }
+
+    [AvaloniaFact]
     public async Task GitHubSettingsValidateSaveMaskAndRemoveOptionalToken()
     {
         using var api = new HttpClient(new Handler(request =>

@@ -102,6 +102,8 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
 
       - name: Publish
+        env:
+          AYAKAMODS_API_KEY: ${{ secrets.AYAKAMODS_API_KEY }}
         run: >
           dotnet publish
           "src/Quartermaster.Gui/Quartermaster.Gui.csproj"

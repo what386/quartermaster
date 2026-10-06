@@ -16,6 +16,7 @@ public sealed class AppServices : IAsyncDisposable
     public Quartermaster.Providers.ApiKeyStore Keys { get; }
     public Quartermaster.Providers.Clients.NexusMods.NexusClient Nexus { get; }
     public Quartermaster.Providers.Clients.GitHub.GitHubProvider GitHub { get; }
+    public Quartermaster.Providers.Clients.AyakaMods.AyakaProvider Ayaka { get; }
     public Quartermaster.Library.Mods.LibraryService Library { get; }
     public string DataDirectory { get; }
     public LibrarySession Session { get; }
@@ -24,7 +25,7 @@ public sealed class AppServices : IAsyncDisposable
     public Action LaunchGame { get; }
     public Action<Uri> OpenBrowser { get; }
     public IDialogService Dialogs { get; }
-    public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null)
+    public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null, HttpClient? ayakaApi = null, HttpClient? ayakaDownloads = null, Func<CancellationToken, Task<string?>>? ayakaKey = null)
     {
         DataDirectory = Path.GetFullPath(directory); Dialogs = dialogs;
         var log = new JsonEventLog(DataDirectory);
@@ -48,14 +49,15 @@ public sealed class AppServices : IAsyncDisposable
             return await client.ValidateAsync(ct);
         };
         GitHub = new(githubApi, githubDownloads, ct => Keys.GetAsync("github", ct));
-        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Clients.NexusMods.NexusAdapter(Nexus), GitHub], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
+        Ayaka = new(ayakaApi, ayakaDownloads, ayakaKey);
+        Providers = new(Library, new(DataDirectory), [new Quartermaster.Providers.Clients.NexusMods.NexusAdapter(Nexus), GitHub, Ayaka], TemporaryStorage.PathFor(DataDirectory, "downloads"), OpenBrowser);
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));
         Session.Changed += (_, _) => Theme.Load(Session.Settings);
         Downloads = new(this);
     }
-    public async ValueTask DisposeAsync() { IsDisposed = true; await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
+    public async ValueTask DisposeAsync() { IsDisposed = true; await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); Ayaka.Dispose(); }
     public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster");
 }

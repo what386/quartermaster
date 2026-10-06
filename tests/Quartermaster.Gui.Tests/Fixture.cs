@@ -59,11 +59,11 @@ internal sealed class Fixture : IDisposable
     public int Launches { get; private set; }
     public List<Uri> BrowserRequests { get; } = [];
     private readonly Action<Uri>? browserCallback;
-    public Fixture(bool discoverGame = true, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null)
+    public Fixture(bool discoverGame = true, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null, HttpClient? ayakaApi = null, HttpClient? ayakaDownloads = null, Func<CancellationToken, Task<string?>>? ayakaKey = null)
     {
         browserCallback = openBrowser;
         Directory.CreateDirectory(Game); File.WriteAllBytes(Path.Combine(Game, Archive), Patch(1));
-        Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++, RecordBrowserRequest, nexusApi, nexusDownloads, githubApi, githubDownloads);
+        Services = new(Data, Dialogs, () => discoverGame ? [Game] : [], () => Launches++, RecordBrowserRequest, nexusApi, nexusDownloads, githubApi, githubDownloads, ayakaApi, ayakaDownloads, ayakaKey);
         Shell = new(Services);
     }
     private void RecordBrowserRequest(Uri uri)

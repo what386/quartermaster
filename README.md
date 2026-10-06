@@ -3,13 +3,13 @@
 ![Quartermaster profile view](assets/profile-view.png)
 
 Quartermaster is a Helldivers 2 mod manager for organizing, updating, and deploying
-mods. Search Nexus Mods from the app, track updates from Nexus Mods and GitHub,
-and keep separate mod setups in profiles.
+mods. Search Nexus Mods and AyakaMods from the app, track updates from those
+providers and GitHub, and keep separate mod setups in profiles.
 
 Disclaimer: This is actively in development and has yet to hit a stable v1.0 release. Expect the UI to change drastically, and features may be added or removed in subsequent versions.
 
-- **Mod search:** browse Helldivers 2 Nexus Mods with thumbnails and open a
-  result's download page from the app.
+- **Mod search:** browse Helldivers 2 mods on Nexus Mods or AyakaMods and add
+  results to your library.
 
 - **Mod updates:** check your library or a profile for updates, then install
   replacements without losing mod order, groups, or compatible option selections.
@@ -37,8 +37,8 @@ and macOS on x64 and ARM64.
    **Find Steam installs**. Configure provider credentials here if you want
    search and online updates.
 
-2. Open **Library** and choose **Add mod** to import a ZIP, folder, or Nexus Mods
-   or GitHub link. You can also drag ZIPs and folders into the app.
+2. Open **Library** and choose **Add mod** to import a ZIP, folder, or Nexus Mods,
+   AyakaMods, or GitHub link. You can also drag ZIPs and folders into the app.
 
 3. Click **+** in the sidebar to create a profile. Right-click mods in Library
    and choose **Add to** to add them to it. Dropping a mod into a profile imports
@@ -56,14 +56,16 @@ ZIP through the create-profile dialog or by dropping it into the sidebar.
 
 ## Search and updates
 
-Use **Search** to find Helldivers 2 mods on Nexus Mods. Choose **Open download
-page** to start an import. Quartermaster opens your browser and watches your
-configured download folder; once the ZIP finishes downloading, it imports the mod.
+Use **Search** to find Helldivers 2 mods on Nexus Mods or AyakaMods. For Nexus Mods,
+choose **Open download page** to start an import. Quartermaster opens your browser
+and watches your configured download folder; once the ZIP finishes downloading,
+it imports the mod.
 
 **Check updates** in Library checks all tracked mods. In a profile, it checks
 that profile's mods. Mods with an available update show an **Update** button.
 
-GitHub release ZIPs download directly; Nexus Mods updates use your browser.
+AyakaMods hosted ZIPs and GitHub release ZIPs download directly; Nexus Mods
+updates use your browser.
 
 Updated mods keep their place in your profiles. After updates, you must redeploy.
 
@@ -83,6 +85,10 @@ Configure credentials in **Settings**, then click **Save**.
 
 - **GitHub:** a personal access token is optional and increases the API rate
   limit. Create one under Settings → Developer settings → Personal access tokens.
+
+AyakaMods uses Quartermaster's integration key and needs no user API key.
+Its [public API is documented as not yet live](https://docs.ayakamods.com/);
+availability depends on AyakaMods enabling access.
 
 ## Your mod files
 
@@ -107,6 +113,11 @@ To run from source, install the .NET 10 SDK:
 ```bash
 dotnet run --project src/Quartermaster.Gui
 ```
+
+For AyakaMods access, set the staff-issued integration key as `AYAKAMODS_API_KEY`
+in the root `.env` before building (see [.env.example](.env.example)). The build embeds
+the key, so it does not read `.env` at runtime. Without a key, the other providers
+still work. Release builds read the `AYAKAMODS_API_KEY` repository secret instead.
 
 With [just](https://github.com/casey/just):
 

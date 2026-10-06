@@ -1,0 +1,69 @@
+<Project>
+  <PropertyGroup>
+    <AyakaModsEnvFile Condition="'$(AyakaModsEnvFile)' == ''">$(MSBuildThisFileDirectory)../.env</AyakaModsEnvFile>
+  </PropertyGroup>
+  <UsingTask TaskName="LoadAyakaModsBuildKey" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <EnvFile ParameterType="System.String" Required="true" />
+      <FallbackKey ParameterType="System.String" />
+      <ApiKey ParameterType="System.String" Output="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Text.RegularExpressions" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        ApiKey = FallbackKey ?? "";
+        bool found = false;
+        if (File.Exists(EnvFile))
+        {
+            foreach (string line in File.ReadAllLines(EnvFile))
+            {
+                var match = Regex.Match(line, @"^\s*(?:export\s+)?AYAKAMODS_API_KEY\s*=\s*(.*?)\s*$");
+                if (!match.Success) continue;
+                if (found)
+                {
+                    Log.LogError("AYAKAMODS_API_KEY is defined more than once in .env.");
+                    return false;
+                }
+                found = true;
+                var value = match.Groups[1].Value;
+                if (value.StartsWith("\"") || value.StartsWith("'"))
+                {
+                    var quote = value[0];
+                    var end = value.IndexOf(quote, 1);
+                    if (end < 0 || (value.Substring(end + 1).Trim().Length > 0 && !value.Substring(end + 1).Trim().StartsWith("#")))
+                    {
+                        Log.LogError("Invalid quoted AYAKAMODS_API_KEY in .env.");
+                        return false;
+                    }
+                    value = value.Substring(1, end - 1);
+                }
+                else
+                {
+                    var comment = value.IndexOf(" #", StringComparison.Ordinal);
+                    if (comment >= 0) value = value.Substring(0, comment).TrimEnd();
+                }
+                if (value.Length > 0) ApiKey = value;
+            }
+        }
+        if (ApiKey.Length > 4096 || Regex.IsMatch(ApiKey, @"[^\x21-\x7e]"))
+        {
+            Log.LogError("Invalid AYAKAMODS_API_KEY format. The key must contain printable ASCII without spaces.");
+            return false;
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="EmbedAyakaModsKey" BeforeTargets="GetAssemblyAttributes">
+    <LoadAyakaModsBuildKey EnvFile="$(AyakaModsEnvFile)" FallbackKey="$(AYAKAMODS_API_KEY)">
+      <Output TaskParameter="ApiKey" PropertyName="_AyakaModsBuildKey" />
+    </LoadAyakaModsBuildKey>
+    <ItemGroup>
+      <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>AyakaModsApiKey</_Parameter1>
+        <_Parameter2>$(_AyakaModsBuildKey)</_Parameter2>
+      </AssemblyAttribute>
+    </ItemGroup>
+  </Target>
+</Project>
