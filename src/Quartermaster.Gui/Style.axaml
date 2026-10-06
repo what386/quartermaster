@@ -5,7 +5,7 @@
     <SolidColorBrush x:Key="CardBackground">#202327</SolidColorBrush>
     <SolidColorBrush x:Key="LineBrush">#34383D</SolidColorBrush>
     <SolidColorBrush x:Key="MutedBrush">#9299A1</SolidColorBrush>
-    <SolidColorBrush x:Key="AccentBrush">#F27A22</SolidColorBrush>
+    <SolidColorBrush x:Key="AccentBrush">#397ADA</SolidColorBrush>
     <SolidColorBrush x:Key="SuccessBrush">#4AB98A</SolidColorBrush>
     <SolidColorBrush x:Key="ClashBrush">#E2C457</SolidColorBrush>
     <SolidColorBrush x:Key="TextBrush">#FFFFFF</SolidColorBrush>
@@ -14,10 +14,10 @@
     <SolidColorBrush x:Key="SwitchBackground">#41464D</SolidColorBrush>
     <SolidColorBrush x:Key="ListBackground">#17191C</SolidColorBrush>
     <SolidColorBrush x:Key="RowBackground">#1D1F23</SolidColorBrush>
-    <SolidColorBrush x:Key="SelectedBackground">#34291F</SolidColorBrush>
-    <SolidColorBrush x:Key="SelectedRowBackground">#2B2723</SolidColorBrush>
+    <SolidColorBrush x:Key="SelectedBackground">#212D3E</SolidColorBrush>
+    <SolidColorBrush x:Key="SelectedRowBackground">#202835</SolidColorBrush>
     <SolidColorBrush x:Key="ProfileBorderBrush">#454B52</SolidColorBrush>
-    <SolidColorBrush x:Key="SelectedProfileBackground">#30261F</SolidColorBrush>
+    <SolidColorBrush x:Key="SelectedProfileBackground">#232D3C</SolidColorBrush>
     <SolidColorBrush x:Key="InputBackground">#141619</SolidColorBrush>
     <SolidColorBrush x:Key="TileBorderBrush">#5C6269</SolidColorBrush>
     <SolidColorBrush x:Key="TileBackground">#24272B</SolidColorBrush>

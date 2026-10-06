@@ -1202,7 +1202,7 @@ public class GuiTests
     }
 
     [AvaloniaFact]
-    public async Task SelectedProfileKeepsOrangeBorderOverHoverBackground()
+    public async Task SelectedProfileKeepsAccentBorderOverHoverBackground()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         var window = new MainWindow { DataContext = f.Shell }; window.Show();
@@ -1217,7 +1217,7 @@ public class GuiTests
             window.MouseMove(button.TranslatePoint(new Point(24, 24), window)!.Value);
             window.CaptureRenderedFrame()?.Dispose();
             Assert.True(button.IsPointerOver);
-            Assert.Equal(Avalonia.Media.Color.Parse("#F27A22"), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(presenter.BorderBrush).Color);
+            Assert.Equal(Avalonia.Media.Color.Parse(ThemeManager.DefaultAccent), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(presenter.BorderBrush).Color);
             Assert.Equal(new Thickness(2), presenter.BorderThickness);
             Assert.NotEqual(idleBackground, presenter.Background);
         }

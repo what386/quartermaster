@@ -10,7 +10,7 @@ public enum ThemePreset { Dark, Slate, Light }
 /// <summary>Applies saved palettes and settings previews to the app and Fluent controls.</summary>
 public sealed class ThemeManager
 {
-    public const string DefaultAccent = "#F27A22";
+    public const string DefaultAccent = "#397ADA";
     private (ThemePreset Theme, string Accent)? loaded;
 
     public void Load(ApplicationSettings settings)
@@ -26,7 +26,7 @@ public sealed class ThemeManager
     {
         if (!Enum.IsDefined(theme)) throw new InvalidDataException("Invalid theme setting.");
         if (!Color.TryParse(accent, out var color) || color.A != 255)
-            throw new InvalidDataException("Accent color must be an opaque color, such as #F27A22.");
+            throw new InvalidDataException("Accent color must be an opaque color, such as #397ADA.");
     }
 
     public static string Format(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";
@@ -74,7 +74,7 @@ public sealed class ThemeManager
             (byte)Math.Round(background.R * (1 - amount) + foreground.R * amount),
             (byte)Math.Round(background.G * (1 - amount) + foreground.G * amount),
             (byte)Math.Round(background.B * (1 - amount) + foreground.B * amount));
-        var original = preset == ThemePreset.Dark && Format(accent) == DefaultAccent;
+        var original = preset == ThemePreset.Dark && Format(accent) == "#F27A22";
         Brush("SelectedBackground", original ? "#34291F" : Format(Blend(Color.Parse(palette.Row), accent, 0.15)));
         Brush("SelectedRowBackground", original ? "#2B2723" : Format(Blend(Color.Parse(palette.Row), accent, 0.10)));
         Brush("SelectedProfileBackground", original ? "#30261F" : Format(Blend(Color.Parse(palette.Card), accent, 0.12)));

@@ -5,7 +5,7 @@
   <Application.Styles>
     <FluentTheme DensityStyle="Compact">
       <FluentTheme.Palettes>
-        <ColorPaletteResources x:Key="Dark" Accent="#F27A22" RegionColor="#191B1E" ChromeLow="#101214" ChromeMedium="#23262A" />
+        <ColorPaletteResources x:Key="Dark" Accent="#397ADA" RegionColor="#191B1E" ChromeLow="#101214" ChromeMedium="#23262A" />
       </FluentTheme.Palettes>
     </FluentTheme>
     <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
