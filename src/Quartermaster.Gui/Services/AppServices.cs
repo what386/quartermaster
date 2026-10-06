@@ -19,6 +19,7 @@ public sealed class AppServices : IAsyncDisposable
     public Quartermaster.Library.Mods.LibraryService Library { get; }
     public string DataDirectory { get; }
     public LibrarySession Session { get; }
+    public ThemeManager Theme { get; } = new();
     public OperationState Operations { get; }
     public Action LaunchGame { get; }
     public Action<Uri> OpenBrowser { get; }
@@ -51,6 +52,7 @@ public sealed class AppServices : IAsyncDisposable
         Session = new(Library, new ProfileArchives(store, content),
             new FileDeploymentStorage(DataDirectory, content), content, new SettingsStore(DataDirectory),
             discover ?? (() => SteamGameDiscovery.FindInstallations()));
+        Session.Changed += (_, _) => Theme.Load(Session.Settings);
         Downloads = new(this);
     }
     public async ValueTask DisposeAsync() { IsDisposed = true; await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }

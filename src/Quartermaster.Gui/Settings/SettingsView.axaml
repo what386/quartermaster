@@ -4,12 +4,13 @@
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
       <TextBlock Text="Settings" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
       <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search settings…" Margin="0,0,8,0" />
-      <Button Grid.Column="2" Content="Reset" Command="{Binding ResetCommand}" ToolTip.Tip="Restore defaults. Click Save to apply." Margin="0,0,8,0" />
+      <Button Grid.Column="2" Content="Reset" Command="{Binding ResetCommand}" ToolTip.Tip="Restore defaults. Click Save to keep them." Margin="0,0,8,0" />
       <Button Grid.Column="3" Content="Save" Classes="primary" Command="{Binding SaveCommand}" />
     </Grid>
     <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><TextBlock Text="PREFERENCES" FontWeight="SemiBold" /></Border>
     <ScrollViewer Grid.Row="2"><StackPanel Spacing="12">
       <Border Classes="card" IsVisible="{Binding HasMatches}"><StackPanel Spacing="16">
+        <vm:AppearanceSettingsView IsVisible="{Binding ShowAppearance}" />
         <Grid x:Name="InstallationSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowInstallation}">
           <StackPanel Spacing="4"><TextBlock Text="Game folder" FontWeight="SemiBold" /><TextBlock Text="Installation or data folder" Classes="muted" FontSize="11" /></StackPanel>
           <StackPanel Grid.Column="1" Spacing="8">

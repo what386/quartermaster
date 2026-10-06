@@ -33,7 +33,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
         {
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
-                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(HasMatches) }) Notify(name);
+                nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(ShowAppearance), nameof(HasMatches) }) Notify(name);
         }
     }
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || keywords.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -47,7 +47,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowLogs => Matches("Log file diagnostics troubleshooting " + LogFilePath);
     public bool ShowConfiguration => Matches("Settings configuration file " + ConfigurationFilePath);
     public bool HasMatches => ShowInstallation || ShowPriority || ShowRepatch || ShowStorage ||
-        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration || ShowNexus || ShowGitHub;
+        ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration || ShowNexus || ShowGitHub || ShowAppearance;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;
@@ -68,12 +68,13 @@ public sealed partial class SettingsViewModel : SessionViewModel
         SaveCommand = Operations.CreateCommand("Saving settings", async ct =>
         {
             var account = await ValidateProviderDraftAsync(ct);
-            await Session.SaveSettingsAsync(GamePath.Trim(), (RepatchMode)RepatchChoice, profileId, (PriorityDirection)PriorityChoice, ct);
+            await Session.SaveSettingsAsync(GamePath.Trim(), (RepatchMode)RepatchChoice, profileId, (PriorityDirection)PriorityChoice, ct,
+                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor));
             await SaveProviderDraftAsync(account, ct);
             LoadDrafts();
-        }, () => RepatchChoice >= 0 && RepatchChoice < RepatchChoices.Count && PriorityChoice >= 0 && PriorityChoice < PriorityChoices.Count &&
+        }, () => ValidAppearance && RepatchChoice >= 0 && RepatchChoice < RepatchChoices.Count && PriorityChoice >= 0 && PriorityChoice < PriorityChoices.Count &&
             (GamePath.Trim() != Session.GameDirectory || RepatchChoice != (int)Session.Settings.Repatch ||
-             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged));
+             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged));
         ResetCommand = new(() =>
         {
             var defaults = new ApplicationSettings();
@@ -81,6 +82,8 @@ public sealed partial class SettingsViewModel : SessionViewModel
             GamePath = defaults.GameDataDirectory ?? "";
             RepatchChoice = (int)defaults.Repatch;
             PriorityChoice = (int)PriorityDirection.LastWins;
+            ThemeChoice = (int)defaults.Theme;
+            AccentColor = Avalonia.Media.Color.Parse(defaults.AccentColor);
             ResetProviderDraft();
         }, () => Operations.CanInteract);
         BrowseCommand = Operations.CreateCommand("Selecting game folder", async _ =>
@@ -102,6 +105,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
         saved = Session.Settings; profileId = Session.ActiveProfile?.Id;
         savedPriority = (int)(Session.ActiveProfile?.Priority ?? PriorityDirection.LastWins);
         GamePath = Session.GameDirectory; RepatchChoice = (int)Session.Settings.Repatch; PriorityChoice = savedPriority;
+        LoadAppearance();
         SaveCommand.Refresh();
     }
     protected override void Refresh()
@@ -114,6 +118,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             if (RepatchChoice == (int)saved.Repatch) RepatchChoice = (int)Session.Settings.Repatch;
             var currentPriority = (int)(Session.ActiveProfile?.Priority ?? PriorityDirection.LastWins);
             if (profileId != Session.ActiveProfile?.Id || PriorityChoice == savedPriority) PriorityChoice = currentPriority;
+            RefreshAppearance(saved);
             saved = Session.Settings; profileId = Session.ActiveProfile?.Id; savedPriority = currentPriority;
         }
         Notify(nameof(ActiveProfileName)); Notify(nameof(HasProfile)); Notify(nameof(ShowPriority)); Notify(nameof(HasMatches)); SaveCommand.Refresh();

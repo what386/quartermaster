@@ -4,7 +4,8 @@ using Quartermaster.Library.Storage;
 namespace Quartermaster.Gui.Services;
 
 public enum RepatchMode { Ask, Automatic, Never }
-public sealed record ApplicationSettings(string? GameDataDirectory = null, RepatchMode Repatch = RepatchMode.Ask);
+public sealed record ApplicationSettings(string? GameDataDirectory = null, RepatchMode Repatch = RepatchMode.Ask,
+    ThemePreset Theme = ThemePreset.Dark, string AccentColor = ThemeManager.DefaultAccent);
 
 public sealed class SettingsStore(string directory)
 {
@@ -17,12 +18,14 @@ public sealed class SettingsStore(string directory)
         {
             var settings = await JsonSerializer.DeserializeAsync<ApplicationSettings>(file, cancellationToken: ct) ?? new();
             if (!Enum.IsDefined(settings.Repatch)) throw new InvalidDataException("Invalid repatch setting.");
+            ThemeManager.Validate(settings.Theme, settings.AccentColor);
             return settings;
         }
         catch (JsonException ex) { throw new InvalidDataException("Application settings are invalid.", ex); }
     }
     public async Task SaveAsync(ApplicationSettings settings, CancellationToken ct)
     {
+        ThemeManager.Validate(settings.Theme, settings.AccentColor);
         Directory.CreateDirectory(directory);
         var temporary = TemporaryStorage.PathFor(directory, "settings-" + Guid.NewGuid().ToString("N") + ".tmp");
         try

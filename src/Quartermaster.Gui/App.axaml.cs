@@ -10,7 +10,11 @@ namespace Quartermaster.Gui;
 
 public partial class App : Application
 {
-    public override void Initialize() => AvaloniaXamlLoader.Load(this);
+    public override void Initialize()
+    {
+        AvaloniaXamlLoader.Load(this);
+        ThemeManager.Apply(ThemePreset.Dark, Avalonia.Media.Color.Parse(ThemeManager.DefaultAccent));
+    }
 
     public override void OnFrameworkInitializationCompleted()
     {

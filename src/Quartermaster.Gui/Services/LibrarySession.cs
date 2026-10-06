@@ -195,14 +195,22 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         }
         finally { await ReloadAsync(CancellationToken.None); }
     }
-    public async Task SaveSettingsAsync(string gamePath, RepatchMode mode, Guid? profileId, PriorityDirection priority, CancellationToken ct)
+    public async Task SaveSettingsAsync(string gamePath, RepatchMode mode, Guid? profileId, PriorityDirection priority, CancellationToken ct,
+        ThemePreset? theme = null, string? accentColor = null)
     {
         if (!Enum.IsDefined(mode) || !Enum.IsDefined(priority)) throw new ArgumentException("Invalid settings choice.");
         var directory = string.IsNullOrWhiteSpace(gamePath) ? null :
             await Task.Run(() => SteamGameDiscovery.ResolveDataDirectory(gamePath), ct)
             ?? throw new ArgumentException("Choose a Helldivers 2 installation or its data folder.");
         var profile = profileId is null ? null : State.Profiles.Single(p => p.Id == profileId);
-        var updated = Settings with { GameDataDirectory = directory, Repatch = mode };
+        var updated = Settings with
+        {
+            GameDataDirectory = directory,
+            Repatch = mode,
+            Theme = theme ?? Settings.Theme,
+            AccentColor = accentColor ?? Settings.AccentColor
+        };
+        ThemeManager.Validate(updated.Theme, updated.AccentColor);
         // Validate the complete draft before persisting any fields.
         try
         {

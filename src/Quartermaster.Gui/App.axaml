@@ -8,6 +8,7 @@
         <ColorPaletteResources x:Key="Dark" Accent="#F27A22" RegionColor="#191B1E" ChromeLow="#101214" ChromeMedium="#23262A" />
       </FluentTheme.Palettes>
     </FluentTheme>
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
     <StyleInclude Source="avares://Quartermaster.Gui/Style.axaml" />
   </Application.Styles>
 </Application>

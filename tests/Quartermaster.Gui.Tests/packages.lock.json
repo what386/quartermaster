@@ -57,6 +57,15 @@
         "resolved": "11.3.2",
         "contentHash": "qHDToxto1e3hci5YqbG9n0Ty8mlp3zBUN5wT66wKqaDVzXyQ0do3EnRILd4Ke9jpvsktaPpgE0YjEk7hornryQ=="
       },
+      "Avalonia.Controls.ColorPicker": {
+        "type": "Transitive",
+        "resolved": "12.1.0",
+        "contentHash": "5ye5pHOKNSPh/lqQlQ/Z4rKwTjzjCGqlWseycjAuJp4DjyDR2ZH1mt3GBgL7K/y1Th+Gxu+LfM9IqIe6UqlxFA==",
+        "dependencies": {
+          "Avalonia": "12.1.0",
+          "Avalonia.Remote.Protocol": "12.1.0"
+        }
+      },
       "Avalonia.Desktop": {
         "type": "Transitive",
         "resolved": "12.1.0",
@@ -383,30 +392,31 @@
       "quartermaster.core": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Repatcher": "[1.0.0, )"
+          "Quartermaster.Repatcher": "[0.2.2, )"
         }
       },
       "quartermaster.gui": {
         "type": "Project",
         "dependencies": {
           "Avalonia": "[12.1.0, )",
+          "Avalonia.Controls.ColorPicker": "[12.1.0, )",
           "Avalonia.Desktop": "[12.1.0, )",
           "Avalonia.Fonts.Inter": "[12.1.0, )",
           "Avalonia.Themes.Fluent": "[12.1.0, )",
-          "Quartermaster.Library": "[1.0.0, )",
-          "Quartermaster.Providers": "[1.0.0, )"
+          "Quartermaster.Library": "[0.2.2, )",
+          "Quartermaster.Providers": "[0.2.2, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Core": "[1.0.0, )"
+          "Quartermaster.Core": "[0.2.2, )"
         }
       },
       "quartermaster.providers": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Library": "[1.0.0, )"
+          "Quartermaster.Library": "[0.2.2, )"
         }
       },
       "quartermaster.repatcher": {

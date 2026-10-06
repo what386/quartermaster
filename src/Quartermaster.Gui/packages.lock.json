@@ -13,6 +13,16 @@
           "MicroCom.Runtime": "0.11.6"
         }
       },
+      "Avalonia.Controls.ColorPicker": {
+        "type": "Direct",
+        "requested": "[12.1.0, )",
+        "resolved": "12.1.0",
+        "contentHash": "5ye5pHOKNSPh/lqQlQ/Z4rKwTjzjCGqlWseycjAuJp4DjyDR2ZH1mt3GBgL7K/y1Th+Gxu+LfM9IqIe6UqlxFA==",
+        "dependencies": {
+          "Avalonia": "12.1.0",
+          "Avalonia.Remote.Protocol": "12.1.0"
+        }
+      },
       "Avalonia.Desktop": {
         "type": "Direct",
         "requested": "[12.1.0, )",
@@ -206,19 +216,19 @@
       "quartermaster.core": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Repatcher": "[0.1.0, )"
+          "Quartermaster.Repatcher": "[0.2.2, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Core": "[0.1.0, )"
+          "Quartermaster.Core": "[0.2.2, )"
         }
       },
       "quartermaster.providers": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Library": "[0.1.0, )"
+          "Quartermaster.Library": "[0.2.2, )"
         }
       },
       "quartermaster.repatcher": {

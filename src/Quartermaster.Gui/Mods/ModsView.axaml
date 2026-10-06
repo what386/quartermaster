@@ -11,7 +11,7 @@
       <Grid ColumnDefinitions="*,Auto"><TextBlock Text="LOCAL LIBRARY" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding CountLabel}" /></Grid>
     </Border>
     <Grid Grid.Row="2" RowDefinitions="24,*">
-      <Border Background="#25282C" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="56,0,0,0" /></Grid></Border>
+      <Border Background="{DynamicResource TableHeaderBackground}" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="56,0,0,0" /></Grid></Border>
       <ListBox Grid.Row="1" x:Name="ModsList" Focusable="True" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding Mods}" SelectedItems="{Binding SelectedMods}" DoubleTapped="OpenModDetails">
         <ListBox.ContextMenu><ContextMenu>
           <MenuItem x:Name="AddToProfileMenuItem" Header="Add to" IsEnabled="{Binding HasSelection}" />
