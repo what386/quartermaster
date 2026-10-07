@@ -42,7 +42,7 @@ public sealed class ModDetailsViewModel : ViewModelBase
     }
     public string Name => mod.Name;
     public string Description => string.IsNullOrWhiteSpace(mod.Description) ? "No description provided." : mod.Description;
-    public string Version => mod.Version ?? "Not specified";
+    public string Version => ModPresentation.Version(mod) ?? "Not specified";
     public string ImportedAt => mod.ImportedAt.ToLocalTime().ToString("g");
     public string ResourceSummary => $"{ModPresentation.Count(mod.PatchSets.Count, "patch set")} · {ModPresentation.Count(mod.PatchSets.Sum(p => p.Resources.Count), "indexed resource")}";
     public IReadOnlyList<string> Archives => mod.PatchSets.Select(p => p.Archive).Distinct().ToArray();

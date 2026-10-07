@@ -2,13 +2,39 @@ using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
 using Quartermaster.Gui.Mods;
+using Quartermaster.Gui.Profiles;
+using Quartermaster.Gui;
 using Quartermaster.Library.Mods;
+using Quartermaster.Library.Profiles;
 using Xunit;
 
 namespace Quartermaster.Gui.Tests;
 
 public sealed class ModDetailsTests
 {
+    [AvaloniaFact]
+    public async Task RetainedVersionsAreLabelledAndProfilesShowTheUpdatedProviderVersion()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var old = await f.Services.Library.ImportAsync(f.Source("Old", 1), "Example");
+        var updated = await f.Services.Library.ImportAsync(f.Source("New", 2), "Example");
+        Assert.Null(old.Version); Assert.Null(updated.Version);
+        await f.Services.Library.SetSourcesAsync(old.Id, [new("nexusmods", "100", "10", "1.0")]);
+        await f.Services.Library.SetSourcesAsync(updated.Id, [new("nexusmods", "100", "11", "2.0")]);
+        await f.Services.Session.SaveProfileAsync(ProfileEditor.Add(f.Services.Session.ActiveProfile!, old), false, CancellationToken.None);
+        await f.Services.Library.ReplaceInProfilesAsync(old.Id, updated.Id);
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var profile = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
+        var row = Assert.Single(profile.Entries);
+        Assert.Equal(updated.Id, row.Mod.Id); Assert.Equal("Example · 2.0", row.Title);
+        Assert.Equal("2.0", new ModDetailsViewModel(row.Mod, f.Services).Version);
+        f.Shell.Navigate(PageKind.Mods);
+        var library = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
+        Assert.Equal(2, library.Mods.Count);
+        Assert.Equal("Example · 1.0 (previous version)", library.Mods.Single(item => item.Mod.Id == old.Id).Title);
+        Assert.Equal("Example · 2.0", library.Mods.Single(item => item.Mod.Id == updated.Id).Title);
+    }
+
     [AvaloniaFact]
     public async Task DetailsShowSavedRequirementsAndReverseDependenciesFromTheLibrary()
     {

@@ -89,7 +89,13 @@ public interface IModRow
 public static class ModPresentation
 {
     public static string Count(int count, string singular) => $"{count} {singular}{(count == 1 ? "" : "s")}";
-    public static string Title(Mod mod) => string.IsNullOrWhiteSpace(mod.Version) ? mod.Name : $"{mod.Name} · {mod.Version}";
+    public static string? Version(Mod mod) => !string.IsNullOrWhiteSpace(mod.Version) ? mod.Version :
+        mod.Sources.Select(source => source.InstalledVersion).FirstOrDefault(version => !string.IsNullOrWhiteSpace(version));
+    public static string Title(Mod mod)
+    {
+        var title = Version(mod) is { } version ? $"{mod.Name} · {version}" : mod.Name;
+        return mod.Superseded ? $"{title} (previous version)" : title;
+    }
     public static string Description(Mod mod) => string.IsNullOrWhiteSpace(mod.Description) ? "No description" :
         string.Join(" ", mod.Description.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     public static string Monogram(Mod mod) => string.Concat(mod.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
