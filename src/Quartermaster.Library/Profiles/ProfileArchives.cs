@@ -139,7 +139,8 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                         PageLink = existing.PageLink ?? ModLinks.PageFor(original),
                         ImportedFileName = existing.ImportedFileName ?? original.ImportedFileName,
                         Dependencies = existing.DependenciesKnown ? existing.Dependencies : original.Dependencies,
-                        DependenciesKnown = existing.DependenciesKnown || original.DependenciesKnown
+                        DependenciesKnown = existing.DependenciesKnown || original.DependenciesKnown,
+                        InstalledAsDependency = existing.InstalledAsDependency && original.InstalledAsDependency
                     };
                     mods[mods.FindIndex(mod => mod.Id == existing.Id)] = existing;
                     created.Remove(imported.Id); mapping.Add(original.Id, existing);
@@ -155,7 +156,8 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                         ImportedFileName = original.ImportedFileName,
                         Dependencies = original.Dependencies,
                         DependenciesKnown = original.DependenciesKnown,
-                        Superseded = original.Superseded
+                        Superseded = original.Superseded,
+                        InstalledAsDependency = original.InstalledAsDependency
                     };
                     mods.Add(imported); mapping.Add(original.Id, imported);
                 }

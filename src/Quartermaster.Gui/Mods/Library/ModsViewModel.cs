@@ -22,6 +22,7 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
+            (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(HasOptions), HasOptions, value.HasOptions),
@@ -50,6 +51,7 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
     public bool HasOptions => Mod.Options.Count > 0;
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
+    public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public bool HasToggle => false;
     public bool IsEnabled => false;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Avalonia.Layout.HorizontalAlignment.Left;
@@ -70,6 +72,7 @@ public interface IModRow
     string? IconPath { get; }
     bool HasConflict { get; }
     bool HasWarnings { get; }
+    bool InstalledAsDependency { get; }
     string WarningDescription { get; }
     bool HasToggle { get; }
     bool HasOptions { get; }

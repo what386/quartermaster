@@ -8,6 +8,8 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Quartermaster.Gui.Search;
+using Quartermaster.Gui.Mods;
+using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Providers.Downloads;
 using Xunit;
@@ -27,6 +29,8 @@ public class NexusMetadataTests
         public Dictionary<int, byte[]> Archives { get; } = [];
         public bool External { get; set; }
         public bool FailScans { get; set; }
+        public bool Updated { get; set; }
+        public int[] RootDependencies { get; set; } = [2, 1];
         public async Task<HttpResponseMessage> Respond(HttpRequestMessage request)
         {
             var path = request.RequestUri!.AbsolutePath;
@@ -41,7 +45,7 @@ public class NexusMetadataTests
                 if (query.Contains("modRequirements"))
                 {
                     var id = int.Parse(variables.GetProperty("mod").GetString()!);
-                    var deps = id == 3 ? new[] { 2, 1 } : id == 2 ? new[] { 1, 3 } : Array.Empty<int>();
+                    var deps = id == 3 ? RootDependencies : id == 2 ? new[] { 1, 3 } : Array.Empty<int>();
                     var nodes = deps.Select(dep => (object)new { modName = "Mod" + dep, modId = dep.ToString(), gameId = "7184",
                         url = $"https://www.nexusmods.com/helldivers2/mods/{dep}", notes = "Required", externalRequirement = false }).ToList();
                     if (External && id == 3) nodes.Add(new { modName = "External tool", modId = "0", gameId = "0",
@@ -66,13 +70,13 @@ public class NexusMetadataTests
                 var hash = Path.GetFileNameWithoutExtension(path);
                 return Json(Archives.Where(pair => Convert.ToHexString(MD5.HashData(pair.Value)).Equals(hash, StringComparison.OrdinalIgnoreCase))
                     .Select(pair => new { mod = new { mod_id = pair.Key, name = "Mod" + pair.Key, summary = "", version = "1", available = true },
-                        file_details = new { file_id = pair.Key * 10, name = "Main", file_name = $"Mod{pair.Key}.zip", version = "1", category_id = 1, is_primary = true } }));
+                        file_details = new { file_id = pair.Key * 10 + (Updated && pair.Key == 3 ? 1 : 0), name = "Main", file_name = $"Mod{pair.Key}.zip", version = "1", category_id = 1, is_primary = true } }));
             }
             if (path.EndsWith("files.json"))
             {
                 var id = int.Parse(path.Split('/')[^2]);
-                return Json(new { files = new[] { new { file_id = id * 10, name = "Main", file_name = $"Mod{id}.zip", version = "1",
-                    category_id = 1, is_primary = true, size_in_bytes = Archives[id].Length } }, file_updates = Array.Empty<object>() });
+                return Json(new { files = new[] { new { file_id = id * 10 + (Updated && id == 3 ? 1 : 0), name = "Main", file_name = $"Mod{id}.zip", version = Updated && id == 3 ? "2" : "1",
+                    category_id = 1, is_primary = true, size_in_bytes = Archives[id].Length } }, file_updates = Updated && id == 3 ? new object[] { new { old_file_id = 30, new_file_id = 31 } } : Array.Empty<object>() });
             }
             var modId = int.Parse(Path.GetFileNameWithoutExtension(path));
             return Json(new { mod_id = modId, name = "Mod" + modId, summary = "", version = "1", available = true });
@@ -108,6 +112,7 @@ public class NexusMetadataTests
         Assert.Equal(installed ? 2 : 3, f.Services.Providers.State.Jobs.Count);
         Assert.Equal(new[] { "1", "2", "3" }.Where(id => !installed || id != "1"), f.Services.Providers.State.Jobs.Select(job => job.File.ModId));
         Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(target, job.ProfileId));
+        Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(job.File.ModId != "3", job.InstalledAsDependency));
         foreach (var job in f.Services.Providers.State.Jobs.ToArray())
         {
             File.WriteAllBytes(Path.Combine(folder, job.File.FileName), server.Archives[int.Parse(job.File.ModId)]);
@@ -118,9 +123,105 @@ public class NexusMetadataTests
         Assert.Equal(3, f.Services.Session.State.Mods.Count);
         var rootMod = f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod3");
         Assert.True(rootMod.DependenciesKnown);
+        Assert.False(rootMod.InstalledAsDependency);
+        Assert.True(f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod2").InstalledAsDependency);
+        Assert.Equal(!installed, f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod1").InstalledAsDependency);
+        await using (var reopened = f.ReopenServices())
+            Assert.True((await reopened.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Mod2").InstalledAsDependency);
         Assert.Equal(new[] { "Mod2", "Mod1" }, rootMod.Dependencies.Select(dependency => dependency.Name));
         Assert.Equal(new[] { "Mod1", "Mod3" }, f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod2").Dependencies.Select(dependency => dependency.Name));
         Assert.Equal(profile ? 3 : 0, f.Services.Session.ActiveProfile!.Entries.Count);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task UpdatesOfferNewDependenciesAndIncludeThemInEveryProfile(bool includeDependencies, bool singleUpdate)
+    {
+        var server = new NexusServer { Updated = true }; using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        await f.Services.Providers.SetDirectoriesAsync([folder]);
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        var old = await f.Services.Library.ImportAsync(f.Source("Old root", 33), name: "Mod3", installedAsDependency: true);
+        await f.Services.Library.SetSourcesAsync(old.Id, [new("nexusmods", "3", "30", "1")]);
+        await f.Services.Library.SetDependenciesAsync(old.Id, []);
+        var first = ProfileEditor.Add(f.Services.Session.ActiveProfile!, old);
+        var second = ProfileEditor.Add(ProfileEditor.Create("Second"), old);
+        await f.Services.Session.SaveProfileAsync(first, false, CancellationToken.None);
+        await f.Services.Session.SaveProfileAsync(second, false, CancellationToken.None);
+        await f.Services.Library.RecordUpdateCheckAsync(new(old.Id, "nexusmods", DateTimeOffset.UtcNow, "2", "31"));
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        f.Dialogs.Confirm = includeDependencies;
+        if (singleUpdate) await f.Services.Downloads.CreateUpdateCommand(f.Services.Session.State.Mods.Single())!.ExecuteAsync();
+        else await f.Services.Operations.RunAsync("Updating mods", ct => f.Services.Downloads.ApplyUpdatesAsync(ct));
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        var prompt = Assert.Single(f.Dialogs.Confirmations);
+        Assert.Equal("Mod requirements", prompt.Title); Assert.Contains("Mod2", prompt.Message);
+        Assert.Equal(includeDependencies ? 3 : 1, f.Services.Providers.State.Jobs.Count);
+        foreach (var job in f.Services.Providers.State.Jobs.ToArray())
+        {
+            File.WriteAllBytes(Path.Combine(folder, job.File.FileName), server.Archives[int.Parse(job.File.ModId)]);
+            await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(DownloadStatus.Complete, job.Status));
+        var root = f.Services.Session.State.Mods.Single(mod => !mod.Superseded && mod.Name == "Mod3");
+        Assert.NotEqual(old.Id, root.Id); Assert.True(root.InstalledAsDependency);
+        Assert.Equal(new[] { "Mod2", "Mod1" }, root.Dependencies.Select(item => item.Name));
+        Assert.All(f.Services.Session.State.Profiles, profile =>
+        {
+            Assert.Contains(profile.Entries, entry => entry.ModId == root.Id);
+            Assert.Equal(includeDependencies ? 3 : 1, profile.Entries.Count);
+        });
+    }
+
+    [AvaloniaFact]
+    public async Task ResolveButtonRepairsRequirementsAndDistinguishesDependencyImports()
+    {
+        var server = new NexusServer(); using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        await f.Services.Providers.SetDirectoriesAsync([folder]);
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        var root = await f.Services.Library.ImportAsync(Path.Combine(f.Root, "Mod3.zip"));
+        var explicitMod = await f.Services.Library.ImportAsync(Path.Combine(f.Root, "Mod1.zip"));
+        await f.Services.Library.SetSourcesAsync(root.Id, [new("nexusmods", "3", "30", "1")]);
+        await f.Services.Library.SetSourcesAsync(explicitMod.Id, [new("nexusmods", "1", "10", "1")]);
+        var profile = ProfileEditor.SetEnabled(ProfileEditor.Add(ProfileEditor.Add(f.Services.Session.ActiveProfile!, root), explicitMod), explicitMod.Id, false);
+        await f.Services.Session.SaveProfileAsync(profile, false, CancellationToken.None);
+        var details = new ModDetailsViewModel(root, f.Services);
+        var dialog = new ModDetailsDialog { DataContext = details };
+        var window = new Window { Content = dialog }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.True(dialog.FindControl<Button>("ResolveDependenciesButton")!.IsVisible);
+            await details.ResolveDependenciesCommand.ExecuteAsync();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            var job = Assert.Single(f.Services.Providers.State.Jobs); Assert.True(job.InstalledAsDependency);
+            File.WriteAllBytes(Path.Combine(folder, job.File.FileName), server.Archives[2]);
+            await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(10));
+            await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+            Assert.Equal(3, f.Services.Session.ActiveProfile!.Entries.Count);
+            Assert.All(f.Services.Session.ActiveProfile.Entries, entry => Assert.True(entry.Enabled));
+            Assert.Equal(2, details.Dependencies.Count); Assert.All(details.Dependencies, item => Assert.Equal("In library", item.Status));
+            var imported = f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod2");
+            Assert.True(imported.InstalledAsDependency);
+            Assert.False(f.Services.Session.State.Mods.Single(mod => mod.Id == explicitMod.Id).InstalledAsDependency);
+            var row = new ModRowView { DataContext = new ModListItem(imported, 0, false) };
+            window.Content = row; window.CaptureRenderedFrame()?.Dispose();
+            var icon = row.FindControl<Border>("DependencyIcon")!;
+            Assert.True(icon.IsVisible); Assert.Equal("Installed as a dependency", ToolTip.GetTip(icon));
+            row.DataContext = new ModListItem(root, 0, false); Dispatcher.UIThread.RunJobs(); Assert.False(icon.IsVisible);
+        }
+        finally { window.Close(); }
+        // A second repair makes no duplicate requests or installations.
+        await f.Services.Operations.RunAsync("Resolving again", ct => f.Services.Downloads.ResolveDependenciesAsync(root.Id, ct));
+        Assert.Single(f.Dialogs.Confirmations); Assert.Single(f.Services.Providers.State.Jobs);
+        Assert.Equal(3, f.Services.Session.State.Mods.Count);
     }
 
     [AvaloniaFact]

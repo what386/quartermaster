@@ -12,6 +12,19 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Fact]
+    public async Task ExplicitImportsPromoteDependenciesAndDependencyImportsNeverDemoteExplicitMods()
+    {
+        using var f = new Fixture(); var source = f.Source("Dependency");
+        var dependency = await f.Library.ImportAsync(source, installedAsDependency: true);
+        Assert.True(dependency.InstalledAsDependency);
+        Assert.True(Assert.Single((await f.Library.LoadAsync()).Mods).InstalledAsDependency);
+        var explicitMod = await f.Library.ImportAsync(source);
+        Assert.Equal(dependency.Id, explicitMod.Id); Assert.False(explicitMod.InstalledAsDependency);
+        var again = await f.Library.ImportAsync(source, installedAsDependency: true);
+        Assert.False(again.InstalledAsDependency); Assert.Single((await f.Library.LoadAsync()).Mods);
+    }
+
+    [Fact]
     public async Task ImportPageIsSavedForNewAndDuplicateModsAndBlankPreservesIt()
     {
         using var f = new Fixture(); var source = f.Source("Mod");

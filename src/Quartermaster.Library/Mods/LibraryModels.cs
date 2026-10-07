@@ -15,6 +15,7 @@ public sealed record Mod(Guid Id, string Name, string Description, string? Versi
     public string? PageLink { get; init; }
     public string? ImportedFileName { get; init; }
     public bool Superseded { get; init; }
+    public bool InstalledAsDependency { get; init; }
 }
 
 public sealed record ModDependency(string Name, string Page, string? Notes = null, bool CanInstall = true);

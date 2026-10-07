@@ -11,6 +11,8 @@ public sealed record DownloadJob(Guid Id, ProviderFile File, DownloadStatus Stat
     public IReadOnlyList<DownloadFingerprint> ExistingFiles { get; init; } = [];
     public string? Warning { get; init; }
     public DownloadFingerprint? ConfirmationFile { get; init; }
+    public bool InstalledAsDependency { get; init; }
+    public IReadOnlyList<Guid> AdditionalProfileIds { get; init; } = [];
 }
 public sealed record DownloadFingerprint(string Path, long Size, DateTime LastWrite);
 public sealed record DownloadState(IReadOnlyList<string> Directories, IReadOnlyList<DownloadJob> Jobs);

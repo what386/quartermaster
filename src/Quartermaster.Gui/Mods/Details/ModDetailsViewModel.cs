@@ -7,15 +7,25 @@ namespace Quartermaster.Gui.Mods;
 
 public sealed class ModDetailsViewModel : ViewModelBase
 {
-    private readonly Mod mod;
+    private Mod mod;
+    private readonly AppServices services;
     private string pageLink;
     private string savedPage;
     public string PageLink { get => pageLink; set { if (Set(ref pageLink, value)) { SavePageCommand.Refresh(); OpenPageCommand.Refresh(); } } }
     public AsyncCommand SavePageCommand { get; }
     public AsyncCommand OpenPageCommand { get; }
+    public AsyncCommand ResolveDependenciesCommand { get; }
+    public bool CanResolveDependencies => services.Downloads.CanResolveDependencies(mod);
     public ModDetailsViewModel(Mod mod, AppServices services)
     {
         this.mod = mod;
+        this.services = services;
+        RefreshRelationships();
+        ResolveDependenciesCommand = services.Operations.CreateCommand("Resolving dependencies", async ct =>
+        {
+            await services.Downloads.ResolveDependenciesAsync(this.mod.Id, ct);
+            RefreshRelationships();
+        }, () => CanResolveDependencies);
         pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
         SavePageCommand = services.Operations.CreateCommand("Saving mod page", async ct =>
         {
@@ -38,6 +48,45 @@ public sealed class ModDetailsViewModel : ViewModelBase
     public IReadOnlyList<string> Archives => mod.PatchSets.Select(p => p.Archive).Distinct().ToArray();
     public IReadOnlyList<string> Files => mod.PatchSets.SelectMany(p => p.Files).Select(f => f.RelativePath).ToArray();
     public bool HasOptions => mod.Options.Count > 0;
+    public IReadOnlyList<ModRelationshipItem> Dependencies { get; private set; } = [];
+    public IReadOnlyList<ModRelationshipItem> Dependents { get; private set; } = [];
+    public bool HasDependencies => Dependencies.Count > 0;
+    public bool HasDependents => Dependents.Count > 0;
+    public string DependencySummary => mod.DependenciesKnown ? "No dependencies." : "Dependency information unavailable.";
+    internal void StartWatching() { services.Session.Changed += SessionChanged; RefreshRelationships(); }
+    internal void StopWatching() => services.Session.Changed -= SessionChanged;
+    private void SessionChanged(object? sender, EventArgs args) => RefreshRelationships();
+    private void RefreshRelationships()
+    {
+        mod = services.Session.State.Mods.FirstOrDefault(item => item.Id == mod.Id) ?? mod;
+        var library = services.Session.State.Mods.Where(item => !item.Superseded).ToArray();
+        Dependencies = mod.Dependencies.Select(dependency => new ModRelationshipItem(
+            dependency.Name,
+            !dependency.CanInstall ? "External requirement" : library.Any(item => ModDependencyMatching.Matches(item, dependency))
+                ? "In library" : "Not in library",
+            dependency.Notes ?? "",
+            dependency.Page,
+            services)).ToArray();
+        Dependents = library.Where(item => item.Id != mod.Id && item.Dependencies.Any(dependency => ModDependencyMatching.Matches(mod, dependency)))
+            .OrderBy(item => item.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(item => new ModRelationshipItem(item.Name, "", "", ModLinks.PageFor(item), services)).ToArray();
+        Notify(nameof(Dependencies)); Notify(nameof(Dependents));
+        Notify(nameof(HasDependencies)); Notify(nameof(HasDependents)); Notify(nameof(DependencySummary));
+        Notify(nameof(CanResolveDependencies)); ResolveDependenciesCommand?.Refresh();
+    }
+
+}
+
+public sealed class ModRelationshipItem(string name, string status, string notes, string? page, AppServices services)
+{
+    public string Name { get; } = name;
+    public string Status { get; } = status;
+    public string Notes { get; } = notes;
+    public bool HasStatus => Status.Length > 0;
+    public bool HasNotes => Notes.Length > 0;
+    public bool HasPage { get; } = Uri.TryCreate(page, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http";
+    public Command OpenPageCommand { get; } = new(() => services.OpenBrowser(new Uri(page!)),
+        () => Uri.TryCreate(page, UriKind.Absolute, out var uri) && uri.Scheme is "https" or "http");
 }
 
 public sealed class ModOptionsViewModel

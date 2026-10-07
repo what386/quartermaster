@@ -35,7 +35,7 @@ public sealed class ProviderManager(
         var file = new ProviderFile(ManualDownloads.ProviderId, modId.ToString(), "manual-update", mod.Name,
             mod.ImportedFileName ?? mod.Name + ".zip", null, new Uri(page))
         { PageLink = new Uri(page) };
-        return await QueueAsync(file, replacesModId: modId, ct: ct);
+        return await QueueAsync(file, replacesModId: modId, ct: ct, installedAsDependency: mod.InstalledAsDependency);
     }
 
     public async Task InitializeAsync(CancellationToken ct = default)
@@ -126,7 +126,9 @@ public sealed class ProviderManager(
         ProviderFile file,
         Guid? profileId = null,
         Guid? replacesModId = null,
-        CancellationToken ct = default
+        CancellationToken ct = default,
+        bool installedAsDependency = false,
+        IReadOnlyList<Guid>? additionalProfileIds = null
     )
     {
         GetProvider(file.Provider);
@@ -163,7 +165,8 @@ public sealed class ProviderManager(
                             or DownloadStatus.Downloading
                             or DownloadStatus.Importing
                             or DownloadStatus.NeedsConfirmation
-                ) ?? new(Guid.NewGuid(), file, ProfileId: profileId, ReplacesModId: replacesModId);
+                ) ?? new(Guid.NewGuid(), file, ProfileId: profileId, ReplacesModId: replacesModId)
+                { InstalledAsDependency = installedAsDependency, AdditionalProfileIds = additionalProfileIds ?? [] };
             if (!State.Jobs.Any(j => j.Id == job.Id))
             {
                 if (file.Provider == ManualDownloads.ProviderId)
@@ -172,6 +175,17 @@ public sealed class ProviderManager(
                 await store.SaveAsync(updated, ct);
                 State = updated;
                 Start(job);
+            }
+            else
+            {
+                job = job with
+                {
+                    InstalledAsDependency = job.InstalledAsDependency && installedAsDependency,
+                    AdditionalProfileIds = job.AdditionalProfileIds.Concat(additionalProfileIds ?? []).Distinct().ToArray()
+                };
+                var updated = State with { Jobs = State.Jobs.Select(item => item.Id == job.Id ? job : item).ToArray() };
+                await store.SaveAsync(updated, ct);
+                State = updated;
             }
         }
         finally
@@ -335,7 +349,7 @@ public sealed class ProviderManager(
             }
     }
 
-    public async Task<DownloadJob> QueueUpdateAsync(Guid modId, CancellationToken ct = default)
+    public async Task<DownloadJob> QueueUpdateAsync(Guid modId, CancellationToken ct = default, IReadOnlyList<ModDependency>? dependencies = null)
     {
         var state = await library.LoadAsync(ct);
         var mod = state.Mods.Single(m => m.Id == modId);
@@ -355,10 +369,12 @@ public sealed class ProviderManager(
             throw new InvalidOperationException(
                 "The update is no longer available. Check for updates again."
             );
+        if (dependencies is not null) file = file with { Dependencies = dependencies };
         if (file.Provider == NexusAdapter.ProviderId && file.Dependencies is null)
             file = file with { Dependencies = (await GetRequirementsAsync(file.DownloadPage.AbsoluteUri, ct))
                 .Select(requirement => new ModDependency(requirement.Name, requirement.Page.AbsoluteUri, requirement.Notes, requirement.CanInstall)).ToArray() };
-        return await QueueAsync(file with { Name = mod.Name }, replacesModId: mod.Id, ct: ct);
+        return await QueueAsync(file with { Name = mod.Name }, replacesModId: mod.Id, ct: ct,
+            installedAsDependency: mod.InstalledAsDependency);
     }
 
     public async Task WaitForJobAsync(Guid id)
@@ -449,7 +465,11 @@ public sealed class ProviderManager(
                 var importName = job.File.Provider == ManualDownloads.ProviderId &&
                     (job.File.Name == DownloadNames.DisplayName(job.File.FileName) || job.File.Name == Path.GetFileNameWithoutExtension(job.File.FileName))
                     ? DownloadNames.DisplayName(filename) : job.File.Name;
-                var mod = await library.ImportAsync(path, importName, ct, job.ProfileId);
+                job = State.Jobs.Single(item => item.Id == job.Id);
+                var mod = await library.ImportAsync(path, importName, ct, job.ProfileId,
+                    installedAsDependency: job.InstalledAsDependency);
+                foreach (var profileId in job.AdditionalProfileIds)
+                    await library.AddToProfileAsync(mod.Id, profileId, ct);
                 if (job.File.Provider != ManualDownloads.ProviderId) await library.SetSourcesAsync(
                     mod.Id,
                     [

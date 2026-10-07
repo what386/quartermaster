@@ -21,6 +21,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public ModDeploymentState DeploymentState { get; private set; } = DeploymentState;
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
+    public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public AsyncCommand? UpdateCommand { get; private set; }
     public void Update(ProfileModItem value)
     {
@@ -34,6 +35,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
+            (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(IsLoaded), IsLoaded, value.IsLoaded),
             (nameof(IsUnloaded), IsUnloaded, value.IsUnloaded),

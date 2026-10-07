@@ -16,7 +16,7 @@ internal static class ModWarnings
         {
             foreach (var dependency in mods[id].Dependencies.Where(dependency => dependency.CanInstall))
             {
-                var matches = state.Mods.Where(mod => Matches(mod, dependency)).ToArray();
+                var matches = state.Mods.Where(mod => ModDependencyMatching.Matches(mod, dependency)).ToArray();
                 if (matches.Any(mod => enabled.Contains(mod.Id))) continue;
                 var disabled = matches.Where(mod => warnings.ContainsKey(mod.Id)).ToArray();
                 warnings[id].Add($"Requires {dependency.Name} ({(disabled.Length > 0 ? "disabled" : "missing from this profile")}).");
@@ -38,22 +38,9 @@ internal static class ModWarnings
 
     public static string ForLibraryMod(LibraryState state, Mod mod, IReadOnlyDictionary<Guid, string> profileWarnings)
     {
-        var missing = mod.Dependencies.Where(dependency => dependency.CanInstall && !state.Mods.Any(installed => !installed.Superseded && Matches(installed, dependency)))
+        var missing = mod.Dependencies.Where(dependency => dependency.CanInstall && !state.Mods.Any(installed => !installed.Superseded && ModDependencyMatching.Matches(installed, dependency)))
             .Select(dependency => $"Requires {dependency.Name} (missing from your library).");
         return string.Join("\n", missing.Prepend(profileWarnings.GetValueOrDefault(mod.Id, "")).Where(text => text.Length > 0).Distinct());
-    }
-
-    private static bool Matches(Mod mod, ModDependency dependency)
-    {
-        if (!Uri.TryCreate(dependency.Page, UriKind.Absolute, out var page)) return false;
-        if (page.Host.Equals("www.nexusmods.com", StringComparison.OrdinalIgnoreCase) || page.Host.Equals("nexusmods.com", StringComparison.OrdinalIgnoreCase))
-        {
-            var parts = page.AbsolutePath.Trim('/').Split('/');
-            if (parts is ["helldivers2", "mods", var id] && mod.Sources.Any(source => source.Provider == "nexusmods" && source.ModId == id)) return true;
-        }
-        return Uri.TryCreate(ModLinks.PageFor(mod), UriKind.Absolute, out var installedPage) &&
-            page.Host.Replace("www.", "").Equals(installedPage.Host.Replace("www.", ""), StringComparison.OrdinalIgnoreCase) &&
-            page.AbsolutePath.TrimEnd('/').Equals(installedPage.AbsolutePath.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool IsBingusSharedLoader(Mod mod)

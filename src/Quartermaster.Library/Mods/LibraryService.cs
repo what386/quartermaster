@@ -7,7 +7,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
 {
     public Task<LibraryState> LoadAsync(CancellationToken cancellationToken = default) => store.LoadAsync(cancellationToken);
 
-    public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default, Guid? profileId = null, string? pageLink = null)
+    public async Task<Mod> ImportAsync(string source, string? name = null, CancellationToken cancellationToken = default, Guid? profileId = null, string? pageLink = null, bool installedAsDependency = false)
     {
         pageLink = ModLinks.ValidatePage(pageLink);
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
@@ -15,13 +15,15 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         var target = profileId is null ? null : state.Profiles.SingleOrDefault(p => p.Id == profileId)
             ?? throw new KeyNotFoundException("Profile does not exist.");
         var mod = await contents.ImportAsync(source, name, cancellationToken).ConfigureAwait(false);
+        mod = mod with { InstalledAsDependency = installedAsDependency };
         if (pageLink is not null) mod = mod with { PageLink = pageLink };
         var identity = ModIdentity.GetKey(mod);
         var existing = state.Mods.FirstOrDefault(item => ModIdentity.GetKey(item) == identity);
         if (existing is not null)
         {
             await contents.DeleteAsync(mod.Id, CancellationToken.None).ConfigureAwait(false);
-            var updatedExisting = pageLink is null ? existing : existing with { PageLink = pageLink };
+            var updatedExisting = existing with { PageLink = pageLink ?? existing.PageLink,
+                InstalledAsDependency = existing.InstalledAsDependency && installedAsDependency };
             var duplicateState = state;
             if (updatedExisting != existing) duplicateState = duplicateState with
             { Mods = state.Mods.Select(item => item.Id == existing.Id ? updatedExisting : item).ToArray() };
@@ -174,7 +176,8 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
             Mods = state.Mods.Select(mod => mod.Id == oldId ? mod with { Superseded = true } :
                 mod.Id == newId ? mod with { Superseded = false, PageLink = oldMod.PageLink ?? mod.PageLink,
                     Dependencies = mod.DependenciesKnown ? mod.Dependencies : oldMod.Dependencies,
-                    DependenciesKnown = mod.DependenciesKnown || oldMod.DependenciesKnown } : mod).ToArray(),
+                    DependenciesKnown = mod.DependenciesKnown || oldMod.DependenciesKnown,
+                    InstalledAsDependency = mod.InstalledAsDependency && oldMod.InstalledAsDependency } : mod).ToArray(),
             Profiles = state.Profiles.Select(profile => profile.Entries.Any(e => e.ModId == oldId)
                 ? profile with { Entries = profile.Entries.Where(e => e.ModId != newId).Select(e => e.ModId == oldId ? Replace(e) : e).ToArray() }
                 : profile).ToArray()

@@ -6,6 +6,19 @@ namespace Quartermaster.Library.Tests;
 public sealed class ModUpdateTests
 {
     [Theory]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    public async Task UpdatingPreservesDependencyOriginAndExplicitInstallsTakePrecedence(bool oldDependency, bool newDependency, bool expected)
+    {
+        using var f = new Fixture();
+        var old = await f.Library.ImportAsync(f.Source("old", 1), installedAsDependency: oldDependency);
+        var updated = await f.Library.ImportAsync(f.Source("new", 2), installedAsDependency: newDependency);
+        await f.Library.ReplaceInProfilesAsync(old.Id, updated.Id);
+        Assert.Equal(expected, (await f.Library.LoadAsync()).Mods.Single(mod => mod.Id == updated.Id).InstalledAsDependency);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task ReplacementPreservesKnownDependenciesUnlessTheUpdateHasFreshMetadata(bool refreshed)

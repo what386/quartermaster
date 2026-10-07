@@ -104,10 +104,10 @@ public sealed partial class ModDownloads : ViewModelBase
         }
         ct.ThrowIfCancellationRequested();
         if (profileId is { } target && dependencies.Where(item => item.Installed is not null).Select(item => item.Installed!.Id).ToArray() is { Length: > 0 } ids)
-            await services.Session.AddModsToProfileAsync(ids, target, ct);
+            await IncludeDependenciesInProfileAsync(ids, target, ct);
         foreach (var selected in selectedFiles)
         {
-            var queued = await services.Providers.QueueAsync(selected, profileId, ct: ct);
+            var queued = await services.Providers.QueueAsync(selected, profileId, ct: ct, installedAsDependency: true);
             if (!services.Providers.DownloadsDirectly(queued.File)) services.Providers.OpenDownloadPage(queued.Id);
         }
         if (direct) await services.Providers.HandleDownloadLinkAsync(link, ct, profileId, file.Dependencies);
@@ -160,8 +160,7 @@ public sealed partial class ModDownloads : ViewModelBase
             ct.ThrowIfCancellationRequested();
             try
             {
-                var job = await services.Providers.QueueUpdateAsync(mod.Id, ct);
-                if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
+                await QueueModUpdateAsync(mod, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException) { failures.Add($"{mod.Name}: {ex.Message}"); }
         }
@@ -173,8 +172,7 @@ public sealed partial class ModDownloads : ViewModelBase
     public AsyncCommand? CreateUpdateCommand(Mod mod) => AvailableUpdate(mod) is null ? null :
         new AsyncCommand(() => services.Operations.RunAsync("Updating mod", async ct =>
         {
-            var job = await services.Providers.QueueUpdateAsync(mod.Id, ct);
-            if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
+            await QueueModUpdateAsync(mod, ct);
         }), () => !services.Operations.IsProgressVisible && CanQueueUpdate(mod), services.Operations.ReportError);
     public string? UpdateDescription(Mod mod) => AvailableUpdate(mod) is { } check
         ? $"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Click Update to upgrade." : null;

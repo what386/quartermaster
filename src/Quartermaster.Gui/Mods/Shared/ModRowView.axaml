@@ -16,6 +16,11 @@
       <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
     </StackPanel>
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+      <Border x:Name="DependencyIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding InstalledAsDependency}"
+              ToolTip.Tip="Installed as a dependency" AutomationProperties.Name="Installed as a dependency">
+        <Path Data="M4,3 L10,3 L10,9 L4,9 Z M14,15 L20,15 L20,21 L14,21 Z M7,9 L7,18 L14,18" Stretch="Uniform"
+              Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" Margin="3" IsHitTestVisible="False" />
+      </Border>
       <Button x:Name="UpdateModButton" Content="Update" Classes="primary" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"
               ToolTip.Tip="{Binding UpdateDescription}" AutomationProperties.Name="Update mod" Padding="8,4" MinHeight="0" />
       <Border x:Name="ModWarning" Width="24" Height="24" Background="Transparent" IsVisible="{Binding HasWarnings}"
