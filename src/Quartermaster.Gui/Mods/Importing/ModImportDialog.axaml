@@ -1,11 +1,11 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              x:Class="Quartermaster.Gui.Mods.ModImportDialog" Width="460">
   <StackPanel Spacing="16">
     <TextBlock Text="Import mod" Classes="pageTitle" />
     <TextBlock x:Name="SourceText" TextWrapping="Wrap" />
     <StackPanel Spacing="6">
       <TextBlock Text="Mod page URL (optional)" />
-      <TextBox x:Name="PageInput" PlaceholderText="https://…" TextChanged="PageChanged" />
+      <shared:ContentSizedTextBox x:Name="PageInput" PlaceholderText="https://…" TextChanged="PageChanged" />
       <TextBlock Text="Save the mod's page now to check for updates later." Classes="muted" TextWrapping="Wrap" />
       <TextBlock x:Name="ValidationText" IsVisible="False" TextWrapping="Wrap" />
     </StackPanel>

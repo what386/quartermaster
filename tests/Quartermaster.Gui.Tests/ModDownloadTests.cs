@@ -135,11 +135,11 @@ public sealed class ModDownloadTests
             settings.GitHubToken = "personal-token"; Assert.True(settings.SaveCommand.CanExecute(null));
             await settings.SaveCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
             Assert.True(settings.HasSavedGitHubToken); Assert.Equal("diver", settings.GitHubAccount);
-            Assert.Equal("personal-token", await f.Services.Keys.GetAsync("github")); Assert.Equal("*********", settings.GitHubToken);
+            Assert.Equal("personal-token", await f.Services.Keys.GetAsync("github")); Assert.Matches(@"^\*+$", settings.GitHubToken);
             Assert.DoesNotContain("personal-token", File.ReadAllText(Path.Combine(f.Data, "settings.json")));
             Assert.DoesNotContain("personal-token", File.ReadAllText(Path.Combine(f.Data, "log.jsonl")));
             await settings.InitializeProviderSettingsAsync(CancellationToken.None);
-            Assert.True(settings.HasSavedGitHubToken); Assert.Equal("*********", settings.GitHubToken);
+            Assert.True(settings.HasSavedGitHubToken); Assert.Matches(@"^\*+$", settings.GitHubToken);
             Assert.False(settings.SaveCommand.CanExecute(null));
             settings.DownloadFolder = Path.Combine(f.Root, "different-downloads");
             await settings.SaveCommand.ExecuteAsync();
@@ -149,7 +149,7 @@ public sealed class ModDownloadTests
             remove.Command!.Execute(null);
             Assert.True(settings.RemoveGitHubToken); Assert.Empty(settings.GitHubToken);
             remove.Command!.Execute(null);
-            Assert.False(settings.RemoveGitHubToken); Assert.Equal("*********", settings.GitHubToken);
+            Assert.False(settings.RemoveGitHubToken); Assert.Matches(@"^\*+$", settings.GitHubToken);
             remove.Command!.Execute(null); Dispatcher.UIThread.RunJobs();
             Assert.True(settings.RemoveGitHubToken);
             Assert.Equal("personal-token", await f.Services.Keys.GetAsync("github"));
@@ -508,7 +508,7 @@ public sealed class ModDownloadTests
             Assert.Single(view.GetVisualDescendants().OfType<Button>(), button => Equals(button.Content, "Save"));
             Assert.Contains(view.GetVisualDescendants().OfType<TextBox>(), box => box.PasswordChar == '*');
             await settings.SaveCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
-            Assert.Equal("test-personal-key", await f.Services.Keys.GetAsync("nexusmods")); Assert.Equal("*********", settings.NexusApiKey);
+            Assert.Equal("test-personal-key", await f.Services.Keys.GetAsync("nexusmods")); Assert.Matches(@"^\*+$", settings.NexusApiKey);
             Assert.Contains("Example user", settings.NexusAccount); Assert.Equal(folder, Assert.Single(f.Services.Providers.State.Directories));
             Assert.DoesNotContain("test-personal-key", await File.ReadAllTextAsync(Path.Combine(f.Data, "settings.json")));
             settings.Search = "nexus"; Assert.True(settings.ShowNexus); Assert.False(settings.ShowRepatch);

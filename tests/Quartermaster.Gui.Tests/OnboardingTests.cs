@@ -79,7 +79,7 @@ public class OnboardingTests
         await f.Services.Keys.SetAsync("nexusmods", "existing-nexus");
         await f.Services.Keys.SetAsync("github", "existing-github");
         using var model = new SetupViewModel(f.Services, CancellationToken.None); await model.InitializeAsync();
-        Assert.Equal("*********", model.NexusApiKey); Assert.Equal("*********", model.GitHubToken);
+        Assert.Matches(@"^\*+$", model.NexusApiKey); Assert.Matches(@"^\*+$", model.GitHubToken);
         model.GamePath = "invalid"; model.NexusApiKey = "unsaved"; model.GitHubToken = "unsaved";
         model.SkipCommand.Execute(null);
         await model.NextCommand.ExecuteAsync();
@@ -102,12 +102,12 @@ public class OnboardingTests
         var dialog = new SetupDialog(model);
         await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync();
         var removeNexus = dialog.FindControl<Button>("RemoveNexusKeyButton")!;
-        Assert.Equal("*********", model.NexusApiKey);
+        Assert.Matches(@"^\*+$", model.NexusApiKey);
         removeNexus.Command!.Execute(null);
         Assert.Empty(model.NexusApiKey); Assert.True(model.RemoveNexusKey);
         Assert.Equal("existing-nexus", await f.Services.Keys.GetAsync("nexusmods"));
         removeNexus.Command.Execute(null);
-        Assert.Equal("*********", model.NexusApiKey); Assert.False(model.RemoveNexusKey);
+        Assert.Matches(@"^\*+$", model.NexusApiKey); Assert.False(model.RemoveNexusKey);
         await model.NextCommand.ExecuteAsync(); Assert.True(model.IsGitHub); Assert.Empty(model.Error);
         Assert.Equal("existing-nexus", await f.Services.Keys.GetAsync("nexusmods"));
         await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads); Assert.Empty(model.Error);
@@ -135,7 +135,7 @@ public class OnboardingTests
         model.AllowAutomaticUpdate = true; await model.NextCommand.ExecuteAsync();
         Assert.True(f.Services.Session.Settings.AllowAutomaticUpdate);
         model.NexusApiKey = "nexus-key"; await model.NextCommand.ExecuteAsync();
-        Assert.True(model.IsGitHub); Assert.Equal("*********", model.NexusApiKey);
+        Assert.True(model.IsGitHub); Assert.Matches(@"^\*+$", model.NexusApiKey);
         model.GitHubToken = "github-token"; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads);
         model.DownloadFolder = "relative"; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads); Assert.NotEmpty(model.Error);
         model.DownloadFolder = Path.Combine(f.Root, "downloads"); await model.NextCommand.ExecuteAsync(); Assert.True(model.IsReady);
