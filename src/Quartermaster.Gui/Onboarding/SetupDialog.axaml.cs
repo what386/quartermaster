@@ -7,7 +7,12 @@ public partial class SetupDialog : UserControl, IModalDialog
 {
     public event Action<object?>? Completed;
 
-    public SetupDialog() => InitializeComponent();
+    public SetupDialog()
+    {
+        InitializeComponent();
+        NexusKeyInput.GotFocus += (_, _) => NexusKeyInput.SelectAll();
+        GitHubTokenInput.GotFocus += (_, _) => GitHubTokenInput.SelectAll();
+    }
 
     public SetupDialog(SetupViewModel model)
         : this()

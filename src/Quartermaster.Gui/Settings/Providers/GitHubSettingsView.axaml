@@ -4,8 +4,8 @@
     <StackPanel Spacing="4"><TextBlock Text="GitHub" FontWeight="SemiBold" /><TextBlock Text="{Binding GitHubAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
     <StackPanel Grid.Column="1" Spacing="8">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" MaxWidth="760" HorizontalAlignment="Left">
-        <TextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken}" PasswordChar="●" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="Optional personal access token" MinWidth="260" VerticalAlignment="Center" />
-        <CheckBox Grid.Column="1" x:Name="RemoveGitHubTokenInput" Content="Remove saved token" IsChecked="{Binding RemoveGitHubToken, Mode=TwoWay}" IsEnabled="{Binding HasSavedGitHubToken}" VerticalAlignment="Center" />
+        <TextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken}" PasswordChar="*" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="Optional personal access token" MinWidth="260" VerticalAlignment="Center" />
+        <Button Grid.Column="1" x:Name="RemoveGitHubTokenInput" Content="{Binding RemoveGitHubTokenLabel}" Command="{Binding RemoveGitHubTokenCommand}" ToolTip.Tip="Save settings to apply removal." VerticalAlignment="Center" />
       </Grid>
       <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
         <Run Text="A token increases your GitHub API rate limit. Create one in " />

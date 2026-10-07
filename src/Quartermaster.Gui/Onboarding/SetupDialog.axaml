@@ -12,13 +12,17 @@
       </Grid>
       <CheckBox IsVisible="{Binding IsUpdates}" Content="Allow automatic update checks" IsChecked="{Binding AllowAutomaticUpdate, Mode=TwoWay}" />
       <StackPanel IsVisible="{Binding IsNexus}" Spacing="8">
-        <TextBox x:Name="NexusKeyInput" Text="{Binding NexusApiKey, Mode=TwoWay}" PasswordChar="●" PlaceholderText="Personal Nexus API key" />
-        <TextBlock Text="{Binding NexusStatus}" Classes="muted" FontSize="11" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox x:Name="NexusKeyInput" Text="{Binding NexusApiKey, Mode=TwoWay}" PasswordChar="*" IsEnabled="{Binding !RemoveNexusKey}" PlaceholderText="Personal Nexus API key" />
+          <Button Grid.Column="1" x:Name="RemoveNexusKeyButton" Content="{Binding RemoveNexusKeyLabel}" Command="{Binding RemoveNexusKeyCommand}" IsVisible="{Binding HasSavedNexusKey}" ToolTip.Tip="Continue to apply removal." />
+        </Grid>
         <HyperlinkButton Content="Get your Nexus API key →" Command="{Binding OpenNexusCommand}" Foreground="{DynamicResource AccentBrush}" Padding="0" />
       </StackPanel>
       <StackPanel IsVisible="{Binding IsGitHub}" Spacing="8">
-        <TextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken, Mode=TwoWay}" PasswordChar="●" PlaceholderText="GitHub personal access token" />
-        <TextBlock Text="{Binding GitHubStatus}" Classes="muted" FontSize="11" />
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+          <TextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken, Mode=TwoWay}" PasswordChar="*" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="GitHub personal access token" />
+          <Button Grid.Column="1" x:Name="RemoveGitHubTokenButton" Content="{Binding RemoveGitHubTokenLabel}" Command="{Binding RemoveGitHubTokenCommand}" IsVisible="{Binding HasSavedGitHubToken}" ToolTip.Tip="Continue to apply removal." />
+        </Grid>
         <HyperlinkButton Content="Create a GitHub token →" Command="{Binding OpenGitHubCommand}" Foreground="{DynamicResource AccentBrush}" Padding="0" />
       </StackPanel>
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" IsVisible="{Binding IsDownloads}">

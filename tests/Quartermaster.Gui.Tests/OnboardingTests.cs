@@ -79,7 +79,7 @@ public class OnboardingTests
         await f.Services.Keys.SetAsync("nexusmods", "existing-nexus");
         await f.Services.Keys.SetAsync("github", "existing-github");
         using var model = new SetupViewModel(f.Services, CancellationToken.None); await model.InitializeAsync();
-        Assert.NotEmpty(model.NexusStatus); Assert.NotEmpty(model.GitHubStatus);
+        Assert.Equal("*********", model.NexusApiKey); Assert.Equal("*********", model.GitHubToken);
         model.GamePath = "invalid"; model.NexusApiKey = "unsaved"; model.GitHubToken = "unsaved";
         model.SkipCommand.Execute(null);
         await model.NextCommand.ExecuteAsync();
@@ -89,6 +89,37 @@ public class OnboardingTests
         Assert.False(f.Services.Session.Settings.AllowAutomaticUpdate);
         Assert.Equal("existing-nexus", await f.Services.Keys.GetAsync("nexusmods"));
         Assert.Equal("existing-github", await f.Services.Keys.GetAsync("github"));
+    }
+
+    [AvaloniaFact]
+    public async Task SavedMasksArePreservedAndRemovalButtonsCommitOnlyOnContinue()
+    {
+        using var api = new HttpClient(new Handler(_ => throw new InvalidOperationException("Saved masks must not be validated.")));
+        using var f = new Fixture(nexusApi: api, githubApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "existing-nexus");
+        await f.Services.Keys.SetAsync("github", "existing-github");
+        using var model = new SetupViewModel(f.Services, CancellationToken.None); await model.InitializeAsync();
+        var dialog = new SetupDialog(model);
+        await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync();
+        var removeNexus = dialog.FindControl<Button>("RemoveNexusKeyButton")!;
+        Assert.Equal("*********", model.NexusApiKey);
+        removeNexus.Command!.Execute(null);
+        Assert.Empty(model.NexusApiKey); Assert.True(model.RemoveNexusKey);
+        Assert.Equal("existing-nexus", await f.Services.Keys.GetAsync("nexusmods"));
+        removeNexus.Command.Execute(null);
+        Assert.Equal("*********", model.NexusApiKey); Assert.False(model.RemoveNexusKey);
+        await model.NextCommand.ExecuteAsync(); Assert.True(model.IsGitHub); Assert.Empty(model.Error);
+        Assert.Equal("existing-nexus", await f.Services.Keys.GetAsync("nexusmods"));
+        await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads); Assert.Empty(model.Error);
+        Assert.Equal("existing-github", await f.Services.Keys.GetAsync("github"));
+        model.BackCommand.Execute(null);
+        dialog.FindControl<Button>("RemoveGitHubTokenButton")!.Command!.Execute(null);
+        Assert.Equal("existing-github", await f.Services.Keys.GetAsync("github"));
+        await model.NextCommand.ExecuteAsync(); Assert.Null(await f.Services.Keys.GetAsync("github"));
+        Assert.False(model.HasSavedGitHubToken); Assert.Empty(model.GitHubToken);
+        model.BackCommand.Execute(null); model.BackCommand.Execute(null);
+        removeNexus.Command.Execute(null); await model.NextCommand.ExecuteAsync();
+        Assert.Null(await f.Services.Keys.GetAsync("nexusmods")); Assert.False(model.HasSavedNexusKey);
     }
 
     [AvaloniaFact]
@@ -104,7 +135,7 @@ public class OnboardingTests
         model.AllowAutomaticUpdate = true; await model.NextCommand.ExecuteAsync();
         Assert.True(f.Services.Session.Settings.AllowAutomaticUpdate);
         model.NexusApiKey = "nexus-key"; await model.NextCommand.ExecuteAsync();
-        Assert.True(model.IsGitHub); Assert.Empty(model.NexusApiKey);
+        Assert.True(model.IsGitHub); Assert.Equal("*********", model.NexusApiKey);
         model.GitHubToken = "github-token"; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads);
         model.DownloadFolder = "relative"; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads); Assert.NotEmpty(model.Error);
         model.DownloadFolder = Path.Combine(f.Root, "downloads"); await model.NextCommand.ExecuteAsync(); Assert.True(model.IsReady);
@@ -188,8 +219,8 @@ public class OnboardingTests
         {
             await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
             Assert.True(dialog.FindControl<TextBox>("NexusKeyInput")!.IsEffectivelyVisible);
-            Assert.Equal('●', dialog.FindControl<TextBox>("NexusKeyInput")!.PasswordChar);
-            Assert.Equal('●', dialog.FindControl<TextBox>("GitHubTokenInput")!.PasswordChar);
+            Assert.Equal('*', dialog.FindControl<TextBox>("NexusKeyInput")!.PasswordChar);
+            Assert.Equal('*', dialog.FindControl<TextBox>("GitHubTokenInput")!.PasswordChar);
             using (var frame = window.CaptureRenderedFrame()) frame?.Save(Path.Combine(Path.GetTempPath(), "quartermaster-onboarding-setup.png"), Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
             SetupOutcome? outcome = null; dialog.Completed += value => outcome = Assert.IsType<SetupOutcome>(value);
             model.SkipSetupCommand.Execute(null); Assert.Equal(SetupOutcome.TakeTour, outcome);
