@@ -59,6 +59,13 @@ ZIP through the create-profile dialog or by dropping it into the sidebar.
 Use **Search** to find Helldivers 2 mods on Nexus Mods. Choose **Open download
 page** to start an import. Quartermaster opens your browser and watches your
 configured download folder; once the ZIP finishes downloading, it imports the mod.
+Search results also show Nexus's virus-scan status for available ZIP files.
+
+Nexus installs check the mod's requirements and offer to include missing
+dependencies, including dependencies of dependencies. They go into the same
+library or profile as the requested mod. Dependencies already in your library
+can be added to a profile without downloading them again. External requirements
+are listed for manual installation.
 
 **Check updates** in Library checks all tracked mods. In a profile, it checks
 that profile's mods. When updates are found, you can apply them from the prompt

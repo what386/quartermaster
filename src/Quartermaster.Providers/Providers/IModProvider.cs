@@ -16,7 +16,11 @@ public sealed record ProviderMod(string ModId, string Name, string Summary, stri
         ? "Quartermaster downloads the ZIP and adds it to your library automatically. You can track or cancel it in Downloads."
         : "This opens the file's download page in your browser. Finish the download there; Quartermaster watches your configured download folder, verifies the ZIP, and adds it automatically. You can keep using the app while it waits.";
 }
-public sealed record SearchResult(string ModId, string Name, string Summary, string Version, Uri Page, Uri? Thumbnail = null);
+public sealed record SearchResult(string ModId, string Name, string Summary, string Version, Uri Page, Uri? Thumbnail = null)
+{
+    public string? VirusScanStatus { get; init; }
+}
+public sealed record ModRequirement(string Name, Uri Page, string? Notes = null, bool CanInstall = true);
 public enum UpdateStatus { Current, Available, Unknown }
 public sealed record ProviderUpdate(UpdateStatus Status, ProviderFile? File = null, string? Reason = null);
 
@@ -30,6 +34,8 @@ public interface IModProvider
     bool CanHandle(Uri link);
     bool IsDownloadLink(Uri link) => false;
     Task<ProviderMod> ResolveAsync(string link, CancellationToken ct = default);
+    Task<IReadOnlyList<ModRequirement>> GetRequirementsAsync(string link, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<ModRequirement>>([]);
     Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int offset = 0, CancellationToken ct = default);
     Task<ProviderUpdate> CheckUpdateAsync(SourceReference source, CancellationToken ct = default);
     DownloadScanner CreateScanner();

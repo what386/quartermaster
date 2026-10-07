@@ -1,0 +1,208 @@
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
+using Quartermaster.Gui.Search;
+using Quartermaster.Library.Profiles;
+using Quartermaster.Providers.Downloads;
+using Xunit;
+
+namespace Quartermaster.Gui.Tests;
+
+public class NexusMetadataTests
+{
+    private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => send(request);
+    }
+    private static HttpResponseMessage Json(object data) => new(HttpStatusCode.OK)
+    { Content = new StringContent(JsonSerializer.Serialize(data), Encoding.UTF8, "application/json") };
+    private sealed class NexusServer
+    {
+        public Dictionary<int, byte[]> Archives { get; } = [];
+        public bool External { get; set; }
+        public bool FailScans { get; set; }
+        public async Task<HttpResponseMessage> Respond(HttpRequestMessage request)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path.EndsWith("validate.json")) return Json(new { user_id = 7, name = "User", is_premium = true });
+            if (path.EndsWith("download_link.json")) return Json(new[] { new { URI = "https://cdn.example/" + path.Split('/')[^4] } });
+            if (path == "/v2/graphql")
+            {
+                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+                var query = body.RootElement.GetProperty("query").GetString()!;
+                var variables = body.RootElement.GetProperty("variables");
+                if (query.Contains("game(domainName")) return Json(new { data = new { game = new { id = 7184 } } });
+                if (query.Contains("modRequirements"))
+                {
+                    var id = int.Parse(variables.GetProperty("mod").GetString()!);
+                    var deps = id == 3 ? new[] { 2, 1 } : id == 2 ? new[] { 1, 3 } : Array.Empty<int>();
+                    var nodes = deps.Select(dep => (object)new { modName = "Mod" + dep, modId = dep.ToString(), gameId = "7184",
+                        url = $"https://www.nexusmods.com/helldivers2/mods/{dep}", notes = "Required", externalRequirement = false }).ToList();
+                    if (External && id == 3) nodes.Add(new { modName = "External tool", modId = "0", gameId = "0",
+                        url = "https://example.com/tool", notes = "Install separately", externalRequirement = true });
+                    return Json(new { data = new { mod = new { modRequirements = new { nexusRequirements = new { totalCount = nodes.Count, nodes } } } } });
+                }
+                if (query.Contains("modFiles"))
+                {
+                    if (FailScans) return Json(new { errors = new[] { new { message = "Unavailable" } } });
+                    return Json(new { data = new
+                    {
+                        m0 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "VERIFIED" } },
+                        m1 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "QUARANTINED" } },
+                        m2 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "WAITING_REPORT" } }
+                    } });
+                }
+                return Json(new { data = new { mods = new { nodes = Enumerable.Range(1, 3).Select(id => new
+                { modId = id, gameId = 7184, name = "Mod" + id, summary = "Description", version = "1" }) } } });
+            }
+            if (path.Contains("md5_search"))
+            {
+                var hash = Path.GetFileNameWithoutExtension(path);
+                return Json(Archives.Where(pair => Convert.ToHexString(MD5.HashData(pair.Value)).Equals(hash, StringComparison.OrdinalIgnoreCase))
+                    .Select(pair => new { mod = new { mod_id = pair.Key, name = "Mod" + pair.Key, summary = "", version = "1", available = true },
+                        file_details = new { file_id = pair.Key * 10, name = "Main", file_name = $"Mod{pair.Key}.zip", version = "1", category_id = 1, is_primary = true } }));
+            }
+            if (path.EndsWith("files.json"))
+            {
+                var id = int.Parse(path.Split('/')[^2]);
+                return Json(new { files = new[] { new { file_id = id * 10, name = "Main", file_name = $"Mod{id}.zip", version = "1",
+                    category_id = 1, is_primary = true, size_in_bytes = Archives[id].Length } }, file_updates = Array.Empty<object>() });
+            }
+            var modId = int.Parse(Path.GetFileNameWithoutExtension(path));
+            return Json(new { mod_id = modId, name = "Mod" + modId, summary = "", version = "1", available = true });
+        }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task DependenciesAndTransitiveRequirementsImportIntoTheSameDestination(bool profile, bool installed)
+    {
+        var server = new NexusServer(); using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        await f.Services.Providers.SetDirectoriesAsync([folder]);
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        if (installed)
+        {
+            await f.Services.Session.ImportAsync(Path.Combine(f.Root, "Mod1.zip"), CancellationToken.None);
+            await f.Services.Library.SetSourcesAsync(f.Services.Session.State.Mods.Single().Id, [new("nexusmods", "1", "10", "1")]);
+            await f.Services.Session.ReloadAsync(CancellationToken.None);
+        }
+        Guid? target = profile ? f.Services.Session.ActiveProfile!.Id : null;
+        await f.Services.Operations.RunAsync("Installing mod", ct => f.Services.Downloads.AddLinkAsync("https://www.nexusmods.com/helldivers2/mods/3", ct, target));
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        var prompt = Assert.Single(f.Dialogs.Confirmations);
+        Assert.Equal("Mod requirements", prompt.Title);
+        Assert.Contains("Mod2", prompt.Message);
+        if (installed && profile) Assert.Contains("already in your library", prompt.Message);
+        Assert.Equal(installed ? 2 : 3, f.Services.Providers.State.Jobs.Count);
+        Assert.Equal(new[] { "1", "2", "3" }.Where(id => !installed || id != "1"), f.Services.Providers.State.Jobs.Select(job => job.File.ModId));
+        Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(target, job.ProfileId));
+        foreach (var job in f.Services.Providers.State.Jobs.ToArray())
+        {
+            File.WriteAllBytes(Path.Combine(folder, job.File.FileName), server.Archives[int.Parse(job.File.ModId)]);
+            await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(DownloadStatus.Complete, job.Status));
+        Assert.Equal(3, f.Services.Session.State.Mods.Count);
+        Assert.Equal(profile ? 3 : 0, f.Services.Session.ActiveProfile!.Entries.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task AddingAnInstalledNexusModToAProfileAlsoAddsItsInstalledDependencies()
+    {
+        var server = new NexusServer(); using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        for (var id = 1; id <= 3; id++)
+        {
+            await f.Services.Session.ImportAsync(f.Source("Mod" + id, (ulong)id), CancellationToken.None);
+            var mod = f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod" + id);
+            await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", id.ToString(), (id * 10).ToString(), "1")]);
+        }
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var model = Assert.IsType<Quartermaster.Gui.Profiles.ProfilesViewModel>(f.Shell.CurrentPage);
+        model.ModToAdd = f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod3");
+        await model.AddCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        Assert.Equal(3, model.Entries.Count); Assert.Equal(3, f.Services.Session.State.Mods.Count);
+        Assert.Equal(new[] { "Mod1", "Mod2", "Mod3" }, model.Entries.Select(row => row.Name));
+        Assert.Contains("already in your library", Assert.Single(f.Dialogs.Confirmations).Message);
+        Assert.Empty(f.Services.Providers.State.Jobs); Assert.Empty(f.BrowserRequests);
+    }
+
+    [AvaloniaFact]
+    public async Task ManagerLinkKeepsTheQueuedProfileDestinationForDependencies()
+    {
+        var server = new NexusServer(); using var api = new HttpClient(new Handler(server.Respond));
+        using var download = new HttpClient(new Handler(request => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new ByteArrayContent(server.Archives[int.Parse(request.RequestUri!.AbsolutePath.Trim('/'))]) })));
+        using var f = new Fixture(nexusApi: api, nexusDownloads: download); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        await f.Services.Providers.SetDirectoriesAsync([folder]);
+        var profile = f.Services.Session.ActiveProfile!.Id;
+        var root = await f.Services.Providers.ResolveAsync("https://www.nexusmods.com/helldivers2/mods/3");
+        await f.Services.Providers.QueueAsync(root.Files.Single(), profile);
+        await f.Services.Operations.RunAsync("Receiving Nexus download", ct => f.Services.Downloads.AddLinkAsync("nxm://helldivers2/mods/3/files/30", ct));
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        Assert.Equal(3, f.Services.Providers.State.Jobs.Count);
+        Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(profile, job.ProfileId));
+        foreach (var job in f.Services.Providers.State.Jobs.ToArray())
+        {
+            if (job.File.ModId != "3") File.WriteAllBytes(Path.Combine(folder, job.File.FileName), server.Archives[int.Parse(job.File.ModId)]);
+            await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
+        Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(DownloadStatus.Complete, job.Status));
+        Assert.Equal(3, f.Services.Session.ActiveProfile!.Entries.Count);
+    }
+
+    [AvaloniaFact]
+    public async Task DecliningDependenciesOnlyQueuesRequestedModAndListsExternalRequirements()
+    {
+        var server = new NexusServer { External = true }; using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        f.Dialogs.Confirm = false;
+        await f.Services.Operations.RunAsync("Installing mod", ct => f.Services.Downloads.AddLinkAsync("https://www.nexusmods.com/helldivers2/mods/3", ct));
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        Assert.Equal("3", Assert.Single(f.Services.Providers.State.Jobs).File.ModId);
+        Assert.Contains("External tool: https://example.com/tool", Assert.Single(f.Dialogs.Confirmations).Message);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SearchShowsVirusResultsAndUnknownWhenMetadataFails(bool fail)
+    {
+        var server = new NexusServer { FailScans = fail }; using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key"); f.Shell.Navigate(PageKind.Search);
+        var model = Assert.IsType<SearchViewModel>(f.Shell.CurrentPage); model.Query = "Mod";
+        await model.SearchCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        Assert.Equal(fail ? new[] { "Virus scan: Unknown", "Virus scan: Unknown", "Virus scan: Unknown" }
+            : new[] { "Virus scan: Passed", "Virus scan: Quarantined", "Virus scan: Awaiting report" }, model.Results.Select(result => result.VirusResult));
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(3, window.GetVisualDescendants().OfType<TextBlock>().Count(text => text.Name == "VirusScanResult" && text.IsVisible));
+        }
+        finally { window.Close(); }
+    }
+}

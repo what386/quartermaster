@@ -89,6 +89,8 @@ public sealed class ProviderManager(
 
     public Task<ProviderMod> ResolveAsync(string link, CancellationToken ct = default) =>
         FindProvider(link).ResolveAsync(link.Trim(), ct);
+    public Task<IReadOnlyList<ModRequirement>> GetRequirementsAsync(string link, CancellationToken ct = default) =>
+        FindProvider(link).GetRequirementsAsync(link, ct);
 
     public Task<ProviderMod> ResolveAsync(
         string provider,

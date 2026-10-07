@@ -48,7 +48,7 @@ public partial class App : Application
                     var path = inbox.Pending.FirstOrDefault();
                     if (path is null) return;
                     await services.Operations.RunAsync("Receiving Nexus download", async ct =>
-                        await services.Providers.HandleNxmAsync(inbox.Read(path), ct));
+                        await services.Downloads.AddLinkAsync(inbox.Read(path), ct));
                     inbox.Remove(path);
                 }
                 catch (Exception ex) { services.Operations.ReportError(ex); }

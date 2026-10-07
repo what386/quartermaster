@@ -82,15 +82,40 @@ public sealed partial class ModDownloads : ViewModelBase
     }
     public async Task AddLinkAsync(string link, CancellationToken ct, Guid? profileId = null)
     {
-        if (services.Providers.IsDownloadLink(link))
-        { await services.Providers.HandleDownloadLinkAsync(link, ct, profileId); return; }
+        var direct = services.Providers.IsDownloadLink(link);
         var mod = await services.Providers.ResolveAsync(link, ct);
-        var file = await services.Dialogs.ChooseModFileAsync(mod);
+        var file = direct ? mod.Files.Single() : await services.Dialogs.ChooseModFileAsync(mod);
         if (file is null) return;
+        // A manager link may be fulfilling an existing profile download.
+        if (direct && profileId is null)
+            profileId = services.Providers.State.Jobs.FirstOrDefault(job => job.File.Provider == file.Provider &&
+                job.File.ModId == file.ModId && job.File.FileId == file.FileId &&
+                job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled)?.ProfileId;
+        var dependencies = file.Provider == "nexusmods" ? await PlanNexusDependenciesAsync(mod, profileId, ct) : [];
+        var selectedFiles = new List<Quartermaster.Providers.Clients.ProviderFile>();
+        foreach (var dependency in dependencies.Where(item => item.Installed is null))
+        {
+            var resolved = await services.Providers.ResolveAsync(dependency.Requirement.Page.AbsoluteUri, ct);
+            var selected = await services.Dialogs.ChooseModFileAsync(resolved);
+            if (selected is null) return;
+            selectedFiles.Add(selected with { Name = resolved.Name });
+        }
         ct.ThrowIfCancellationRequested();
-        var job = await services.Providers.QueueAsync(file with { Name = mod.Name }, profileId, ct: ct);
-        if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
+        if (profileId is { } target && dependencies.Where(item => item.Installed is not null).Select(item => item.Installed!.Id).ToArray() is { Length: > 0 } ids)
+            await services.Session.AddModsToProfileAsync(ids, target, ct);
+        foreach (var selected in selectedFiles)
+        {
+            var queued = await services.Providers.QueueAsync(selected, profileId, ct: ct);
+            if (!services.Providers.DownloadsDirectly(queued.File)) services.Providers.OpenDownloadPage(queued.Id);
+        }
+        if (direct) await services.Providers.HandleDownloadLinkAsync(link, ct, profileId);
+        else
+        {
+            var job = await services.Providers.QueueAsync(file with { Name = mod.Name }, profileId, ct: ct);
+            if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
+        }
     }
+
     public async Task CheckUpdatesAsync(CancellationToken ct, IReadOnlyCollection<Guid>? modIds = null)
     {
         var started = DateTimeOffset.UtcNow;

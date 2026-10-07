@@ -143,7 +143,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         Services.Downloads.Changed += (_, _) => { foreach (var row in Entries) row.UpdateCommand?.Refresh(); };
         AddGroupCommand = Operations.CreateCommand("Adding group", AddGroupAsync, () => HasProfile);
         MakeActiveCommand = Operations.CreateCommand("Selecting active profile", ct => Session.SaveProfileAsync(SelectedProfile!, true, ct), () => HasProfile);
-        AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Save(ProfileEditor.Add(SelectedProfile!, ModToAdd!), ct), () => HasProfile && ModToAdd is not null);
+        AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Services.Downloads.AddLibraryModsToProfileAsync([ModToAdd!.Id], SelectedProfile!.Id, ct), () => HasProfile && ModToAdd is not null);
         RemoveCommand = Operations.CreateCommand("Removing mod from profile", ct => Save(ProfileEditor.Remove(SelectedProfile!, SelectedMod!.Mod.Id), ct), () => SelectedMod is not null);
         ToggleCommand = Operations.CreateCommand("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, SelectedMod!.Mod.Id, !SelectedMod.Entry.Enabled), ct), () => SelectedMod is not null);
         ApplyOptionsCommand = Operations.CreateCommand("Saving mod options", ct => Save(ProfileEditor.SetOptions(SelectedProfile!, SelectedMod!.Mod, Options!.Selections()), ct), () => Options?.HasOptions == true);

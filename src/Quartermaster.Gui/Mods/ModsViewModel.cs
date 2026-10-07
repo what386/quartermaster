@@ -158,11 +158,11 @@ public sealed class ModsViewModel : SessionViewModel
     }
     public IReadOnlyList<Quartermaster.Library.Profiles.Profile> Profiles => Session.State.Profiles;
     public Task AddToProfileAsync(Guid modId, Guid profileId) => Operations.RunAsync("Adding mod to profile",
-        ct => Session.AddModToProfileAsync(modId, profileId, ct));
+        ct => Downloads.AddLibraryModsToProfileAsync([modId], profileId, ct));
     public Task AddSelectedToProfileAsync(Guid profileId)
     {
         var ids = SelectedMods.Select(item => item.Mod.Id).ToArray();
-        return Operations.RunAsync("Adding mods to profile", ct => Session.AddModsToProfileAsync(ids, profileId, ct));
+        return Operations.RunAsync("Adding mods to profile", ct => Downloads.AddLibraryModsToProfileAsync(ids, profileId, ct));
     }
     private void SelectionChanged()
     {

@@ -22,7 +22,13 @@
                   <shared:RemoteImage x:Name="ResultThumbnail" SourceUri="{Binding Thumbnail}" Width="104" Height="104" Stretch="UniformToFill" />
                 </Grid>
               </Border>
-              <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+              <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+                <TextBlock x:Name="VirusScanResult" Text="{Binding VirusResult}" IsVisible="{Binding HasVirusResult}" Classes="muted"
+                           Classes.success="{Binding VirusPassed}" Classes.error="{Binding VirusQuarantined}" FontSize="11"
+                           ToolTip.Tip="Nexus scan status across available ZIP files." />
+              </StackPanel>
               <Button Grid.Column="2" Content="Open page" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
               <Button Grid.Column="3" Content="Add mod" Command="{Binding AddCommand}" Classes="primary" VerticalAlignment="Center" />
             </Grid>

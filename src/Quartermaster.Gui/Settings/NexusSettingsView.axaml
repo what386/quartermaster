@@ -11,7 +11,7 @@
       <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
         <Run Text="Get your personal key from " />
         <InlineUIContainer><HyperlinkButton x:Name="NexusKeySettingsLink" Content="Nexus account settings → API" Command="{Binding OpenNexusKeySettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
-        <Run Text=", and scroll until you see a long string of characters." />
+        <Run Text=", and scroll until you see &quot;Request personal API key&quot;." />
       </TextBlock>
     </StackPanel>
   </Grid>

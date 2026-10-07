@@ -280,7 +280,7 @@ public sealed class ModDownloadTests
         if (fail?.Invoke(request) == true) return new(HttpStatusCode.ServiceUnavailable);
         var path = request.RequestUri!.AbsolutePath;
         if (path.EndsWith("validate.json")) return Json(new { user_id = 7, name = "Example user", is_premium = false });
-        if (path == "/v2/graphql") return Json(new { data = new { mods = new { nodes = new[] { new { modId = 123, name = "Example mod", summary = "Example description", version = "2" } } } } });
+        if (path == "/v2/graphql") return Json(new { data = new { game = new { id = 7184 }, mod = new { modRequirements = new { nexusRequirements = new { totalCount = 0, nodes = Array.Empty<object>() } } }, mods = new { nodes = new[] { new { modId = 123, name = "Example mod", summary = "Example description", version = "2" } } } } });
         if (path.Contains("md5_search")) return Json(new[] { new { mod = ModInfo, file_details = ModFile(20) } });
         if (path.EndsWith("files.json")) return Json(new { files = new[] { ModFile(10, 4), ModFile(20) }, file_updates = new[] { new { old_file_id = 10, new_file_id = 20 } } });
         return Json(ModInfo);

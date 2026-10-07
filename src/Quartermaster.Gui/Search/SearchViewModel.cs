@@ -63,6 +63,23 @@ public sealed class SearchModItem
     public string Title => result.Name + (string.IsNullOrWhiteSpace(result.Version) ? "" : " · " + result.Version);
     public string Description => result.Summary;
     public Uri? Thumbnail => result.Thumbnail;
+    public bool HasVirusResult => result.VirusScanStatus is not null;
+    public bool VirusPassed => result.VirusScanStatus is "VERIFIED" or "INTERNALLY_VERIFIED" or "MANUALLY_VERIFIED";
+    public bool VirusQuarantined => result.VirusScanStatus == "QUARANTINED";
+    public string VirusResult => "Virus scan: " + (result.VirusScanStatus switch
+    {
+        "VERIFIED" => "Passed",
+        "INTERNALLY_VERIFIED" => "Verified by Nexus",
+        "MANUALLY_VERIFIED" => "Manually verified",
+        "QUARANTINED" => "Quarantined",
+        "QUEUED" => "Queued",
+        "WAITING_REPORT" => "Awaiting report",
+        "NOT_SCANNED" => "Not scanned",
+        "TOO_LARGE" => "Too large to scan",
+        "PARTIAL" => "Partially scanned",
+        "REPORT_ERROR" => "Scan error",
+        _ => "Unknown"
+    });
     public AsyncCommand AddCommand { get; }
     public AsyncCommand OpenCommand { get; }
     public SearchModItem(SearchResult result, AppServices services)
