@@ -10,7 +10,10 @@ namespace Quartermaster.Gui.Services;
 public sealed class AppServices : IAsyncDisposable
 {
     public bool IsDisposed { get; private set; }
+    private readonly CancellationTokenSource lifetime = new();
+    public CancellationToken Lifetime => lifetime.Token;
     public ModDownloads Downloads { get; }
+    public AppUpdates AppUpdates { get; }
     public Func<string, CancellationToken, Task<Quartermaster.Providers.Clients.NexusMods.NexusUser>> ValidateNexusKeyAsync { get; }
     public Quartermaster.Providers.ProviderManager Providers { get; }
     public Quartermaster.Providers.ApiKeyStore Keys { get; }
@@ -24,7 +27,8 @@ public sealed class AppServices : IAsyncDisposable
     public Action LaunchGame { get; }
     public Action<Uri> OpenBrowser { get; }
     public IDialogService Dialogs { get; }
-    public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null)
+    public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null,
+        Func<Quartermaster.SelfUpdate.SelfUpdateManager>? appUpdateManager = null, Action? shutdownForUpdate = null)
     {
         DataDirectory = Path.GetFullPath(directory); Dialogs = dialogs;
         var log = new JsonEventLog(DataDirectory);
@@ -54,8 +58,10 @@ public sealed class AppServices : IAsyncDisposable
             discover ?? (() => SteamGameDiscovery.FindInstallations()), Dialogs);
         Session.Changed += (_, _) => Theme.Load(Session.Settings);
         Downloads = new(this);
+        AppUpdates = new(this, appUpdateManager, shutdownForUpdate ?? (() =>
+            throw new InvalidOperationException("Application shutdown was not configured.")));
     }
-    public async ValueTask DisposeAsync() { IsDisposed = true; await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
+    public async ValueTask DisposeAsync() { IsDisposed = true; lifetime.Cancel(); AppUpdates.Dispose(); await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
     public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster");
 }

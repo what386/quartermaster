@@ -5,7 +5,8 @@ namespace Quartermaster.Gui.Services;
 
 public enum RepatchMode { Ask, Automatic, Never }
 public sealed record ApplicationSettings(string? GameDataDirectory = null, RepatchMode Repatch = RepatchMode.Ask,
-    ThemePreset Theme = ThemePreset.Dark, string AccentColor = ThemeManager.DefaultAccent);
+    ThemePreset Theme = ThemePreset.Dark, string AccentColor = ThemeManager.DefaultAccent,
+    bool AllowAutomaticUpdate = false, string? SkippedAppUpdateVersion = null, bool OnboardingCompleted = false);
 
 public sealed class SettingsStore(string directory)
 {

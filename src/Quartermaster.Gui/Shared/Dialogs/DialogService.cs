@@ -6,9 +6,12 @@ using Quartermaster.Providers.Clients;
 namespace Quartermaster.Gui.Shared;
 
 public sealed record ProfileCreationRequest(string? Name = null, bool FromFile = false);
+public enum AppUpdateChoice { Cancel, Update, Skip }
 
 public interface IDialogService
 {
+    Task<Onboarding.SetupOutcome> ShowOnboardingAsync(Onboarding.SetupViewModel model, CancellationToken ct = default);
+    Task<AppUpdateChoice> PromptAppUpdateAsync(string version, string notes, CancellationToken ct = default);
     Task<ModImportRequest?> RequestModImportAsync();
     Task<LocalModImportOptions?> ConfirmModImportAsync(string source);
     Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod);
@@ -24,6 +27,18 @@ public interface IDialogService
 
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
+    public async Task<Onboarding.SetupOutcome> ShowOnboardingAsync(Onboarding.SetupViewModel model, CancellationToken ct = default)
+    {
+        await owner().WaitForDialogAsync(ct);
+        ct.ThrowIfCancellationRequested();
+        return await owner().ShowDialogAsync<Onboarding.SetupOutcome>(new Onboarding.SetupDialog(model));
+    }
+    public async Task<AppUpdateChoice> PromptAppUpdateAsync(string version, string notes, CancellationToken ct = default)
+    {
+        await owner().WaitForDialogAsync(ct);
+        ct.ThrowIfCancellationRequested();
+        return await owner().ShowDialogAsync<AppUpdateChoice>(new AppUpdateDialog(version, notes));
+    }
     public Task<ModImportRequest?> RequestModImportAsync() => owner().ShowDialogAsync<ModImportRequest?>(new AddModDialog());
     public Task<LocalModImportOptions?> ConfirmModImportAsync(string source) => owner().ShowDialogAsync<LocalModImportOptions?>(new ModImportDialog(source));
     public Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod) => owner().ShowDialogAsync<ProviderFile?>(new ModFilesDialog(mod));
