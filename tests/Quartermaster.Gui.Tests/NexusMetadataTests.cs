@@ -116,6 +116,10 @@ public class NexusMetadataTests
         await f.Services.Session.ReloadAsync(CancellationToken.None); Dispatcher.UIThread.RunJobs();
         Assert.All(f.Services.Providers.State.Jobs, job => Assert.Equal(DownloadStatus.Complete, job.Status));
         Assert.Equal(3, f.Services.Session.State.Mods.Count);
+        var rootMod = f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod3");
+        Assert.True(rootMod.DependenciesKnown);
+        Assert.Equal(new[] { "Mod2", "Mod1" }, rootMod.Dependencies.Select(dependency => dependency.Name));
+        Assert.Equal(new[] { "Mod1", "Mod3" }, f.Services.Session.State.Mods.Single(mod => mod.Name == "Mod2").Dependencies.Select(dependency => dependency.Name));
         Assert.Equal(profile ? 3 : 0, f.Services.Session.ActiveProfile!.Entries.Count);
     }
 

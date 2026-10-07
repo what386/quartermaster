@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 
 namespace Quartermaster.Gui.Mods;
 
-public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null) : ViewModelBase, IModRow
+public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null, string WarningDescription = "") : ViewModelBase, IModRow
 {
     public Mod Mod { get; private set; } = Mod;
     public int Index { get; private set; } = Index;
@@ -21,11 +21,14 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
             (nameof(Description), Description, value.Description),
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
+            (nameof(HasWarnings), HasWarnings, value.HasWarnings),
+            (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(HasOptions), HasOptions, value.HasOptions),
             (nameof(HasUpdate), HasUpdate, value.HasUpdate),
             (nameof(UpdateDescription), UpdateDescription, value.UpdateDescription),
         };
+        WarningDescription = value.WarningDescription;
         Mod = value.Mod; Index = value.Index; HasConflict = value.HasConflict; IconPath = value.IconPath;
         if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
         UpdateDescription = value.UpdateDescription;
@@ -45,6 +48,8 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
     public bool HasDeploymentWarning => false;
     public string? DeploymentDescription => null;
     public bool HasOptions => Mod.Options.Count > 0;
+    public string WarningDescription { get; private set; } = WarningDescription;
+    public bool HasWarnings => WarningDescription.Length > 0;
     public bool HasToggle => false;
     public bool IsEnabled => false;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Avalonia.Layout.HorizontalAlignment.Left;
@@ -64,6 +69,8 @@ public interface IModRow
     string Title { get; }
     string? IconPath { get; }
     bool HasConflict { get; }
+    bool HasWarnings { get; }
+    string WarningDescription { get; }
     bool HasToggle { get; }
     bool HasOptions { get; }
     bool IsLoaded { get; }
@@ -173,11 +180,13 @@ public sealed class ModsViewModel : SessionViewModel
     protected override void Refresh()
     {
         var ids = SelectedMods.Select(item => item.Mod.Id).ToHashSet();
-        var collisions = Session.ActiveProfile is { } active ? Quartermaster.Core.Deployment.ConflictAnalyzer.Analyze(
-            Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)).Resources.SelectMany(c => c.SourceIds).ToHashSet() : [];
+        var report = Session.ActiveProfile is { } active ? Quartermaster.Core.Deployment.ConflictAnalyzer.Analyze(
+            Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)) : null;
+        var collisions = report?.Resources.SelectMany(c => c.SourceIds).ToHashSet() ?? [];
+        var warnings = ModWarnings.ForProfile(Session.State, Session.ActiveProfile, report);
         var existing = Mods.ToDictionary(row => row.Mod.Id);
         var rows = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
-            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m))
+            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m), ModWarnings.ForLibraryMod(Session.State, m, warnings))
             { UpdateCommand = Services.Downloads.CreateUpdateCommand(m), UpdateDescription = Services.Downloads.UpdateDescription(m) }).ToArray();
         var desired = rows.Select(row =>
         {

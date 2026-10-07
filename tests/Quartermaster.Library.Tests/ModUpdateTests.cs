@@ -5,6 +5,23 @@ namespace Quartermaster.Library.Tests;
 
 public sealed class ModUpdateTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ReplacementPreservesKnownDependenciesUnlessTheUpdateHasFreshMetadata(bool refreshed)
+    {
+        using var f = new Fixture();
+        var old = await f.Library.ImportAsync(f.Source("old", 1));
+        var updated = await f.Library.ImportAsync(f.Source("new", 2));
+        await f.Library.SetDependenciesAsync(old.Id, [new("Requirement", "https://www.nexusmods.com/helldivers2/mods/100")]);
+        if (refreshed) await f.Library.SetDependenciesAsync(updated.Id, []);
+        await f.Library.ReplaceInProfilesAsync(old.Id, updated.Id);
+        var replacement = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Id == updated.Id);
+        Assert.True(replacement.DependenciesKnown);
+        if (refreshed) Assert.Empty(replacement.Dependencies);
+        else Assert.Equal("Requirement", Assert.Single(replacement.Dependencies).Name);
+    }
+
     [Fact]
     public async Task ReplacementPreservesProfilePositionGroupsDisabledStateAndDoesNotDuplicate()
     {

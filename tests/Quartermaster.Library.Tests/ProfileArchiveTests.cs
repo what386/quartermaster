@@ -22,6 +22,8 @@ public class ProfileArchiveTests
         await File.WriteAllTextAsync(Path.Combine(source, "readme.txt"), "Included with the mod.");
         var variants = await sender.Library.ImportAsync(source, "Custom mod name");
         var disabled = await sender.Library.ImportAsync(sender.Source("Disabled", 4));
+        await sender.Library.SetDependenciesAsync(variants.Id, [new("Requirement", "https://www.nexusmods.com/helldivers2/mods/100")]);
+        await sender.Library.SetDependenciesAsync(disabled.Id, []);
         var profile = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Create("My loadout"), disabled), variants);
         profile = ProfileEditor.SetEnabled(profile, disabled.Id, false);
         profile = ProfileEditor.SetOptions(profile, variants, [new(variants.Options[0].Id, true, 1), new(variants.Options[1].Id, false)]);
@@ -52,6 +54,9 @@ public class ProfileArchiveTests
         Assert.Equal(1, imported.Entries[1].Options[0].ChoiceIndex); Assert.False(imported.Entries[1].Options[1].Enabled);
         Assert.Equal("red", Assert.Single(PatchSelection.Select(existing, imported.Entries[1])).Folder);
         var importedDisabled = state.Mods.Single(mod => mod.Id == imported.Entries[0].ModId);
+        Assert.True(state.Mods.Single(mod => mod.Id == existing.Id).DependenciesKnown);
+        Assert.Equal("Requirement", Assert.Single(state.Mods.Single(mod => mod.Id == existing.Id).Dependencies).Name);
+        Assert.True(importedDisabled.DependenciesKnown); Assert.Empty(importedDisabled.Dependencies);
         Assert.Equal("Disabled", importedDisabled.Name);
         foreach (var file in Directory.GetFiles(sender.Contents.GetModDirectory(disabled.Id), "*", SearchOption.AllDirectories))
         {

@@ -10,6 +10,7 @@ public sealed partial class ModDownloads
     public async Task AddLibraryModsToProfileAsync(IReadOnlyCollection<Guid> modIds, Guid profileId, CancellationToken ct)
     {
         var dependencies = new List<Dependency>();
+        var metadata = new Dictionary<string, IReadOnlyList<ModDependency>>();
         foreach (var mod in services.Session.State.Mods.Where(mod => modIds.Contains(mod.Id)).ToArray())
         {
             var source = mod.Sources.FirstOrDefault(source => source.Provider == "nexusmods");
@@ -17,7 +18,7 @@ public sealed partial class ModDownloads
             var page = $"https://www.nexusmods.com/{NexusLink.Game}/mods/{source.ModId}";
             try { NexusLink.Parse(page); }
             catch (ArgumentException) { continue; }
-            dependencies.AddRange(await PlanNexusDependenciesAsync(new(mod.Id.ToString(), mod.Name, mod.Description, mod.Version, new(page), []), profileId, ct));
+            dependencies.AddRange(await PlanNexusDependenciesAsync(new(mod.Id.ToString(), mod.Name, mod.Description, mod.Version, new(page), []), profileId, ct, metadata));
         }
         var unique = dependencies.DistinctBy(item => item.Requirement.Page.AbsoluteUri).ToArray();
         var files = new List<ProviderFile>();
@@ -26,7 +27,7 @@ public sealed partial class ModDownloads
             var mod = await services.Providers.ResolveAsync(dependency.Requirement.Page.AbsoluteUri, ct);
             var file = await services.Dialogs.ChooseModFileAsync(mod);
             if (file is null) return;
-            files.Add(file with { Name = mod.Name });
+            files.Add(file with { Name = mod.Name, Dependencies = metadata[file.ModId] });
         }
         ct.ThrowIfCancellationRequested();
         await services.Session.AddModsToProfileAsync(unique.Where(item => item.Installed is not null)
@@ -37,7 +38,7 @@ public sealed partial class ModDownloads
             if (!services.Providers.DownloadsDirectly(job.File)) services.Providers.OpenDownloadPage(job.Id);
         }
     }
-    private async Task<IReadOnlyList<Dependency>> PlanNexusDependenciesAsync(ProviderMod root, Guid? profileId, CancellationToken ct)
+    private async Task<IReadOnlyList<Dependency>> PlanNexusDependenciesAsync(ProviderMod root, Guid? profileId, CancellationToken ct, Dictionary<string, IReadOnlyList<ModDependency>> metadata)
     {
         var visited = new HashSet<long> { NexusLink.Parse(root.Page.AbsoluteUri).ModId };
         var missing = new List<Dependency>();
@@ -46,7 +47,13 @@ public sealed partial class ModDownloads
             ? services.Session.State.Profiles.Single(profile => profile.Id == id).Entries.Select(entry => entry.ModId).ToHashSet() : null;
         async Task Visit(string page)
         {
-            foreach (var requirement in await services.Providers.GetRequirementsAsync(page, ct))
+            var requirements = await services.Providers.GetRequirementsAsync(page, ct);
+            var snapshot = requirements.Select(requirement => new ModDependency(requirement.Name, requirement.Page.AbsoluteUri, requirement.Notes, requirement.CanInstall)).ToArray();
+            metadata[NexusLink.Parse(page).ModId.ToString()] = snapshot;
+            var installedOwner = services.Session.State.Mods.Where(mod => MatchesNexusMod(mod, NexusLink.Parse(page).ModId)).ToArray();
+            foreach (var owner in installedOwner)
+                await services.Library.SetDependenciesAsync(owner.Id, snapshot, ct);
+            foreach (var requirement in requirements)
             {
                 ct.ThrowIfCancellationRequested();
                 if (!requirement.CanInstall)
@@ -65,6 +72,7 @@ public sealed partial class ModDownloads
             }
         }
         await Visit(root.Page.AbsoluteUri);
+        await services.Session.ReloadAsync(ct);
         if (missing.Count == 0 && external.Count == 0) return [];
         var message = missing.Count > 0
             ? $"{root.Name} requires:\n" + string.Join("\n", missing.Select(item => "• " + item.Requirement.Name +

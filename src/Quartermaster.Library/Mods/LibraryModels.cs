@@ -9,10 +9,15 @@ public sealed record Mod(Guid Id, string Name, string Description, string? Versi
     DateTimeOffset ImportedAt, IReadOnlyList<PatchSet> PatchSets, IReadOnlyList<ModOption> Options,
     IReadOnlyList<SourceReference> Sources)
 {
+    // Distinguish a checked, empty requirement list from an older import with no metadata.
+    public bool DependenciesKnown { get; init; }
+    public IReadOnlyList<ModDependency> Dependencies { get; init; } = [];
     public string? PageLink { get; init; }
     public string? ImportedFileName { get; init; }
     public bool Superseded { get; init; }
 }
+
+public sealed record ModDependency(string Name, string Page, string? Notes = null, bool CanInstall = true);
 
 public static class ModLinks
 {

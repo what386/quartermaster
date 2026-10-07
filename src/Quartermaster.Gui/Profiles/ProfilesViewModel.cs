@@ -10,7 +10,7 @@ namespace Quartermaster.Gui.Profiles;
 
 public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
-public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown) : ViewModelBase, IModRow, IProfileListItem
+public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "") : ViewModelBase, IModRow, IProfileListItem
 {
     public Mod Mod { get; private set; } = Mod;
     public ProfileEntry Entry { get; private set; } = Entry;
@@ -19,6 +19,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public bool HasConflict { get; private set; } = HasConflict;
     public string? IconPath { get; private set; } = IconPath;
     public ModDeploymentState DeploymentState { get; private set; } = DeploymentState;
+    public string WarningDescription { get; private set; } = WarningDescription;
+    public bool HasWarnings => WarningDescription.Length > 0;
     public AsyncCommand? UpdateCommand { get; private set; }
     public void Update(ProfileModItem value)
     {
@@ -30,6 +32,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(Description), Description, value.Description),
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
+            (nameof(WarningDescription), WarningDescription, value.WarningDescription),
+            (nameof(HasWarnings), HasWarnings, value.HasWarnings),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(IsLoaded), IsLoaded, value.IsLoaded),
             (nameof(IsUnloaded), IsUnloaded, value.IsUnloaded),
@@ -45,6 +49,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(UpdateDescription), UpdateDescription, value.UpdateDescription),
         };
         Mod = value.Mod; Entry = value.Entry; Index = value.Index;
+        WarningDescription = value.WarningDescription;
         HasConflict = value.HasConflict; IconPath = value.IconPath; DeploymentState = value.DeploymentState;
         // Update commands act on the mod ID, so retain them while an update remains available.
         if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
@@ -150,7 +155,9 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         DeployCommand = Operations.CreateCommand("Deploying profile", async ct =>
         {
             var current = SelectedProfile!;
-            if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout.", "Deploy"))
+            var warnings = Entries.Where(row => row.HasWarnings).Select(row => $"• {row.Name}: {row.WarningDescription.Replace("\n", "\n  ")}").ToArray();
+            var warningSummary = warnings.Length > 0 ? "\n\nActive warnings:\n" + string.Join("\n", warnings) : "";
+            if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout." + warningSummary, "Deploy"))
             {
                 var names = Session.State.Mods.ToDictionary(mod => mod.Id, mod => mod.Name);
                 var progress = Operations.CreateProgress<DeploymentProgress>(update =>
@@ -206,12 +213,14 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         var mods = Session.State.Mods.ToDictionary(m => m.Id);
         var report = SelectedProfile is null ? new ConflictReport([], []) : ConflictAnalyzer.Analyze(ProfilePatches.Resolve(Session.State, SelectedProfile));
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
+        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, report);
         var rows = SelectedProfile?.Entries.Select((e, index) =>
         {
             // Recycled controls retain their appearance during silent edits; RunAsync still prevents concurrent saves.
             var row = new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !Entries.Single(row => row.Mod.Id == e.ModId).IsEnabled), ct)),
-                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e));
+                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e),
+                warnings.GetValueOrDefault(e.ModId, ""));
             row.SetUpdate(Services.Downloads.CreateUpdateCommand(mods[e.ModId]), Services.Downloads.UpdateDescription(mods[e.ModId]));
             if (existing.TryGetValue(e.ModId, out var current)) { current.Update(row); return current; }
             return row;

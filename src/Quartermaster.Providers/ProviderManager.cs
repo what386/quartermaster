@@ -191,14 +191,15 @@ public sealed class ProviderManager(
     public async Task HandleDownloadLinkAsync(
         string link,
         CancellationToken ct = default,
-        Guid? profileId = null
+        Guid? profileId = null,
+        IReadOnlyList<ModDependency>? dependencies = null
     )
     {
         var provider = FindProvider(link);
         if (!provider.IsDownloadLink(new Uri(link.Trim())))
             throw new ArgumentException("Expected a direct mod-manager download link.");
         var mod = await provider.ResolveAsync(link.Trim(), ct);
-        var file = mod.Files.Single();
+        var file = mod.Files.Single() with { Dependencies = dependencies };
         var existing = State.Jobs.FirstOrDefault(j =>
             j.File.Provider == file.Provider
             && j.File.ModId == file.ModId
@@ -211,6 +212,9 @@ public sealed class ProviderManager(
         );
         var job = existing ?? await QueueAsync(file, profileId, ct: ct);
         await StopWorkerAsync(job.Id);
+        if (dependencies is not null)
+            await MutateAsync(state => state with { Jobs = state.Jobs.Select(item => item.Id == job.Id
+                ? item with { File = item.File with { Dependencies = dependencies } } : item).ToArray() }, ct);
         await SetStatusAsync(job.Id, DownloadStatus.Waiting);
         await gate.WaitAsync(ct);
         try
@@ -351,6 +355,9 @@ public sealed class ProviderManager(
             throw new InvalidOperationException(
                 "The update is no longer available. Check for updates again."
             );
+        if (file.Provider == NexusAdapter.ProviderId && file.Dependencies is null)
+            file = file with { Dependencies = (await GetRequirementsAsync(file.DownloadPage.AbsoluteUri, ct))
+                .Select(requirement => new ModDependency(requirement.Name, requirement.Page.AbsoluteUri, requirement.Notes, requirement.CanInstall)).ToArray() };
         return await QueueAsync(file with { Name = mod.Name }, replacesModId: mod.Id, ct: ct);
     }
 
@@ -451,6 +458,7 @@ public sealed class ProviderManager(
                     ],
                     ct
                 );
+                if (job.File.Dependencies is { } dependencies) await library.SetDependenciesAsync(mod.Id, dependencies, ct);
                 await library.SetDownloadMetadataAsync(mod.Id, filename, job.File.PageLink?.AbsoluteUri ??
                     (job.File.Provider == ManualDownloads.ProviderId ? job.File.DownloadPage.AbsoluteUri : null), ct);
                 if (job.ReplacesModId is { } old)
