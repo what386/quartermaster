@@ -30,14 +30,10 @@ TRIM=false
 RUNTIME="all"
 CLEAN=true
 
-# Major .NET desktop/server targets.
+# Supported release targets.
 RUNTIMES=(
     "linux-x64"
-    "linux-arm64"
     "win-x64"
-    "win-arm64"
-    "osx-x64"
-    "osx-arm64"
 )
 
 # ============================================================================
@@ -63,11 +59,7 @@ Options:
 
       Available:
         linux-x64
-        linux-arm64
         win-x64
-        win-arm64
-        osx-x64
-        osx-arm64
         all
 
       Default: all
@@ -130,11 +122,8 @@ Examples:
   # Build only Linux x64
   $(basename "$0") --runtime linux-x64
 
-  # Build Linux ARM64
-  $(basename "$0") --runtime linux-arm64 --self-contained
-
-  # Build macOS Apple Silicon
-  $(basename "$0") --runtime osx-arm64 --self-contained
+  # Build Windows x64
+  $(basename "$0") --runtime win-x64 --self-contained
 
   # Build Debug
   $(basename "$0") --configuration Debug
@@ -146,11 +135,7 @@ Output:
 For example:
 
   dist/$PROJECT_NAME/Release/linux-x64/
-  dist/$PROJECT_NAME/Release/linux-arm64/
   dist/$PROJECT_NAME/Release/win-x64/
-  dist/$PROJECT_NAME/Release/win-arm64/
-  dist/$PROJECT_NAME/Release/osx-x64/
-  dist/$PROJECT_NAME/Release/osx-arm64/
 EOF
 }
 
