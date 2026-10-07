@@ -9,6 +9,8 @@ public enum PageKind { Mods, Profiles, Search, Downloads, Settings, ManualChecks
 public sealed class NavigationItem(PageKind page, string label, string iconFile) : ViewModelBase
 {
     private bool active;
+    private bool tourTarget;
+    public bool IsTourTarget { get => tourTarget; internal set => Set(ref tourTarget, value); }
     public PageKind Page { get; } = page;
     public string Label { get; } = label;
     public string IconSource { get; } = $"avares://Quartermaster.Gui/Assets/{iconFile}";

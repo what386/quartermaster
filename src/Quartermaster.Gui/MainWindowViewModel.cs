@@ -14,6 +14,7 @@ namespace Quartermaster.Gui;
 public sealed class MainWindowViewModel : ViewModelBase
 {
     private readonly Dictionary<PageKind, ViewModelBase> pages;
+    public Onboarding.OnboardingCoordinator Onboarding { get; }
     private NavigationItem selected;
     public IReadOnlyList<NavigationItem> NavigationItems { get; } =
         [new(PageKind.Mods, "Library", "library.svg"),
@@ -51,6 +52,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel(AppServices services)
     {
         this.services = services; Operations = services.Operations;
+        Onboarding = new(services, Navigate, NavigationItems);
         services.Downloads.Changed += (_, _) => Notify(nameof(ShowDownloadProgress));
         services.Downloads.ManualChecksRequested += (_, _) => Navigate(PageKind.ManualChecks);
         selected = NavigationItems.Single(item => item.Page == PageKind.Profiles); selected.IsActive = true;
@@ -62,8 +64,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             [PageKind.Search] = new SearchViewModel(services),
             [PageKind.Downloads] = services.Downloads,
             [PageKind.ManualChecks] = new ManualChecksPageViewModel(services.Downloads),
-            [PageKind.Settings] = new SettingsViewModel(services)
+            [PageKind.Settings] = new SettingsViewModel(services, Onboarding.RunAsync)
         };
+        Onboarding.RefreshSettingsAsync = () => ((SettingsViewModel)pages[PageKind.Settings]).InitializeProviderSettingsAsync(services.Lifetime);
         AddProfileCommand = Operations.CreateCommand("Creating profile", async ct =>
         {
             var request = await services.Dialogs.RequestProfileCreationAsync();
@@ -209,10 +212,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (path is not null) await services.Session.ExportProfileAsync(id, path, ct);
     });
     public void Navigate(PageKind page) => SelectedNavigation = NavigationItems.Single(n => n.Page == page);
-    public Task InitializeAsync() => Operations.RunAsync("Loading library", async ct =>
+    public async Task InitializeAsync()
     {
-        await services.Session.InitializeAsync(ct);
-        await services.Providers.InitializeAsync(ct);
-        await ((SettingsViewModel)pages[PageKind.Settings]).InitializeProviderSettingsAsync(ct);
-    });
+        await Operations.RunAsync("Loading library", async ct =>
+        {
+            await services.Session.InitializeAsync(ct);
+            await services.Providers.InitializeAsync(ct);
+            await ((SettingsViewModel)pages[PageKind.Settings]).InitializeProviderSettingsAsync(ct);
+        });
+        if (!Operations.IsError && !services.IsDisposed)
+        {
+            await Onboarding.RunFirstRunAsync();
+            if (!services.IsDisposed) _ = services.AppUpdates.CheckAtStartupAsync();
+        }
+    }
 }

@@ -18,6 +18,14 @@ public static class TestAppBuilder
 
 internal sealed class FakeDialogs : IDialogService
 {
+    public Func<Onboarding.SetupViewModel, Task<Onboarding.SetupOutcome>>? OnboardingHandler { get; set; }
+    public int OnboardingPrompts { get; private set; }
+    public Task<Onboarding.SetupOutcome> ShowOnboardingAsync(Onboarding.SetupViewModel model, CancellationToken ct = default)
+    { OnboardingPrompts++; return OnboardingHandler?.Invoke(model) ?? Task.FromResult(Onboarding.SetupOutcome.SkipTour); }
+    public AppUpdateChoice AppUpdateAnswer { get; set; } = AppUpdateChoice.Cancel;
+    public List<string> AppUpdatePrompts { get; } = [];
+    public Task<AppUpdateChoice> PromptAppUpdateAsync(string version, string notes, CancellationToken ct = default)
+    { AppUpdatePrompts.Add(version); return Task.FromResult(AppUpdateAnswer); }
     public Quartermaster.Gui.Mods.ModImportRequest? ModImport { get; set; }
     public Quartermaster.Providers.Clients.ProviderFile? ModFile { get; set; }
     public bool CancelModFile { get; set; }

@@ -14,6 +14,10 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
 - **Mod updates:** check your library or a profile for updates, then install
   replacements without losing mod order, groups, or compatible option selections.
 
+- **App updates:** enable **Allow automatic update** in Settings for background
+  startup checks, or use **Check app updates**. Choose Update to install and restart,
+  Skip to ignore that release at startup, or Cancel to decide later.
+
 - **Profiles:** enable mods, select their options, organize them into collapsible
   groups, and drag them to change load order.
 
@@ -27,11 +31,13 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
 
 Download the latest archive for your operating system and architecture:
 
-Choose a `bundled` archive to run without installing .NET. The smaller `runtime`
-archives require the .NET 10 runtime. Builds are available for Linux, Windows,
-and macOS on x64 and ARM64.
+Download the `bundled` archive for Windows x64 or Linux x64. These releases
+include the .NET runtime.
 
 ## Getting started
+
+First launch offers optional setup and a quick tour. Skip any step, and replay
+them later from **Settings → Getting started → Setup and quick tour**.
 
 1. Open **Settings** and select your Helldivers 2 installation, or use
    **Find Steam installs**. Configure provider credentials here if you want

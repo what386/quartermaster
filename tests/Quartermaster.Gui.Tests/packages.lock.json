@@ -386,7 +386,7 @@
       "quartermaster.core": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Repatcher": "[0.2.2, )"
+          "Quartermaster.Repatcher": "[0.4.0, )"
         }
       },
       "quartermaster.gui": {
@@ -397,20 +397,21 @@
           "Avalonia.Desktop": "[12.1.3, )",
           "Avalonia.Fonts.Inter": "[12.1.3, )",
           "Avalonia.Themes.Fluent": "[12.1.3, )",
-          "Quartermaster.Library": "[0.2.2, )",
-          "Quartermaster.Providers": "[0.2.2, )"
+          "Quartermaster.Library": "[0.4.0, )",
+          "Quartermaster.Providers": "[0.4.0, )",
+          "Quartermaster.SelfUpdate": "[0.4.0, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Core": "[0.2.2, )"
+          "Quartermaster.Core": "[0.4.0, )"
         }
       },
       "quartermaster.providers": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Library": "[0.2.2, )"
+          "Quartermaster.Library": "[0.4.0, )"
         }
       },
       "quartermaster.repatcher": {
@@ -418,6 +419,9 @@
         "dependencies": {
           "K4os.Compression.LZ4": "[1.3.8, )"
         }
+      },
+      "quartermaster.selfupdate": {
+        "type": "Project"
       }
     }
   }

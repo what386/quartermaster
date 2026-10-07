@@ -21,7 +21,8 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var window = new MainWindow();
-            var services = new AppServices(AppServices.DefaultDataDirectory, new DialogService(() => window));
+            var services = new AppServices(AppServices.DefaultDataDirectory, new DialogService(() => window),
+                shutdownForUpdate: () => Dispatcher.UIThread.Post(window.Close));
             var viewModel = new MainWindowViewModel(services);
             window.DataContext = viewModel;
             window.Opened += async (_, _) => await viewModel.InitializeAsync();
@@ -31,7 +32,7 @@ public partial class App : Application
             var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             timer.Tick += async (_, _) =>
             {
-                if (processingLink || !services.Operations.CanInteract || inbox.Pending.Count == 0) return;
+                if (processingLink || viewModel.Onboarding.IsRunning || !services.Operations.CanInteract || inbox.Pending.Count == 0) return;
                 processingLink = true;
                 try
                 {

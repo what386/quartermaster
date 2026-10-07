@@ -3,6 +3,7 @@
         xmlns:mods="clr-namespace:Quartermaster.Gui.Mods" xmlns:profiles="clr-namespace:Quartermaster.Gui.Profiles"
         xmlns:search="clr-namespace:Quartermaster.Gui.Search" xmlns:settings="clr-namespace:Quartermaster.Gui.Settings"
         xmlns:downloads="clr-namespace:Quartermaster.Gui.Downloads" xmlns:services="clr-namespace:Quartermaster.Gui.Services"
+        xmlns:onboarding="clr-namespace:Quartermaster.Gui.Onboarding"
         x:Class="Quartermaster.Gui.MainWindow" x:DataType="local:MainWindowViewModel"
         Title="Quartermaster" Width="1320" Height="850" MinWidth="1040" MinHeight="680">
   <Window.DataTemplates>
@@ -19,7 +20,7 @@
         <Grid RowDefinitions="70,1,*,Auto">
           <ContentControl Content="{Binding LibraryNavigation}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
             <ContentControl.ContentTemplate><DataTemplate x:DataType="local:NavigationItem">
-              <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Library">
+              <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Classes.tourTarget="{Binding IsTourTarget}" Command="{Binding OpenCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Library">
                 <shared:SvgIcon Source="{Binding IconSource}" Width="26" Height="26" Foreground="{Binding $parent[Button].Foreground}" />
               </Button>
             </DataTemplate></ContentControl.ContentTemplate>
@@ -41,7 +42,7 @@
                   </Button>
                 </DataTemplate></ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Button x:Name="AddProfileButton" Classes="profileButton" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile · Right-click to import" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center">
+              <Button x:Name="AddProfileButton" Classes="profileButton" Classes.tourTarget="{Binding Onboarding.IsProfileStep}" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile · Right-click to import" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center">
                 <Button.ContextMenu><ContextMenu>
                   <MenuItem Header="Import profile ZIP" Command="{Binding ImportProfileCommand}" />
                 </ContextMenu></Button.ContextMenu>
@@ -53,7 +54,7 @@
             <ItemsControl ItemsSource="{Binding UtilityNavigationItems}">
               <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:NavigationItem">
-                <Button Classes="profileButton" Classes.active="{Binding IsActive}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
+                <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.tourTarget="{Binding IsTourTarget}" Command="{Binding OpenCommand}" ToolTip.Tip="{Binding Label}" AutomationProperties.Name="{Binding Label}" HorizontalAlignment="Center">
                   <shared:SvgIcon Source="{Binding IconSource}" Width="24" Height="24" Foreground="{Binding $parent[Button].Foreground}" />
                 </Button>
               </DataTemplate></ItemsControl.ItemTemplate>
@@ -65,6 +66,10 @@
         <ContentControl x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
       </Border>
     </Grid>
+    <Canvas x:Name="OnboardingLayer" IsVisible="{Binding Onboarding.IsTourVisible}">
+      <Polygon x:Name="OnboardingPointer" Fill="{DynamicResource AccentBrush}" IsHitTestVisible="False" />
+      <onboarding:TourView x:Name="OnboardingTour" DataContext="{Binding Onboarding}" />
+    </Canvas>
     <shared:DialogHost x:Name="DialogOverlay" />
     <StackPanel HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="24" MaxWidth="620" Spacing="8">
     <shared:ErrorNotification x:Name="ErrorOverlay" DataContext="{Binding Operations}" />
