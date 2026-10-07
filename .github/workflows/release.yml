@@ -23,33 +23,9 @@ jobs:
             deployment: bundled
             self_contained: true
 
-          # Linux ARM64
-          - os: ubuntu-latest
-            rid: linux-arm64
-            deployment: bundled
-            self_contained: true
-
-          # macOS x64
-          - os: macos-latest
-            rid: osx-x64
-            deployment: bundled
-            self_contained: true
-
-          # macOS ARM64
-          - os: macos-latest
-            rid: osx-arm64
-            deployment: bundled
-            self_contained: true
-
           # Windows x64
           - os: windows-latest
             rid: win-x64
-            deployment: bundled
-            self_contained: true
-
-          # Windows ARM64
-          - os: windows-latest
-            rid: win-arm64
             deployment: bundled
             self_contained: true
 
@@ -85,6 +61,21 @@ jobs:
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugType=None
           -p:DebugSymbols=false
+
+      - name: Build and package Windows updater
+        if: matrix.rid == 'win-x64'
+        shell: python
+        run: |
+          import subprocess
+
+          rid = "${{ matrix.rid }}"
+          configure = ["cmake", "-S", "winupdater", "-B", "winupdater/build",
+                       "-DCMAKE_BUILD_TYPE=MinSizeRel", "-DBUILD_TESTING=OFF"]
+          if rid == "win-x64":
+              configure += ["-A", "x64"]
+          subprocess.run(configure, check=True)
+          subprocess.run(["cmake", "--build", "winupdater/build", "--config", "MinSizeRel"], check=True)
+          subprocess.run(["cmake", "--install", "winupdater/build", "--config", "MinSizeRel", "--prefix", "publish"], check=True)
 
       - name: Archive application
         shell: python
@@ -124,11 +115,7 @@ jobs:
           cd dist
           set -- \
             Quartermaster-linux-x64-bundled.zip \
-            Quartermaster-linux-arm64-bundled.zip \
-            Quartermaster-osx-x64-bundled.zip \
-            Quartermaster-osx-arm64-bundled.zip \
-            Quartermaster-win-x64-bundled.zip \
-            Quartermaster-win-arm64-bundled.zip
+            Quartermaster-win-x64-bundled.zip
           for asset in "$@"; do
             test -f "$asset" || { echo "Missing release asset: $asset" >&2; exit 1; }
           done
