@@ -9,9 +9,6 @@
 - [ ] profile icon selection
       @created 2026-10-03 23:30
 
-- [ ] test windows literally at all
-      @created 2026-10-04 21:12
-
 
 ## Completed
 
@@ -22,4 +19,16 @@
 - [x] feat: track mod dependencies from nexusmods
       @created 2026-10-07 04:04
       @completed 2026-10-07 04:04
+
+- [x] feat: automatic update check/install
+      @created 2026-10-07 18:28
+      @completed 2026-10-07 18:59
+
+- [x] feat: dynamic sizing for text input boxes
+      @created 2026-10-07 18:28
+      @completed 2026-10-07 18:59
+
+- [x] feat: onboarding
+      @created 2026-10-07 18:59
+      @completed 2026-10-07 18:59
 
