@@ -112,13 +112,14 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
 
     public async Task SetDependenciesAsync(Guid modId, IReadOnlyList<ModDependency> dependencies, CancellationToken ct = default)
     {
-        var validated = dependencies.Select(dependency =>
+        ModDependency Validate(ModDependency dependency)
         {
             if (!Uri.TryCreate(dependency.Page, UriKind.Absolute, out var page) ||
                 page.Scheme is not ("https" or "http") || page.UserInfo.Length > 0)
                 throw new ArgumentException("A dependency needs a public HTTP or HTTPS page.");
-            return dependency with { Page = page.AbsoluteUri };
-        }).ToArray();
+            return dependency with { Page = page.AbsoluteUri, Alternatives = dependency.Alternatives.Select(Validate).ToArray() };
+        }
+        var validated = dependencies.Select(Validate).ToArray();
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
         if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");

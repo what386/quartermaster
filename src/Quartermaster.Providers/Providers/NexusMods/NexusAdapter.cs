@@ -24,7 +24,10 @@ public sealed class NexusAdapter(NexusClient client) : IModProvider
     }
     public Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int offset = 0, CancellationToken ct = default) => client.SearchAsync(query, offset, ct);
     public Task<IReadOnlyList<ModRequirement>> GetRequirementsAsync(string link, CancellationToken ct = default)
-        => client.GetRequirementsAsync(NexusLink.Parse(link).ModId, ct);
+    {
+        var parsed = NexusLink.Parse(link);
+        return client.GetRequirementsAsync(parsed.ModId, ct, parsed.FileId);
+    }
     public async Task<ProviderUpdate> CheckUpdateAsync(SourceReference source, CancellationToken ct = default)
     {
         if (source.Provider != Id || !long.TryParse(source.ModId, out var modId) || modId <= 0) throw new ArgumentException("Invalid Nexus source.");

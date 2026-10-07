@@ -92,15 +92,14 @@ public sealed partial class ModDownloads : ViewModelBase
                 job.File.ModId == file.ModId && job.File.FileId == file.FileId &&
                 job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled)?.ProfileId;
         var metadata = new Dictionary<string, IReadOnlyList<ModDependency>>();
-        var dependencies = file.Provider == "nexusmods" ? await PlanNexusDependenciesAsync(mod, profileId, ct, metadata) : [];
+        var dependencies = file.Provider == "nexusmods" ? await PlanNexusDependenciesAsync(mod with { Page = file.DownloadPage }, profileId, ct, metadata) : [];
+        if (dependencies is null) return;
         if (metadata.TryGetValue(file.ModId, out var rootDependencies)) file = file with { Dependencies = rootDependencies };
         var selectedFiles = new List<Quartermaster.Providers.Clients.ProviderFile>();
         foreach (var dependency in dependencies.Where(item => item.Installed is null))
         {
-            var resolved = await services.Providers.ResolveAsync(dependency.Requirement.Page.AbsoluteUri, ct);
-            var selected = await services.Dialogs.ChooseModFileAsync(resolved);
-            if (selected is null) return;
-            selectedFiles.Add(selected with { Name = resolved.Name, Dependencies = metadata[selected.ModId] });
+            var selected = dependency.File!;
+            selectedFiles.Add(selected with { Dependencies = metadata[selected.ModId] });
         }
         ct.ThrowIfCancellationRequested();
         if (profileId is { } target && dependencies.Where(item => item.Installed is not null).Select(item => item.Installed!.Id).ToArray() is { Length: > 0 } ids)

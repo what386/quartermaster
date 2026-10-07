@@ -372,7 +372,7 @@ public sealed class ProviderManager(
         if (dependencies is not null) file = file with { Dependencies = dependencies };
         if (file.Provider == NexusAdapter.ProviderId && file.Dependencies is null)
             file = file with { Dependencies = (await GetRequirementsAsync(file.DownloadPage.AbsoluteUri, ct))
-                .Select(requirement => new ModDependency(requirement.Name, requirement.Page.AbsoluteUri, requirement.Notes, requirement.CanInstall)).ToArray() };
+                .Select(requirement => requirement.ToDependency()).ToArray() };
         return await QueueAsync(file with { Name = mod.Name }, replacesModId: mod.Id, ct: ct,
             installedAsDependency: mod.InstalledAsDependency);
     }

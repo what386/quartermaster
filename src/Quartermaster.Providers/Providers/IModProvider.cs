@@ -21,7 +21,13 @@ public sealed record SearchResult(string ModId, string Name, string Summary, str
 {
     public string? VirusScanStatus { get; init; }
 }
-public sealed record ModRequirement(string Name, Uri Page, string? Notes = null, bool CanInstall = true);
+public sealed record ModRequirement(string Name, Uri Page, string? Notes = null, bool CanInstall = true)
+{
+    public IReadOnlyList<string>? AllowedFileIds { get; init; }
+    public IReadOnlyList<ModRequirement> Alternatives { get; init; } = [];
+    public ModDependency ToDependency() => new(Name, Page.AbsoluteUri, Notes, CanInstall)
+    { AllowedFileIds = AllowedFileIds, Alternatives = Alternatives.Select(alternative => alternative.ToDependency()).ToArray() };
+}
 public enum UpdateStatus { Current, Available, Unknown }
 public sealed record ProviderUpdate(UpdateStatus Status, ProviderFile? File = null, string? Reason = null);
 

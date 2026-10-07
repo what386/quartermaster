@@ -18,7 +18,11 @@ public sealed record Mod(Guid Id, string Name, string Description, string? Versi
     public bool InstalledAsDependency { get; init; }
 }
 
-public sealed record ModDependency(string Name, string Page, string? Notes = null, bool CanInstall = true);
+public sealed record ModDependency(string Name, string Page, string? Notes = null, bool CanInstall = true)
+{
+    public IReadOnlyList<string>? AllowedFileIds { get; init; }
+    public IReadOnlyList<ModDependency> Alternatives { get; init; } = [];
+}
 
 public static class ModLinks
 {

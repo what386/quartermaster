@@ -12,6 +12,25 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Fact]
+    public async Task FileRequirementAlternativesAndCompatibleVersionsSurvivePersistence()
+    {
+        using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("Requirement"));
+        var dependency = new ModDependency("First option", "https://www.nexusmods.com/helldivers2/mods/100")
+        {
+            AllowedFileIds = ["10"],
+            Alternatives = [new("Other option", "https://www.nexusmods.com/helldivers2/mods/200") { AllowedFileIds = ["20"] }]
+        };
+        await f.Library.SetDependenciesAsync(mod.Id, [dependency]);
+        var saved = Assert.Single(Assert.Single((await f.Library.LoadAsync()).Mods).Dependencies);
+        Assert.Equal(new[] { "10" }, saved.AllowedFileIds);
+        Assert.Equal(new[] { "20" }, Assert.Single(saved.Alternatives).AllowedFileIds);
+        var installed = mod with { Sources = [new("nexusmods", "200", "20")] };
+        Assert.True(ModDependencyMatching.Matches(installed, saved));
+        Assert.False(ModDependencyMatching.MatchesPage(installed, saved));
+        Assert.False(ModDependencyMatching.Matches(installed with { Sources = [new("nexusmods", "200", "21")] }, saved));
+    }
+
+    [Fact]
     public async Task ExplicitImportsPromoteDependenciesAndDependencyImportsNeverDemoteExplicitMods()
     {
         using var f = new Fixture(); var source = f.Source("Dependency");

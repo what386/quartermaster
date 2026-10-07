@@ -25,16 +25,19 @@ public sealed partial class NexusClient
     }
     private static long Id(JsonElement value) => value.ValueKind == JsonValueKind.String
         ? long.Parse(value.GetString()!, System.Globalization.CultureInfo.InvariantCulture) : value.GetInt64();
-    public async Task<IReadOnlyList<ModRequirement>> GetRequirementsAsync(long modId, CancellationToken ct = default)
+    public async Task<IReadOnlyList<ModRequirement>> GetRequirementsAsync(long modId, CancellationToken ct = default, long? fileId = null)
     {
         var game = await GameIdAsync(ct);
         var requirements = new List<ModRequirement>();
         const int pageSize = 100;
         for (var offset = 0; ; offset += pageSize)
         {
-            const string query = "query($mod: ID!, $game: ID!, $offset: Int!) { mod(modId: $mod, gameId: $game) { modRequirements { nexusRequirements(offset: $offset, count: 100) { totalCount nodes { modName modId gameId url notes externalRequirement } } } } }";
+            const string query = "query($mod: ID!, $game: ID!, $offset: Int!) { mod(modId: $mod, gameId: $game) { legacyModRequirementsEnabled modRequirements { nexusRequirements(offset: $offset, count: 100) { totalCount nodes { modName modId gameId url notes externalRequirement } } } } }";
             using var data = await GraphAsync(query, new { mod = Positive(modId).ToString(), game = game.ToString(), offset }, ct);
-            var page = data.RootElement.GetProperty("data").GetProperty("mod").GetProperty("modRequirements").GetProperty("nexusRequirements");
+            var mod = data.RootElement.GetProperty("data").GetProperty("mod");
+            if (mod.TryGetProperty("legacyModRequirementsEnabled", out var legacy) && !legacy.GetBoolean())
+                return await GetFileRequirementsAsync(modId, fileId, ct);
+            var page = mod.GetProperty("modRequirements").GetProperty("nexusRequirements");
             var nodes = page.GetProperty("nodes");
             foreach (var node in nodes.EnumerateArray())
             {

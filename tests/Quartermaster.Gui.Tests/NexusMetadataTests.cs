@@ -30,10 +30,27 @@ public class NexusMetadataTests
         public bool External { get; set; }
         public bool FailScans { get; set; }
         public bool Updated { get; set; }
+        public bool FileRequirements { get; set; }
+        public List<string> RequirementFiles { get; } = [];
         public int[] RootDependencies { get; set; } = [2, 1];
         public async Task<HttpResponseMessage> Respond(HttpRequestMessage request)
         {
             var path = request.RequestUri!.AbsolutePath;
+            if (path.StartsWith("/v3/games/helldivers2/mod-file-versions/"))
+            {
+                RequirementFiles.Add(Path.GetFileName(path));
+                return Json(new { data = new { id = "version-" + Path.GetFileName(path) } });
+            }
+            if (path.StartsWith("/v3/mod-file-versions/"))
+            {
+                object Candidate(int id) => new { id = "file-" + id, name = "Mod" + id,
+                    mod = new { id = "mod-" + id, game_scoped_id = id.ToString(), name = "Mod" + id,
+                        game = new { domain_name = "helldivers2" } },
+                    candidate_versions = new[] { new { game_scoped_id = (id * 10).ToString(), category = "main" } } };
+                return Json(new { dependencies = new[] {
+                    new { id = "loader", candidate_mod_files = new[] { Candidate(2) } },
+                    new { id = "installer", candidate_mod_files = new[] { Candidate(4) } } } });
+            }
             if (path.EndsWith("validate.json")) return Json(new { user_id = 7, name = "User", is_premium = true });
             if (path.EndsWith("download_link.json")) return Json(new[] { new { URI = "https://cdn.example/" + path.Split('/')[^4] } });
             if (path == "/v2/graphql")
@@ -50,7 +67,9 @@ public class NexusMetadataTests
                         url = $"https://www.nexusmods.com/helldivers2/mods/{dep}", notes = "Required", externalRequirement = false }).ToList();
                     if (External && id == 3) nodes.Add(new { modName = "External tool", modId = "0", gameId = "0",
                         url = "https://example.com/tool", notes = "Install separately", externalRequirement = true });
-                    return Json(new { data = new { mod = new { modRequirements = new { nexusRequirements = new { totalCount = nodes.Count, nodes } } } } });
+                    return Json(new { data = new { mod = new { legacyModRequirementsEnabled = !(FileRequirements && id == 3),
+                        modRequirements = new { nexusRequirements = new { totalCount = FileRequirements && id == 3 ? 0 : nodes.Count,
+                            nodes = FileRequirements && id == 3 ? new List<object>() : nodes } } } } });
                 }
                 if (query.Contains("modFiles"))
                 {
@@ -75,12 +94,50 @@ public class NexusMetadataTests
             if (path.EndsWith("files.json"))
             {
                 var id = int.Parse(path.Split('/')[^2]);
-                return Json(new { files = new[] { new { file_id = id * 10 + (Updated && id == 3 ? 1 : 0), name = "Main", file_name = $"Mod{id}.zip", version = Updated && id == 3 ? "2" : "1",
+                return Json(new { files = new[] { new { file_id = id * 10 + (Updated && id == 3 ? 1 : 0), name = "Main", file_name = FileRequirements && id == 4 ? "Installer.exe" : $"Mod{id}.zip", version = Updated && id == 3 ? "2" : "1",
                     category_id = 1, is_primary = true, size_in_bytes = Archives[id].Length } }, file_updates = Updated && id == 3 ? new object[] { new { old_file_id = 30, new_file_id = 31 } } : Array.Empty<object>() });
             }
             var modId = int.Parse(Path.GetFileNameWithoutExtension(path));
             return Json(new { mod_id = modId, name = "Mod" + modId, summary = "", version = "1", available = true });
         }
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task FileRequirementsOfferCompatibleModsAndKeepExecutablesManual(bool update)
+    {
+        var server = new NexusServer { FileRequirements = true, Updated = update }; using var api = new HttpClient(new Handler(server.Respond));
+        using var f = new Fixture(nexusApi: api); await f.Shell.InitializeAsync();
+        await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        var folder = Path.Combine(f.Root, "downloads"); Directory.CreateDirectory(folder);
+        await f.Services.Providers.SetDirectoriesAsync([folder]);
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        server.Archives[4] = [1, 2, 3];
+        if (update)
+        {
+            var old = await f.Services.Library.ImportAsync(f.Source("Old root", 33), name: "Mod3");
+            await f.Services.Library.SetSourcesAsync(old.Id, [new("nexusmods", "3", "30", "1")]);
+            await f.Services.Library.RecordUpdateCheckAsync(new(old.Id, "nexusmods", DateTimeOffset.UtcNow, "2", "31"));
+            await f.Services.Session.ReloadAsync(CancellationToken.None);
+            await f.Services.Operations.RunAsync("Updating", ct => f.Services.Downloads.ApplyUpdatesAsync(ct));
+        }
+        else await f.Services.Operations.RunAsync("Installing", ct => f.Services.Downloads.AddLinkAsync("https://www.nexusmods.com/helldivers2/mods/3", ct));
+        Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+        Assert.Equal(new[] { update ? "31" : "30" }, server.RequirementFiles);
+        var prompt = Assert.Single(f.Dialogs.Confirmations);
+        Assert.Contains("Mod2", prompt.Message); Assert.Contains("Requirements to install manually", prompt.Message); Assert.Contains("Mod4", prompt.Message);
+        Assert.Equal(3, f.Services.Providers.State.Jobs.Count); Assert.DoesNotContain(f.Services.Providers.State.Jobs, job => job.File.ModId == "4");
+        foreach (var job in f.Services.Providers.State.Jobs.ToArray())
+        {
+            File.WriteAllBytes(Path.Combine(folder, job.File.FileName), server.Archives[int.Parse(job.File.ModId)]);
+            await f.Services.Providers.WaitForJobAsync(job.Id).WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var root = f.Services.Session.State.Mods.Single(mod => !mod.Superseded && mod.Name == "Mod3");
+        Assert.True(root.Dependencies.Single(item => item.Name == "Mod2").CanInstall);
+        Assert.False(root.Dependencies.Single(item => item.Name == "Mod4").CanInstall);
+        Assert.Equal(new[] { "20" }, root.Dependencies.Single(item => item.Name == "Mod2").AllowedFileIds);
     }
 
     [AvaloniaTheory]
