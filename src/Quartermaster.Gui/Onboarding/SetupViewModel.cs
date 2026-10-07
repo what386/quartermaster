@@ -17,6 +17,9 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
     private int step;
     private bool busy;
     private string error = "";
+    private string gamePath = "";
+    private string nexusApiKey = "";
+    private string gitHubToken = "";
     public event Action<SetupOutcome>? Completed;
     public int Step => step;
     public bool IsGame => step == 0;
@@ -42,7 +45,7 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
         get => error;
         private set => Set(ref error, value);
     }
-    public string Progress => IsReady ? "SETUP COMPLETE" : $"QUICK SETUP · {step + 1} / 5";
+    public string Progress => IsReady ? "SETUP COMPLETE" : $"SETUP · {step + 1} / 5";
     public string Title =>
         step switch
         {
@@ -67,19 +70,53 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
                 "Choose where your browser saves mod ZIPs. Quartermaster picks them up when you start a download.",
             _ => "Take a quick look around, or skip the tour.",
         };
-    public string NextLabel => IsReady ? "Take the tour" : "Continue";
-    public string SkipLabel => IsReady ? "Skip tour" : "Skip this";
-    public string GamePath { get; set; }
+    public string NextLabel =>
+        IsReady ? "Take the tour"
+        : SkipsCurrentStep ? "Skip"
+        : "Continue";
+    private bool SkipsCurrentStep =>
+        CanSkipStep
+        && (
+            IsGame && string.IsNullOrWhiteSpace(GamePath)
+            || IsNexus && !RemoveNexusKey && string.IsNullOrWhiteSpace(NexusApiKey)
+            || IsGitHub && !RemoveGitHubToken && string.IsNullOrWhiteSpace(GitHubToken)
+        );
+    public string GamePath
+    {
+        get => gamePath;
+        set
+        {
+            if (Set(ref gamePath, value))
+                Notify(nameof(NextLabel));
+        }
+    }
     public string DownloadFolder { get; set; }
     public bool AllowAutomaticUpdate { get; set; }
-    public string NexusApiKey { get; set; } = "";
-    public string GitHubToken { get; set; } = "";
+    public string NexusApiKey
+    {
+        get => nexusApiKey;
+        set
+        {
+            if (Set(ref nexusApiKey, value))
+                Notify(nameof(NextLabel));
+        }
+    }
+    public string GitHubToken
+    {
+        get => gitHubToken;
+        set
+        {
+            if (Set(ref gitHubToken, value))
+                Notify(nameof(NextLabel));
+        }
+    }
     public bool HasSavedNexusKey { get; private set; }
     public bool HasSavedGitHubToken { get; private set; }
     public bool RemoveNexusKey { get; private set; }
     public bool RemoveGitHubToken { get; private set; }
     public string RemoveNexusKeyLabel => RemoveNexusKey ? "Undo removal" : "Remove stored secret";
-    public string RemoveGitHubTokenLabel => RemoveGitHubToken ? "Undo removal" : "Remove stored secret";
+    public string RemoveGitHubTokenLabel =>
+        RemoveGitHubToken ? "Undo removal" : "Remove stored secret";
     public Command RemoveNexusKeyCommand { get; }
     public Command RemoveGitHubTokenCommand { get; }
     public AsyncCommand NextCommand { get; }
@@ -99,34 +136,33 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
             services.Providers.State.Directories.FirstOrDefault()
             ?? DownloadStore.DefaultDownloadsDirectory;
         AllowAutomaticUpdate = services.Session.Settings.AllowAutomaticUpdate;
-        RemoveNexusKeyCommand = new(() =>
-        {
-            RemoveNexusKey = !RemoveNexusKey;
-            NexusApiKey = RemoveNexusKey ? "" : StoredSecret.Mask;
-            Notify(nameof(RemoveNexusKey));
-            Notify(nameof(RemoveNexusKeyLabel));
-            Notify(nameof(NexusApiKey));
-        }, () => !IsBusy && HasSavedNexusKey);
-        RemoveGitHubTokenCommand = new(() =>
-        {
-            RemoveGitHubToken = !RemoveGitHubToken;
-            GitHubToken = RemoveGitHubToken ? "" : StoredSecret.Mask;
-            Notify(nameof(RemoveGitHubToken));
-            Notify(nameof(RemoveGitHubTokenLabel));
-            Notify(nameof(GitHubToken));
-        }, () => !IsBusy && HasSavedGitHubToken);
-        NextCommand = new(ContinueAsync, () => !IsBusy, ReportError);
-        BackCommand = new(() => Move(step - 1), () => !IsBusy && CanGoBack);
-        SkipCommand = new(
+        RemoveNexusKeyCommand = new(
             () =>
             {
-                if (IsReady)
-                    Finish(SetupOutcome.SkipTour);
-                else
-                    Move(step + 1);
+                RemoveNexusKey = !RemoveNexusKey;
+                NexusApiKey = RemoveNexusKey ? "" : StoredSecret.Mask;
+                Notify(nameof(RemoveNexusKey));
+                Notify(nameof(RemoveNexusKeyLabel));
+                Notify(nameof(NextLabel));
+                Notify(nameof(NexusApiKey));
             },
-            () => !IsBusy && CanSkipStep
+            () => !IsBusy && HasSavedNexusKey
         );
+        RemoveGitHubTokenCommand = new(
+            () =>
+            {
+                RemoveGitHubToken = !RemoveGitHubToken;
+                GitHubToken = RemoveGitHubToken ? "" : StoredSecret.Mask;
+                Notify(nameof(RemoveGitHubToken));
+                Notify(nameof(RemoveGitHubTokenLabel));
+                Notify(nameof(NextLabel));
+                Notify(nameof(GitHubToken));
+            },
+            () => !IsBusy && HasSavedGitHubToken
+        );
+        NextCommand = new(ContinueAsync, () => !IsBusy, ReportError);
+        BackCommand = new(() => Move(step - 1), () => !IsBusy && CanGoBack);
+        SkipCommand = new(() => Finish(SetupOutcome.SkipTour), () => !IsBusy && IsReady);
         SkipSetupCommand = new(() => Finish(SetupOutcome.TakeTour), () => !IsBusy && CanSkipSetup);
         BrowseCommand = new(
             async () =>
@@ -160,8 +196,12 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
 
     public async Task InitializeAsync()
     {
-        HasSavedNexusKey = !string.IsNullOrWhiteSpace(await services.Keys.GetAsync("nexusmods", cancellation.Token));
-        HasSavedGitHubToken = !string.IsNullOrWhiteSpace(await services.Keys.GetAsync("github", cancellation.Token));
+        HasSavedNexusKey = !string.IsNullOrWhiteSpace(
+            await services.Keys.GetAsync("nexusmods", cancellation.Token)
+        );
+        HasSavedGitHubToken = !string.IsNullOrWhiteSpace(
+            await services.Keys.GetAsync("github", cancellation.Token)
+        );
         NexusApiKey = HasSavedNexusKey ? StoredSecret.Mask : "";
         GitHubToken = HasSavedGitHubToken ? StoredSecret.Mask : "";
         Notify(nameof(HasSavedNexusKey));
@@ -280,7 +320,6 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
                 nameof(Title),
                 nameof(Description),
                 nameof(NextLabel),
-                nameof(SkipLabel),
             }
         )
             Notify(property);

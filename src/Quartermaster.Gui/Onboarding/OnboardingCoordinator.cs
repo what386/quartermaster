@@ -59,7 +59,7 @@ public sealed class OnboardingCoordinator : ViewModelBase
     }
     public bool IsProfileStep => IsTourVisible && Stops[stop].Page == PageKind.Profiles;
     public PageKind TourPage => Stops[stop].Page;
-    public string Progress => $"QUICK TOUR · {stop + 1} / {Stops.Length}";
+    public string Progress => $"TOUR · {stop + 1} / {Stops.Length}";
     public string Title => Stops[stop].Title;
     public string Description => Stops[stop].Description;
     public string NextLabel => stop == Stops.Length - 1 ? "Finish" : "Next";

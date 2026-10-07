@@ -13,7 +13,7 @@
         <vm:AppearanceSettingsView IsVisible="{Binding ShowAppearance}" />
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowOnboarding}">
           <TextBlock Text="Getting started" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button x:Name="ReplayOnboardingButton" Grid.Column="1" Content="Setup and quick tour" Command="{Binding ReplayOnboardingCommand}" HorizontalAlignment="Left" />
+          <Button x:Name="ReplayOnboardingButton" Grid.Column="1" Content="Setup and tour" Command="{Binding ReplayOnboardingCommand}" HorizontalAlignment="Left" />
         </Grid>
         <StackPanel Spacing="8" IsVisible="{Binding ShowAppUpdates}">
           <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="12" HorizontalAlignment="Left">

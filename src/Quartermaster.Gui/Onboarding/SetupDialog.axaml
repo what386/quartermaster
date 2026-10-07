@@ -35,8 +35,8 @@
     <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
       <Button x:Name="SkipSetupButton" Content="Skip setup" Command="{Binding SkipSetupCommand}" IsVisible="{Binding CanSkipSetup}" HorizontalAlignment="Left" />
       <Button Grid.Column="1" Content="Back" Command="{Binding BackCommand}" IsVisible="{Binding CanGoBack}" />
-      <Button x:Name="SkipStepButton" Grid.Column="2" Content="{Binding SkipLabel}" Command="{Binding SkipCommand}" IsVisible="{Binding CanSkipStep}" />
-      <Button Grid.Column="3" Content="{Binding NextLabel}" Command="{Binding NextCommand}" Classes="primary" />
+      <Button x:Name="SkipTourButton" Grid.Column="2" Content="Skip tour" Command="{Binding SkipCommand}" IsVisible="{Binding IsReady}" />
+      <Button x:Name="NextStepButton" Grid.Column="3" Content="{Binding NextLabel}" Command="{Binding NextCommand}" Classes="primary" />
     </Grid>
   </StackPanel>
 </UserControl>

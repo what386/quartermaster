@@ -18,7 +18,7 @@ public class OnboardingTests
     [AvaloniaTheory]
     [InlineData(true)]
     [InlineData(false)]
-    public async Task SkipButtonsAppearOnlyWhenTheCurrentChoiceCanBeSkipped(bool foundGame)
+    public async Task SingleStepButtonSkipsEmptyOptionalFieldsAndContinuesWithValues(bool foundGame)
     {
         using var f = new Fixture(discoverGame: foundGame); await f.Shell.InitializeAsync();
         using var model = new SetupViewModel(f.Services, CancellationToken.None);
@@ -27,11 +27,13 @@ public class OnboardingTests
         try
         {
             Dispatcher.UIThread.RunJobs();
-            var skip = dialog.FindControl<Button>("SkipStepButton")!;
+            var skip = dialog.FindControl<Button>("SkipTourButton")!;
+            var next = dialog.FindControl<Button>("NextStepButton")!;
             var skipSetup = dialog.FindControl<Button>("SkipSetupButton")!;
-            Assert.Equal(!foundGame, skip.IsEffectivelyVisible);
+            Assert.False(skip.IsEffectivelyVisible);
+            Assert.Equal(foundGame ? "Continue" : "Skip", next.Content);
             Assert.Equal(!foundGame, skipSetup.IsEffectivelyVisible);
-            Assert.Equal(!foundGame, model.SkipCommand.CanExecute(null));
+            Assert.False(model.SkipCommand.CanExecute(null));
             if (foundGame)
             {
                 model.GamePath = "";
@@ -40,16 +42,32 @@ public class OnboardingTests
                 await model.NextCommand.ExecuteAsync(); Assert.True(model.IsGame); Assert.NotEmpty(model.Error);
                 model.GamePath = f.Game; await model.NextCommand.ExecuteAsync();
             }
-            else model.SkipCommand.Execute(null);
+            else
+            {
+                dialog.FindControl<TextBox>("GameFolderInput")!.Text = "invalid";
+                Dispatcher.UIThread.RunJobs(); Assert.Equal("Continue", next.Content);
+                await model.NextCommand.ExecuteAsync(); Assert.True(model.IsGame); Assert.NotEmpty(model.Error);
+                dialog.FindControl<TextBox>("GameFolderInput")!.Text = "   ";
+                Dispatcher.UIThread.RunJobs(); Assert.Equal("Skip", next.Content);
+                await model.NextCommand.ExecuteAsync();
+            }
             Dispatcher.UIThread.RunJobs();
             Assert.True(model.IsUpdates); Assert.False(skip.IsEffectivelyVisible); Assert.False(skipSetup.IsEffectivelyVisible);
+            Assert.Equal("Continue", next.Content);
             await model.NextCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
-            Assert.True(model.IsNexus); Assert.True(skip.IsEffectivelyVisible);
-            model.SkipCommand.Execute(null); model.SkipCommand.Execute(null); Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsNexus); Assert.False(skip.IsEffectivelyVisible); Assert.Equal("Skip", next.Content);
+            dialog.FindControl<TextBox>("NexusKeyInput")!.Text = "new-key";
+            Dispatcher.UIThread.RunJobs(); Assert.Equal("Continue", next.Content);
+            dialog.FindControl<TextBox>("NexusKeyInput")!.Text = "";
+            Dispatcher.UIThread.RunJobs(); Assert.Equal("Skip", next.Content);
+            await model.NextCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsGitHub); Assert.Equal("Skip", next.Content);
+            await model.NextCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
             Assert.True(model.IsDownloads); Assert.False(skip.IsEffectivelyVisible);
-            model.DownloadFolder = ""; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads);
+            model.DownloadFolder = ""; Dispatcher.UIThread.RunJobs(); Assert.Equal("Continue", next.Content);
+            await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads);
             model.DownloadFolder = Path.Combine(f.Root, "downloads"); await model.NextCommand.ExecuteAsync();
-            Dispatcher.UIThread.RunJobs(); Assert.True(model.IsReady); Assert.True(skip.IsEffectivelyVisible);
+            Dispatcher.UIThread.RunJobs(); Assert.True(model.IsReady); Assert.True(skip.IsEffectivelyVisible); Assert.Equal("Take the tour", next.Content);
         }
         finally { window.Close(); }
     }
@@ -80,10 +98,10 @@ public class OnboardingTests
         await f.Services.Keys.SetAsync("github", "existing-github");
         using var model = new SetupViewModel(f.Services, CancellationToken.None); await model.InitializeAsync();
         Assert.Matches(@"^\*+$", model.NexusApiKey); Assert.Matches(@"^\*+$", model.GitHubToken);
-        model.GamePath = "invalid"; model.NexusApiKey = "unsaved"; model.GitHubToken = "unsaved";
-        model.SkipCommand.Execute(null);
+        model.GamePath = ""; model.NexusApiKey = ""; model.GitHubToken = "";
         await model.NextCommand.ExecuteAsync();
-        model.SkipCommand.Execute(null); model.SkipCommand.Execute(null);
+        await model.NextCommand.ExecuteAsync();
+        await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync();
         await model.NextCommand.ExecuteAsync();
         Assert.True(model.IsReady); Assert.Empty(model.Error); Assert.Empty(f.Services.Session.GameDirectory);
         Assert.False(f.Services.Session.Settings.AllowAutomaticUpdate);
@@ -106,6 +124,7 @@ public class OnboardingTests
         removeNexus.Command!.Execute(null);
         Assert.Empty(model.NexusApiKey); Assert.True(model.RemoveNexusKey);
         Assert.Equal("existing-nexus", await f.Services.Keys.GetAsync("nexusmods"));
+        Assert.Equal("Continue", model.NextLabel);
         removeNexus.Command.Execute(null);
         Assert.Matches(@"^\*+$", model.NexusApiKey); Assert.False(model.RemoveNexusKey);
         await model.NextCommand.ExecuteAsync(); Assert.True(model.IsGitHub); Assert.Empty(model.Error);
@@ -155,9 +174,10 @@ public class OnboardingTests
         await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync();
         model.NexusApiKey = "bad-key"; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsNexus); Assert.NotEmpty(model.Error);
         Assert.Equal("saved", await f.Services.Keys.GetAsync("nexusmods"));
-        model.SkipCommand.Execute(null); model.GitHubToken = "bad-token";
+        model.NexusApiKey = ""; await model.NextCommand.ExecuteAsync(); model.GitHubToken = "bad-token";
         await model.NextCommand.ExecuteAsync(); Assert.True(model.IsGitHub); Assert.NotEmpty(model.Error);
-        Assert.Null(await f.Services.Keys.GetAsync("github")); model.SkipCommand.Execute(null); Assert.True(model.IsDownloads);
+        Assert.Null(await f.Services.Keys.GetAsync("github")); model.GitHubToken = "";
+        await model.NextCommand.ExecuteAsync(); Assert.True(model.IsDownloads);
     }
 
     [AvaloniaFact]
