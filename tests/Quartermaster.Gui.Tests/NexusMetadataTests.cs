@@ -46,15 +46,27 @@ public class NexusMetadataTests
             }
             if (path.StartsWith("/v3/mod-file-versions/"))
             {
-                object Candidate(int id) => new { id = "file-" + id, name = "Mod" + id,
-                    mod = new { id = "mod-" + id, game_scoped_id = id.ToString(), name = "Mod" + id,
-                        game = new { domain_name = "helldivers2" } },
-                    candidate_versions = new[] { new { game_scoped_id = (id * 10).ToString(), category = "main" } } };
+                object Candidate(int id) => new
+                {
+                    id = "file-" + id,
+                    name = "Mod" + id,
+                    mod = new
+                    {
+                        id = "mod-" + id,
+                        game_scoped_id = id.ToString(),
+                        name = "Mod" + id,
+                        game = new { domain_name = "helldivers2" }
+                    },
+                    candidate_versions = new[] { new { game_scoped_id = (id * 10).ToString(), category = "main" } }
+                };
                 if (AlternateDependencyFile)
                     return Json(new { dependencies = new[] { new { id = "child", candidate_mod_files = new[] { Candidate(path.Contains("version-21") ? 4 : 1) } } } });
-                return Json(new { dependencies = new[] {
+                return Json(new
+                {
+                    dependencies = new[] {
                     new { id = "loader", candidate_mod_files = new[] { Candidate(2) } },
-                    new { id = "installer", candidate_mod_files = new[] { Candidate(4) } } } });
+                    new { id = "installer", candidate_mod_files = new[] { Candidate(4) } } }
+                });
             }
             if (path.EndsWith("validate.json")) return Json(new { user_id = 7, name = "User", is_premium = true });
             if (path.EndsWith("download_link.json")) return Json(new[] { new { URI = "https://cdn.example/" + path.Split('/')[^4] } });
@@ -70,39 +82,91 @@ public class NexusMetadataTests
                     var id = int.Parse(variables.GetProperty("mod").GetString()!);
                     var migrated = FileRequirements && id == 3 || AlternateDependencyFile && id == 2;
                     var deps = DependencyOverrides.TryGetValue(id, out var custom) ? custom : id == 3 ? RootDependencies : id == 2 ? new[] { 1, 3 } : Array.Empty<int>();
-                    var nodes = deps.Select(dep => (object)new { modName = "Mod" + dep, modId = dep.ToString(), gameId = "7184",
-                        url = $"https://www.nexusmods.com/helldivers2/mods/{dep}", notes = "Required", externalRequirement = false }).ToList();
-                    if (External && id == 3) nodes.Add(new { modName = "External tool", modId = "0", gameId = "0",
-                        url = "https://example.com/tool", notes = "Install separately", externalRequirement = true });
-                    return Json(new { data = new { mod = new { legacyModRequirementsEnabled = !migrated,
-                        modRequirements = new { nexusRequirements = new { totalCount = migrated ? 0 : nodes.Count,
-                            nodes = migrated ? new List<object>() : nodes } } } } });
+                    var nodes = deps.Select(dep => (object)new
+                    {
+                        modName = "Mod" + dep,
+                        modId = dep.ToString(),
+                        gameId = "7184",
+                        url = $"https://www.nexusmods.com/helldivers2/mods/{dep}",
+                        notes = "Required",
+                        externalRequirement = false
+                    }).ToList();
+                    if (External && id == 3) nodes.Add(new
+                    {
+                        modName = "External tool",
+                        modId = "0",
+                        gameId = "0",
+                        url = "https://example.com/tool",
+                        notes = "Install separately",
+                        externalRequirement = true
+                    });
+                    return Json(new
+                    {
+                        data = new
+                        {
+                            mod = new
+                            {
+                                legacyModRequirementsEnabled = !migrated,
+                                modRequirements = new
+                                {
+                                    nexusRequirements = new
+                                    {
+                                        totalCount = migrated ? 0 : nodes.Count,
+                                        nodes = migrated ? new List<object>() : nodes
+                                    }
+                                }
+                            }
+                        }
+                    });
                 }
                 if (query.Contains("modFiles"))
                 {
                     if (FailScans) return Json(new { errors = new[] { new { message = "Unavailable" } } });
-                    return Json(new { data = new
+                    return Json(new
                     {
-                        m0 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "VERIFIED" } },
-                        m1 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "QUARANTINED" } },
-                        m2 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "WAITING_REPORT" } }
-                    } });
+                        data = new
+                        {
+                            m0 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "VERIFIED" } },
+                            m1 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "QUARANTINED" } },
+                            m2 = new[] { new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "WAITING_REPORT" } }
+                        }
+                    });
                 }
-                return Json(new { data = new { mods = new { nodes = Enumerable.Range(1, 3).Select(id => new
-                { modId = id, gameId = 7184, name = "Mod" + id, summary = "Description", version = "1" }) } } });
+                return Json(new
+                {
+                    data = new
+                    {
+                        mods = new
+                        {
+                            nodes = Enumerable.Range(1, 3).Select(id => new
+                            { modId = id, gameId = 7184, name = "Mod" + id, summary = "Description", version = "1" })
+                        }
+                    }
+                });
             }
             if (path.Contains("md5_search"))
             {
                 var hash = Path.GetFileNameWithoutExtension(path);
                 return Json(Archives.Where(pair => Convert.ToHexString(MD5.HashData(pair.Value)).Equals(hash, StringComparison.OrdinalIgnoreCase))
-                    .Select(pair => new { mod = new { mod_id = pair.Key, name = "Mod" + pair.Key, summary = "", version = "1", available = true },
-                        file_details = new { file_id = pair.Key * 10 + (Updated && pair.Key == 3 ? 1 : 0), name = "Main", file_name = $"Mod{pair.Key}.zip", version = "1", category_id = 1, is_primary = true } }));
+                    .Select(pair => new
+                    {
+                        mod = new { mod_id = pair.Key, name = "Mod" + pair.Key, summary = "", version = "1", available = true },
+                        file_details = new { file_id = pair.Key * 10 + (Updated && pair.Key == 3 ? 1 : 0), name = "Main", file_name = $"Mod{pair.Key}.zip", version = "1", category_id = 1, is_primary = true }
+                    }));
             }
             if (path.EndsWith("files.json"))
             {
                 var id = int.Parse(path.Split('/')[^2]);
-                object File(int fileId, bool primary) => new { file_id = fileId, name = primary ? "Main" : "Alternative", file_name = FileRequirements && id == 4 ? "Installer.exe" : $"Mod{id}-{fileId}.zip", version = Updated && id == 3 ? "2" : "1",
-                    category_id = 1, is_primary = primary, size_in_bytes = Archives[id].Length };
+                object File(int fileId, bool primary) => new
+                {
+                    file_id = fileId,
+                    name = primary ? "Main" : "Alternative",
+                    file_name = FileRequirements && id == 4 ? "Installer.exe" : $"Mod{id}-{fileId}.zip",
+                    version = Updated && id == 3 ? "2" : "1",
+                    category_id = 1,
+                    is_primary = primary,
+                    size_in_bytes = Archives[id].Length
+                };
                 var files = new List<object> { File(id * 10 + (Updated && id == 3 ? 1 : 0), true) };
                 if (AlternateDependencyFile && id == 2) files.Add(File(21, false));
                 return Json(new { files, file_updates = Updated && id == 3 ? new object[] { new { old_file_id = 30, new_file_id = 31 } } : Array.Empty<object>() });

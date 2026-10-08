@@ -22,8 +22,11 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         if (existing is not null)
         {
             await contents.DeleteAsync(mod.Id, CancellationToken.None).ConfigureAwait(false);
-            var updatedExisting = existing with { PageLink = pageLink ?? existing.PageLink,
-                InstalledAsDependency = existing.InstalledAsDependency && installedAsDependency };
+            var updatedExisting = existing with
+            {
+                PageLink = pageLink ?? existing.PageLink,
+                InstalledAsDependency = existing.InstalledAsDependency && installedAsDependency
+            };
             var duplicateState = state;
             if (updatedExisting != existing) duplicateState = duplicateState with
             { Mods = state.Mods.Select(item => item.Id == existing.Id ? updatedExisting : item).ToArray() };
@@ -123,8 +126,11 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
         if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
-        await store.SaveAsync(state with { Mods = state.Mods.Select(mod => mod.Id == modId
-            ? mod with { Dependencies = validated, DependenciesKnown = true } : mod).ToArray() }, ct).ConfigureAwait(false);
+        await store.SaveAsync(state with
+        {
+            Mods = state.Mods.Select(mod => mod.Id == modId
+            ? mod with { Dependencies = validated, DependenciesKnown = true } : mod).ToArray()
+        }, ct).ConfigureAwait(false);
     }
 
     public async Task SetPageLinkAsync(Guid modId, string? link, CancellationToken ct = default)
@@ -175,10 +181,14 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         await store.SaveAsync(state with
         {
             Mods = state.Mods.Select(mod => mod.Id == oldId ? mod with { Superseded = true } :
-                mod.Id == newId ? mod with { Superseded = false, PageLink = oldMod.PageLink ?? mod.PageLink,
+                mod.Id == newId ? mod with
+                {
+                    Superseded = false,
+                    PageLink = oldMod.PageLink ?? mod.PageLink,
                     Dependencies = mod.DependenciesKnown ? mod.Dependencies : oldMod.Dependencies,
                     DependenciesKnown = mod.DependenciesKnown || oldMod.DependenciesKnown,
-                    InstalledAsDependency = mod.InstalledAsDependency && oldMod.InstalledAsDependency } : mod).ToArray(),
+                    InstalledAsDependency = mod.InstalledAsDependency && oldMod.InstalledAsDependency
+                } : mod).ToArray(),
             Profiles = state.Profiles.Select(profile => profile.Entries.Any(e => e.ModId == oldId)
                 ? profile with { Entries = profile.Entries.Where(e => e.ModId != newId).Select(e => e.ModId == oldId ? Replace(e) : e).ToArray() }
                 : profile).ToArray()

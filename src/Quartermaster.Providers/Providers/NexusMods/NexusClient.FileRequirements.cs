@@ -43,7 +43,7 @@ public sealed partial class NexusClient
                 alternatives.Add(new(mod.GetProperty("name").GetString()!,
                     page,
                     "Requires a compatible file version.", domain.Equals(NexusLink.Game, StringComparison.OrdinalIgnoreCase))
-                    { AllowedFileIds = allowed });
+                { AllowedFileIds = allowed });
             }
             if (excluded) continue;
             if (alternatives.Count == 0)

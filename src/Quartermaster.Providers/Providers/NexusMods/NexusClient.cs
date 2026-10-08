@@ -68,7 +68,7 @@ public sealed partial class NexusClient : IDisposable
                 node.GetProperty("summary").GetString()!, node.GetProperty("version").GetString()!,
                 new Uri($"https://www.nexusmods.com/{NexusLink.Game}/mods/{node.GetProperty("modId").GetInt64()}"),
                 ImageUrl(node, "thumbnailUrl") ?? ImageUrl(node, "pictureUrl"))
-                { VirusScanStatus = scans.GetValueOrDefault(node.GetProperty("modId").GetInt64().ToString(), "UNKNOWN") }).ToArray();
+            { VirusScanStatus = scans.GetValueOrDefault(node.GetProperty("modId").GetInt64().ToString(), "UNKNOWN") }).ToArray();
     }
     private static Uri? ImageUrl(JsonElement node, string field) => node.TryGetProperty(field, out var value) &&
         value.ValueKind == JsonValueKind.String && Uri.TryCreate(value.GetString(), UriKind.Absolute, out var uri) &&

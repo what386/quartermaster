@@ -27,8 +27,17 @@ public sealed class NexusTests
                 var query = body.RootElement.GetProperty("query").GetString()!;
                 if (query.Contains("game(domainName")) return Json(new { data = new { game = new { id = 6119 } } });
                 Assert.Contains("legacyModRequirementsEnabled", query);
-                return Json(new { data = new { mod = new { legacyModRequirementsEnabled = false,
-                    modRequirements = new { nexusRequirements = new { totalCount = 0, nodes = Array.Empty<object>() } } } } });
+                return Json(new
+                {
+                    data = new
+                    {
+                        mod = new
+                        {
+                            legacyModRequirementsEnabled = false,
+                            modRequirements = new { nexusRequirements = new { totalCount = 0, nodes = Array.Empty<object>() } }
+                        }
+                    }
+                });
             }
             Assert.Equal("test-api-key", request.Headers.GetValues("apikey").Single());
             if (path.StartsWith("/v3/games/helldivers2/mod-file-versions/"))
@@ -37,8 +46,11 @@ public sealed class NexusTests
                 return Json(new { data = new { id = Path.GetFileName(path) == "67401" ? "reticle-current" : "reticle-other" } });
             }
             if (path.Contains("reticle-current"))
-                return new(HttpStatusCode.OK) { Content = new StringContent((await System.IO.File.ReadAllTextAsync(
-                    Path.Combine(AppContext.BaseDirectory, "Fixtures", "nexus-16467-file-requirements.json"))).Replace("\"4664\"", $"\"{managerId}\""), Encoding.UTF8, "application/json") };
+                return new(HttpStatusCode.OK)
+                {
+                    Content = new StringContent((await System.IO.File.ReadAllTextAsync(
+                    Path.Combine(AppContext.BaseDirectory, "Fixtures", "nexus-16467-file-requirements.json"))).Replace("\"4664\"", $"\"{managerId}\""), Encoding.UTF8, "application/json")
+                };
             return Json(new { dependencies = Array.Empty<object>() });
         }));
         using var client = Client(api); var adapter = new NexusAdapter(client);
@@ -66,11 +78,23 @@ public sealed class NexusTests
             var nodes = new[] { 109, 4664, 16292, 200 }.Select(id => new
             {
                 modName = id == 200 ? "HD2 Arsenal themed addon" : "Requirement " + id,
-                modId = id.ToString(), gameId = "6119", notes = "", externalRequirement = false,
+                modId = id.ToString(),
+                gameId = "6119",
+                notes = "",
+                externalRequirement = false,
                 url = $"https://www.nexusmods.com/helldivers2/mods/{id}"
             });
-            return Json(new { data = new { mod = new { legacyModRequirementsEnabled = true,
-                modRequirements = new { nexusRequirements = new { totalCount = 4, nodes } } } } });
+            return Json(new
+            {
+                data = new
+                {
+                    mod = new
+                    {
+                        legacyModRequirementsEnabled = true,
+                        modRequirements = new { nexusRequirements = new { totalCount = 4, nodes } }
+                    }
+                }
+            });
         }));
         using var client = Client(api);
         var requirements = await client.GetRequirementsAsync(16467);
@@ -106,7 +130,10 @@ public sealed class NexusTests
             var offset = variables.GetProperty("offset").GetInt32(); offsets.Add(offset);
             var nodes = Enumerable.Range(offset, offset == 0 ? 100 : 1).Select(index => new
             {
-                modName = "Requirement " + index, modId = (index + 2).ToString(), gameId = "42", notes = "Author notes",
+                modName = "Requirement " + index,
+                modId = (index + 2).ToString(),
+                gameId = "42",
+                notes = "Author notes",
                 url = index == 100 ? "https://example.com/tool" : $"https://www.nexusmods.com/helldivers2/mods/{index + 2}",
                 externalRequirement = index == 100
             });
@@ -128,15 +155,30 @@ public sealed class NexusTests
         {
             using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
             if (body.RootElement.GetProperty("query").GetString()!.Contains("modFiles"))
-                return Json(new { data = new { m0 = new[]
+                return Json(new
+                {
+                    data = new
+                    {
+                        m0 = new[]
                 {
                     new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "VERIFIED" },
                     new { categoryId = 3, detectedFileExtension = "zip", scannedV2 = "NOT_SCANNED" },
                     new { categoryId = 7, detectedFileExtension = "zip", scannedV2 = "QUARANTINED" },
                     new { categoryId = 1, detectedFileExtension = "exe", scannedV2 = "QUARANTINED" }
-                } } });
-            return Json(new { data = new { mods = new { nodes = new[] { new { modId = 1, gameId = 42,
-                name = "Mod", summary = "Description", version = "1" } } } } });
+                }
+                    }
+                });
+            return Json(new
+            {
+                data = new
+                {
+                    mods = new
+                    {
+                        nodes = new[] { new { modId = 1, gameId = 42,
+                name = "Mod", summary = "Description", version = "1" } }
+                    }
+                }
+            });
         }));
         using var client = Client(api);
         Assert.Equal("NOT_SCANNED", Assert.Single(await client.SearchAsync("Mod")).VirusScanStatus);

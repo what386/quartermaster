@@ -103,8 +103,11 @@ public sealed partial class ModDownloads
                     }
                     if (resolved is null)
                     {
-                        var manual = selectedRequirement with { CanInstall = false,
-                            Notes = "No compatible ZIP is available. Install this requirement manually." };
+                        var manual = selectedRequirement with
+                        {
+                            CanInstall = false,
+                            Notes = "No compatible ZIP is available. Install this requirement manually."
+                        };
                         external.TryAdd(manual.Page.AbsoluteUri, manual);
                         snapshot[requirementIndex] = manual.ToDependency();
                         continue;

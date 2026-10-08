@@ -227,8 +227,11 @@ public sealed class ProviderManager(
         var job = existing ?? await QueueAsync(file, profileId, ct: ct);
         await StopWorkerAsync(job.Id);
         if (dependencies is not null)
-            await MutateAsync(state => state with { Jobs = state.Jobs.Select(item => item.Id == job.Id
-                ? item with { File = item.File with { Dependencies = dependencies } } : item).ToArray() }, ct);
+            await MutateAsync(state => state with
+            {
+                Jobs = state.Jobs.Select(item => item.Id == job.Id
+                ? item with { File = item.File with { Dependencies = dependencies } } : item).ToArray()
+            }, ct);
         await SetStatusAsync(job.Id, DownloadStatus.Waiting);
         await gate.WaitAsync(ct);
         try
@@ -371,8 +374,11 @@ public sealed class ProviderManager(
             );
         if (dependencies is not null) file = file with { Dependencies = dependencies };
         if (file.Provider == NexusAdapter.ProviderId && file.Dependencies is null)
-            file = file with { Dependencies = (await GetRequirementsAsync(file.DownloadPage.AbsoluteUri, ct))
-                .Select(requirement => requirement.ToDependency()).ToArray() };
+            file = file with
+            {
+                Dependencies = (await GetRequirementsAsync(file.DownloadPage.AbsoluteUri, ct))
+                .Select(requirement => requirement.ToDependency()).ToArray()
+            };
         return await QueueAsync(file with { Name = mod.Name }, replacesModId: mod.Id, ct: ct,
             installedAsDependency: mod.InstalledAsDependency);
     }
