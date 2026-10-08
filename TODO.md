@@ -18,3 +18,6 @@
 - [ ] feat: arsenal profile loading
       @created 2026-10-08 20:22
 
+- [ ] browser extension
+      @created 2026-10-08 22:56
+
