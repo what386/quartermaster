@@ -235,6 +235,52 @@ public class NexusMetadataTests
     }
 
     [AvaloniaFact]
+    public async Task ResolveFromHostedDetailsCanChooseFilesAndConfirmWithoutClosingDetails()
+    {
+        var server = new NexusServer(); using var api = new HttpClient(new Handler(server.Respond));
+        var window = new MainWindow();
+        using var f = new Fixture(nexusApi: api, dialogs: new Shared.DialogService(() => window));
+        await f.Services.Session.InitializeAsync(CancellationToken.None);
+        await f.Services.Session.SetOnboardingPreferencesAsync(null, true, CancellationToken.None);
+        await f.Shell.InitializeAsync(); await f.Services.Keys.SetAsync("nexusmods", "test-key");
+        for (var id = 1; id <= 3; id++) server.Archives[id] = File.ReadAllBytes(f.Zip("Mod" + id, (ulong)id));
+        var root = await f.Services.Library.ImportAsync(f.Source("Mod3", 3));
+        await f.Services.Library.SetSourcesAsync(root.Id, [new("nexusmods", "3", "30", "1")]);
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var details = new ModDetailsViewModel(root, f.Services);
+        var dialog = new ModDetailsDialog { DataContext = details };
+        dialog.FindControl<TabControl>("DetailsTabs")!.SelectedIndex = 1;
+        window.DataContext = f.Shell; window.Show();
+        var shown = window.ShowDialogAsync<object?>(dialog);
+        try
+        {
+            var run = details.ResolveDependenciesCommand.ExecuteAsync();
+            var choices = 0; var confirmations = 0;
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            while (!run.IsCompleted)
+            {
+                timeout.Token.ThrowIfCancellationRequested();
+                window.CaptureRenderedFrame()?.Dispose();
+                if (window.GetVisualDescendants().OfType<ModFilesDialog>().FirstOrDefault() is { } files)
+                { Assert.True(files.TryAccept()); choices++; }
+                if (window.GetVisualDescendants().OfType<Shared.ConfirmationDialog>().FirstOrDefault() is { } confirm)
+                { Assert.True(confirm.TryAccept()); confirmations++; }
+                await Task.Delay(10, timeout.Token);
+            }
+            await run; window.CaptureRenderedFrame()?.Dispose();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Assert.Equal(2, choices); Assert.Equal(1, confirmations);
+            Assert.False(shown.IsCompleted);
+            Assert.Same(dialog, Assert.Single(window.GetVisualDescendants().OfType<ModDetailsDialog>()));
+            Assert.Equal(1, dialog.FindControl<TabControl>("DetailsTabs")!.SelectedIndex);
+            Assert.Equal(2, details.Dependencies.Count);
+            Assert.Equal(2, f.Services.Providers.State.Jobs.Count);
+            dialog.Cancel(); await shown;
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ResolveButtonRepairsRequirementsAndDistinguishesDependencyImports()
     {
         var server = new NexusServer(); using var api = new HttpClient(new Handler(server.Respond));
@@ -251,6 +297,7 @@ public class NexusMetadataTests
         await f.Services.Session.SaveProfileAsync(profile, false, CancellationToken.None);
         var details = new ModDetailsViewModel(root, f.Services);
         var dialog = new ModDetailsDialog { DataContext = details };
+        dialog.FindControl<TabControl>("DetailsTabs")!.SelectedIndex = 1;
         var window = new Window { Content = dialog }; window.Show();
         try
         {

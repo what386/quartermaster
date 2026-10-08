@@ -11,34 +11,42 @@ public sealed class ModDetailsViewModel : ViewModelBase
     private readonly AppServices services;
     private string pageLink;
     private string savedPage;
-    public string PageLink { get => pageLink; set { if (Set(ref pageLink, value)) { SavePageCommand.Refresh(); OpenPageCommand.Refresh(); } } }
-    public AsyncCommand SavePageCommand { get; }
-    public AsyncCommand OpenPageCommand { get; }
+    public string PageLink { get => pageLink; set => Set(ref pageLink, value); }
+    public OperationState Operations => services.Operations;
     public AsyncCommand ResolveDependenciesCommand { get; }
     public bool CanResolveDependencies => services.Downloads.CanResolveDependencies(mod);
     public ModDetailsViewModel(Mod mod, AppServices services)
     {
         this.mod = mod;
         this.services = services;
+        pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
         RefreshRelationships();
         ResolveDependenciesCommand = services.Operations.CreateCommand("Resolving dependencies", async ct =>
         {
+            await SavePageAsync(ct);
             await services.Downloads.ResolveDependenciesAsync(this.mod.Id, ct);
             RefreshRelationships();
         }, () => CanResolveDependencies);
-        pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
-        SavePageCommand = services.Operations.CreateCommand("Saving mod page", async ct =>
+    }
+    private async Task SavePageAsync(CancellationToken ct)
+    {
+        if (PageLink.Trim() == savedPage) return;
+        await services.Library.SetPageLinkAsync(mod.Id, PageLink, ct);
+        savedPage = PageLink = ModLinks.ValidatePage(PageLink) ?? "";
+        await services.Session.ReloadAsync(ct);
+        RefreshRelationships();
+    }
+    public async Task<bool> SaveOnCloseAsync()
+    {
+        if (!Operations.CanInteract) return false;
+        if (PageLink.Trim() == savedPage) return true;
+        var saved = false;
+        await Operations.RunAsync("Saving mod page", async ct =>
         {
-            await services.Library.SetPageLinkAsync(mod.Id, PageLink, ct);
-            savedPage = PageLink = ModLinks.ValidatePage(PageLink) ?? "";
-            await services.Session.ReloadAsync(ct);
-        }, () => PageLink.Trim() != savedPage);
-        OpenPageCommand = services.Operations.CreateCommand("Opening mod page", _ =>
-        {
-            var link = ModLinks.ValidatePage(PageLink);
-            if (link is not null) services.OpenBrowser(new Uri(link));
-            return Task.CompletedTask;
-        }, () => !string.IsNullOrWhiteSpace(PageLink));
+            await SavePageAsync(ct);
+            saved = true;
+        }, showProgress: false);
+        return saved;
     }
     public string Name => mod.Name;
     public string Description => string.IsNullOrWhiteSpace(mod.Description) ? "No description provided." : mod.Description;

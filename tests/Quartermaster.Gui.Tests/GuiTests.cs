@@ -602,6 +602,14 @@ public class GuiTests
             window.CaptureRenderedFrame()?.Dispose();
             var list = window.GetVisualDescendants().OfType<ListBox>().Single(box => box.Name == "ProfileModsList");
             list.ContextMenu!.Open(list); Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Options", Assert.IsType<MenuItem>(list.ContextMenu.Items[0]).Header);
+            Assert.Equal("Mod details", Assert.IsType<MenuItem>(list.ContextMenu.Items[1]).Header);
+            Assert.IsType<MenuItem>(list.ContextMenu.Items[1]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            window.CaptureRenderedFrame()?.Dispose();
+            var details = Assert.Single(window.GetVisualDescendants().OfType<ModDetailsDialog>());
+            Assert.DoesNotContain(details.GetVisualDescendants().OfType<ModOptionsView>(), _ => true);
+            details.Cancel(); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            list.ContextMenu.Open(list); Dispatcher.UIThread.RunJobs();
             Assert.IsType<MenuItem>(list.ContextMenu.Items[0]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
             window.CaptureRenderedFrame()?.Dispose();
             var dialog = Assert.Single(window.GetVisualDescendants().OfType<ModSettingsDialog>());
@@ -1088,7 +1096,8 @@ public class GuiTests
             Assert.Equal("Cape", profiles.SelectedMod!.Name);
             var menu = list.ContextMenu!;
             if (!menu.IsOpen) menu.Open(list);
-            var toggle = Assert.IsType<MenuItem>(menu.Items[1]);
+            Assert.False(Assert.IsType<MenuItem>(menu.Items[0]).IsEnabled);
+            var toggle = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, profiles.ToggleLabel));
             await Assert.IsType<AsyncCommand>(toggle.Command).ExecuteAsync(); menu.Close();
             Assert.False(profiles.Entries.Single(row => row.Name == "Cape").IsEnabled);
             window.CaptureRenderedFrame()?.Dispose();
@@ -1128,7 +1137,7 @@ public class GuiTests
             Assert.Equal(new[] { "Armor", "Cape", "Helmet" }, profiles.Entries.Select(row => row.Name));
             profiles.SelectedMod = profiles.Entries.Single(row => row.Name == "Helmet");
             menu.Open(list); Dispatcher.UIThread.RunJobs();
-            var remove = Assert.IsType<MenuItem>(menu.Items[3]);
+            var remove = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Remove from profile"));
             await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); menu.Close();
             Assert.DoesNotContain(profiles.Entries, row => row.Name == "Helmet");
         }

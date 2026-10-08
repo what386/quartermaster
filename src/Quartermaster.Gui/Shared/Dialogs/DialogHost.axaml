@@ -2,7 +2,7 @@
              x:Class="Quartermaster.Gui.Shared.DialogHost" KeyboardNavigation.TabNavigation="Cycle">
   <Border Background="{DynamicResource OverlayBrush}">
     <Border Background="{DynamicResource CardBackground}" BorderBrush="{DynamicResource LineBrush}" BorderThickness="1"
-            CornerRadius="8" Padding="24" Margin="24" HorizontalAlignment="Center" VerticalAlignment="Center">
+            CornerRadius="8" HorizontalAlignment="Center" VerticalAlignment="Center">
       <ContentControl x:Name="DialogContent" />
     </Border>
   </Border>

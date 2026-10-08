@@ -4,7 +4,7 @@ using Quartermaster.Gui.Shared;
 
 namespace Quartermaster.Gui.Mods;
 
-public partial class ModDetailsDialog : UserControl, IModalDialog
+public partial class ModDetailsDialog : UserControl, IModalParentDialog
 {
     public event Action<object?>? Completed;
     private bool attached;
@@ -23,6 +23,10 @@ public partial class ModDetailsDialog : UserControl, IModalDialog
         watched?.StartWatching();
     }
     public bool TryAccept() => false;
-    public void Cancel() => Completed?.Invoke(null);
+    public async void Cancel()
+    {
+        if (DataContext is ModDetailsViewModel details && !await details.SaveOnCloseAsync()) return;
+        Completed?.Invoke(null);
+    }
     private void CloseDialog(object? sender, RoutedEventArgs e) => Cancel();
 }

@@ -13,6 +13,28 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDetailsTests
 {
     [AvaloniaFact]
+    public async Task ClosingDetailsSavesLinkAndInvalidLinkKeepsTheDialogOpen()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var mod = await f.Services.Library.ImportAsync(f.Source("Example"));
+        var details = new ModDetailsViewModel(mod, f.Services);
+        var dialog = new ModDetailsDialog { DataContext = details };
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        var shown = window.ShowDialogAsync<object?>(dialog);
+        try
+        {
+            details.PageLink = "invalid link";
+            dialog.Cancel(); await f.Services.Operations.WhenIdle;
+            Assert.False(shown.IsCompleted); Assert.True(f.Services.Operations.IsError);
+            details.PageLink = "https://example.com/mod";
+            dialog.Cancel(); await shown;
+            Assert.Equal(details.PageLink, Assert.Single(f.Services.Session.State.Mods).PageLink);
+            Assert.Empty(f.BrowserRequests);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task RetainedVersionsAreLabelledAndProfilesShowTheUpdatedProviderVersion()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -62,6 +84,7 @@ public sealed class ModDetailsTests
         Assert.Equal("Dependent", Assert.Single(reverse.Dependents).Name);
         Assert.False(reverse.HasDependencies); Assert.Equal("Dependency information unavailable.", reverse.DependencySummary);
         var dialog = new ModDetailsDialog { DataContext = details };
+        dialog.FindControl<TabControl>("DetailsTabs")!.SelectedIndex = 1;
         var window = new Window { Content = dialog }; window.Show();
         try
         {

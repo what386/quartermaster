@@ -13,7 +13,10 @@ public interface IModalDialog
     void Cancel();
 }
 
-/// <summary>Hosts one modal inside the shell and restores focus when it closes.</summary>
+/// <summary>A dialog that can remain open behind file selection or confirmation.</summary>
+public interface IModalParentDialog : IModalDialog { }
+
+/// <summary>Hosts a modal inside the shell, preserving parent dialogs and focus.</summary>
 public partial class DialogHost : UserControl
 {
     public static readonly StyledProperty<bool> IsOpenProperty = AvaloniaProperty.Register<DialogHost, bool>(nameof(IsOpen));
@@ -24,8 +27,12 @@ public partial class DialogHost : UserControl
     public DialogHost() { InitializeComponent(); IsVisible = false; }
     public Task<T> ShowAsync<T>(Control content)
     {
-        if (active is not null) throw new InvalidOperationException("Close the current dialog first.");
+        if (active is not null && active is not IModalParentDialog)
+            throw new InvalidOperationException("Close the current dialog first.");
         if (content is not IModalDialog dialog) throw new ArgumentException("Content must be a modal dialog.", nameof(content));
+        var parent = active;
+        var parentContent = DialogContent.Content;
+        var parentClosed = closed;
         var previousFocus = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() as Control;
         var completion = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
         var dialogClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -33,7 +40,8 @@ public partial class DialogHost : UserControl
         void Finish(object? result)
         {
             dialog.Completed -= Finish;
-            active = null; DialogContent.Content = null; IsOpen = false; IsVisible = false;
+            active = parent; DialogContent.Content = parentContent; closed = parentClosed;
+            IsOpen = parent is not null; IsVisible = IsOpen;
             if (previousFocus?.IsEffectivelyEnabled == true && previousFocus.IsEffectivelyVisible) previousFocus.Focus();
             completion.TrySetResult(result is T value ? value : default!);
             dialogClosed.TrySetResult();
