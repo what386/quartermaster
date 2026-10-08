@@ -112,7 +112,7 @@ public sealed class ManualUpdateTests
     }
 
     [AvaloniaFact]
-    public async Task PageLinksCanBeSavedOpenedAndShownInTheManualCheckQueue()
+    public async Task PageLinksSaveOnCloseAndAppearInTheManualCheckQueue()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         await f.Services.Session.ImportAsync(f.Zip("Homing stim"), CancellationToken.None, f.Services.Session.ActiveProfile!.Id);
@@ -120,9 +120,8 @@ public sealed class ManualUpdateTests
         var library = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
         var details = library.Details!;
         details.PageLink = "https://mods.example/homing";
-        await details.SavePageCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError);
+        Assert.True(await details.SaveOnCloseAsync()); Assert.False(f.Services.Operations.IsError);
         Assert.Equal(details.PageLink, Assert.Single(f.Services.Session.State.Mods).PageLink);
-        await details.OpenPageCommand.ExecuteAsync(); Assert.Equal(new Uri(details.PageLink), Assert.Single(f.BrowserRequests));
         var profile = Assert.Single(f.Services.Session.State.Profiles);
         f.Shell.NavigationItems.Single(item => item.Page == PageKind.Profiles).OpenCommand.Execute(null);
         var profiles = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
@@ -138,7 +137,7 @@ public sealed class ManualUpdateTests
             Assert.Empty(window.GetVisualDescendants().OfType<DownloadsView>());
             var row = Assert.Single(f.Services.Downloads.ManualChecks);
             await row.OpenCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
-            Assert.Equal(2, f.BrowserRequests.Count);
+            Assert.Single(f.BrowserRequests);
             Assert.Equal(profile.Entries[0].ModId, Assert.Single(f.Services.Providers.State.Jobs).ReplacesModId);
             var overlay = window.FindControl<Border>("DownloadProgressOverlay")!;
             Assert.True(overlay.IsVisible);

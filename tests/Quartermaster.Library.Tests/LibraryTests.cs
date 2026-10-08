@@ -12,6 +12,58 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Fact]
+    public async Task ManagerExclusionsApplyToNewMetadataWithoutChangingSavedRequirements()
+    {
+        using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("Mod"));
+        var loader = new ModDependency("Loader", "https://www.nexusmods.com/helldivers2/mods/16292");
+        var arsenal = new ModDependency("Arsenal", "https://www.nexusmods.com/helldivers2/mods/4664?tab=files", CanInstall: false);
+        var manager = new ModDependency("HD2MM", "https://nexusmods.com/helldivers2/mods/109/");
+        var unrelated = new ModDependency("HD2 Arsenal themed addon", "https://www.nexusmods.com/helldivers2/mods/200");
+        var otherGame = new ModDependency("Other game", "https://www.nexusmods.com/anothergame/mods/109");
+        ModDependency[] requirements = [loader, arsenal, manager, unrelated, otherGame, loader with { Alternatives = [arsenal] }];
+        var state = await f.Store.LoadAsync();
+        await f.Store.SaveAsync(state with { Mods = [mod with { DependenciesKnown = true, Dependencies = requirements }] });
+        var saved = Assert.Single((await f.Store.LoadAsync()).Mods);
+        Assert.True(saved.DependenciesKnown);
+        Assert.Equal(requirements.Select(item => item.Page), saved.Dependencies.Select(item => item.Page));
+        await f.Library.SetDependenciesAsync(mod.Id, requirements);
+        Assert.Equal(new[] { "Loader", "HD2 Arsenal themed addon", "Other game" },
+            Assert.Single((await f.Library.LoadAsync()).Mods).Dependencies.Select(item => item.Name));
+    }
+
+    [Fact]
+    public async Task FileRequirementAlternativesAndCompatibleVersionsSurvivePersistence()
+    {
+        using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("Requirement"));
+        var dependency = new ModDependency("First option", "https://www.nexusmods.com/helldivers2/mods/100")
+        {
+            AllowedFileIds = ["10"],
+            Alternatives = [new("Other option", "https://www.nexusmods.com/helldivers2/mods/200") { AllowedFileIds = ["20"] }]
+        };
+        await f.Library.SetDependenciesAsync(mod.Id, [dependency]);
+        var saved = Assert.Single(Assert.Single((await f.Library.LoadAsync()).Mods).Dependencies);
+        Assert.Equal(new[] { "10" }, saved.AllowedFileIds);
+        Assert.Equal(new[] { "20" }, Assert.Single(saved.Alternatives).AllowedFileIds);
+        var installed = mod with { Sources = [new("nexusmods", "200", "20")] };
+        Assert.True(ModDependencyMatching.Matches(installed, saved));
+        Assert.False(ModDependencyMatching.MatchesPage(installed, saved));
+        Assert.False(ModDependencyMatching.Matches(installed with { Sources = [new("nexusmods", "200", "21")] }, saved));
+    }
+
+    [Fact]
+    public async Task ExplicitImportsPromoteDependenciesAndDependencyImportsNeverDemoteExplicitMods()
+    {
+        using var f = new Fixture(); var source = f.Source("Dependency");
+        var dependency = await f.Library.ImportAsync(source, installedAsDependency: true);
+        Assert.True(dependency.InstalledAsDependency);
+        Assert.True(Assert.Single((await f.Library.LoadAsync()).Mods).InstalledAsDependency);
+        var explicitMod = await f.Library.ImportAsync(source);
+        Assert.Equal(dependency.Id, explicitMod.Id); Assert.False(explicitMod.InstalledAsDependency);
+        var again = await f.Library.ImportAsync(source, installedAsDependency: true);
+        Assert.False(again.InstalledAsDependency); Assert.Single((await f.Library.LoadAsync()).Mods);
+    }
+
+    [Fact]
     public async Task ImportPageIsSavedForNewAndDuplicateModsAndBlankPreservesIt()
     {
         using var f = new Fixture(); var source = f.Source("Mod");

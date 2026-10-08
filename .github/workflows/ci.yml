@@ -22,7 +22,6 @@ jobs:
         os:
           - ubuntu-latest
           - windows-latest
-          - macos-latest
 
     steps:
       - uses: actions/checkout@v7
@@ -50,3 +49,18 @@ jobs:
           --configuration Release
           --no-build
           --no-restore
+
+  winupdater:
+    name: Windows updater
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Configure updater
+        run: cmake -S winupdater -B winupdater/build -DCMAKE_BUILD_TYPE=MinSizeRel -DBUILD_TESTING=ON
+
+      - name: Build updater
+        run: cmake --build winupdater/build --config MinSizeRel
+
+      - name: Test updater
+        run: ctest --test-dir winupdater/build --build-config MinSizeRel --output-on-failure

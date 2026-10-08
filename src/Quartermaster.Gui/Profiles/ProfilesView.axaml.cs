@@ -7,7 +7,7 @@ namespace Quartermaster.Gui.Profiles;
 
 public partial class ProfilesView : UserControl
 {
-    private ModSettingsDialog? modDialog;
+    private Control? modDialog;
     public ProfilesView()
     {
         InitializeComponent();
@@ -34,13 +34,18 @@ public partial class ProfilesView : UserControl
         try { await model.CreateGroupFromModsAsync(ids); }
         catch (Exception ex) { model.Operations.ReportError(ex); }
     }
-    private void OpenModOptions(object? sender, RoutedEventArgs e)
+    private async void OpenModOptions(object? sender, RoutedEventArgs e)
     {
         e.Handled = true;
         if (modDialog is not null || DataContext is not ProfilesViewModel { Operations.CanInteract: true } model ||
-            e.Source is not Mods.ModRowView { DataContext: ProfileModItem { HasOptions: true } mod }) return;
+            TopLevel.GetTopLevel(this) is not MainWindow owner) return;
+        var mod = e.Source is Mods.ModRowView { DataContext: ProfileModItem row } ? row : model.SelectedMod;
+        if (mod?.HasOptions != true) return;
         model.SelectedMod = mod;
-        OpenModDetails(sender, e);
+        ProfileModsList.ContextMenu?.Close();
+        modDialog = new ModSettingsDialog { DataContext = model };
+        try { await owner.ShowDialogAsync<object?>(modDialog); }
+        finally { modDialog = null; }
     }
     private void QueueModDetails(object? sender, RoutedEventArgs e)
     {
@@ -54,7 +59,7 @@ public partial class ProfilesView : UserControl
         if (modDialog is not null || DataContext is not ProfilesViewModel { HasSelectedMod: true } model ||
             !model.Operations.CanInteract || TopLevel.GetTopLevel(this) is not MainWindow owner) return;
         ProfileModsList.ContextMenu?.Close();
-        modDialog = new() { DataContext = model };
+        modDialog = new Mods.ModDetailsDialog { DataContext = model.Details };
         try { await owner.ShowDialogAsync<object?>(modDialog); }
         finally { modDialog = null; }
     }

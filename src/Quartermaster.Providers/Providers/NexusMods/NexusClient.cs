@@ -17,7 +17,7 @@ public sealed class NexusApiException(HttpStatusCode status, TimeSpan? retryAfte
     public TimeSpan? RetryAfter { get; } = retryAfter;
 }
 
-public sealed class NexusClient : IDisposable
+public sealed partial class NexusClient : IDisposable
 {
     private readonly Func<CancellationToken, Task<string?>> getKey;
     private readonly HttpClient api;
@@ -48,7 +48,7 @@ public sealed class NexusClient : IDisposable
     public async Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int offset = 0, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query) || query.Length > 200 || offset < 0) throw new ArgumentException("Enter a search term and a valid offset.");
-        const string document = "query($filter: ModsFilter!, $offset: Int!) { mods(filter: $filter, offset: $offset, count: 20) { nodes { modId name summary version thumbnailUrl pictureUrl } } }";
+        const string document = "query($filter: ModsFilter!, $offset: Int!) { mods(filter: $filter, offset: $offset, count: 20) { nodes { modId name summary version thumbnailUrl pictureUrl gameId } } }";
         using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.nexusmods.com/v2/graphql")
         {
             Content = JsonContent.Create(new
@@ -61,11 +61,14 @@ public sealed class NexusClient : IDisposable
         using var response = await SendAsync(request, ct);
         using var result = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(ct), cancellationToken: ct);
         if (result.RootElement.TryGetProperty("errors", out var errors) && errors.GetArrayLength() > 0) throw new InvalidDataException("Nexus search failed.");
-        return result.RootElement.GetProperty("data").GetProperty("mods").GetProperty("nodes").EnumerateArray()
+        var nodes = result.RootElement.GetProperty("data").GetProperty("mods").GetProperty("nodes");
+        var scans = await SearchScanResultsAsync(nodes, ct);
+        return nodes.EnumerateArray()
             .Select(node => new SearchResult(node.GetProperty("modId").GetInt64().ToString(), node.GetProperty("name").GetString()!,
                 node.GetProperty("summary").GetString()!, node.GetProperty("version").GetString()!,
                 new Uri($"https://www.nexusmods.com/{NexusLink.Game}/mods/{node.GetProperty("modId").GetInt64()}"),
-                ImageUrl(node, "thumbnailUrl") ?? ImageUrl(node, "pictureUrl"))).ToArray();
+                ImageUrl(node, "thumbnailUrl") ?? ImageUrl(node, "pictureUrl"))
+            { VirusScanStatus = scans.GetValueOrDefault(node.GetProperty("modId").GetInt64().ToString(), "UNKNOWN") }).ToArray();
     }
     private static Uri? ImageUrl(JsonElement node, string field) => node.TryGetProperty(field, out var value) &&
         value.ValueKind == JsonValueKind.String && Uri.TryCreate(value.GetString(), UriKind.Absolute, out var uri) &&

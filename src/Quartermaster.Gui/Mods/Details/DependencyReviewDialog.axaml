@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods"
+             xmlns:p="clr-namespace:Quartermaster.Providers.Clients;assembly=Quartermaster.Providers"
+             x:Class="Quartermaster.Gui.Mods.DependencyReviewDialog" x:DataType="vm:DependencyReviewViewModel" Width="520">
+  <StackPanel Spacing="16" Margin="20">
+    <TextBlock Text="Dependencies" Classes="sectionTitle" />
+    <TextBlock Text="{Binding Name}" Classes="muted" TextWrapping="Wrap" />
+    <ScrollViewer MaxHeight="360">
+      <StackPanel Spacing="12" IsEnabled="{Binding !IsUpdating}">
+        <ItemsControl ItemsSource="{Binding Items}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:DependencyReviewItem">
+          <StackPanel Spacing="6" Margin="0,0,0,12">
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding Action}" Classes="muted" />
+            <ComboBox ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile, Mode=TwoWay}" IsVisible="{Binding HasFileChoice}" HorizontalAlignment="Stretch">
+              <ComboBox.ItemTemplate><DataTemplate x:DataType="p:ProviderFile"><TextBlock Text="{Binding FileName}" TextTrimming="CharacterEllipsis" /></DataTemplate></ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBlock Text="{Binding FileName}" IsVisible="{Binding !HasFileChoice}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          </StackPanel>
+        </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        <StackPanel IsVisible="{Binding HasManual}" Spacing="8">
+          <TextBlock Text="Install manually" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding Manual}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="p:ModRequirement">
+            <StackPanel Spacing="4" Margin="0,0,0,8">
+              <TextBlock Text="{Binding Name}" TextWrapping="Wrap" />
+              <SelectableTextBlock Text="{Binding Page}" Classes="muted" TextWrapping="Wrap" />
+              <TextBlock Text="{Binding Notes}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+            </StackPanel>
+          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+    <TextBlock Text="Updating file requirements…" IsVisible="{Binding IsUpdating}" Classes="muted" />
+    <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button Content="{Binding CancelLabel}" Click="CancelReview" />
+      <Button Content="{Binding AcceptLabel}" IsEnabled="{Binding CanAccept}" Classes="primary" Click="AcceptReview" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

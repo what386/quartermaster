@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.SettingsView" x:DataType="vm:SettingsViewModel">
   <Grid RowDefinitions="Auto,*" IsEnabled="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
@@ -11,14 +11,25 @@
       <Border x:Name="AppSettingsSection" Classes="card" IsVisible="{Binding ShowAppSettings}"><StackPanel Spacing="16">
         <TextBlock Text="App settings" Classes="sectionTitle" />
         <vm:AppearanceSettingsView IsVisible="{Binding ShowAppearance}" />
+        <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowOnboarding}">
+          <TextBlock Text="Getting started" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button x:Name="ReplayOnboardingButton" Grid.Column="1" Content="Setup and tour" Command="{Binding ReplayOnboardingCommand}" HorizontalAlignment="Left" />
+        </Grid>
+        <StackPanel Spacing="8" IsVisible="{Binding ShowAppUpdates}">
+          <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="12" HorizontalAlignment="Left">
+            <CheckBox x:Name="AutomaticAppUpdateToggle" Content="Allow automatic update" IsChecked="{Binding AllowAutomaticUpdate, Mode=TwoWay}" ToolTip.Tip="Check at startup and ask before updating." />
+            <Button x:Name="CheckAppUpdatesButton" Grid.Column="1" Content="Check app updates" Command="{Binding CheckAppUpdatesCommand}" HorizontalAlignment="Left" />
+          </Grid>
+          <TextBlock Text="{Binding AppUpdates.Status}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+        </StackPanel>
       </StackPanel></Border>
       <Border x:Name="GameSettingsSection" Classes="card" IsVisible="{Binding ShowGameSettings}"><StackPanel Spacing="16">
         <TextBlock Text="Game and deployment" Classes="sectionTitle" />
         <Grid x:Name="InstallationSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowInstallation}">
           <StackPanel Spacing="4"><TextBlock Text="Game folder" FontWeight="SemiBold" /><TextBlock Text="Installation or data folder" Classes="muted" FontSize="11" /></StackPanel>
-          <StackPanel Grid.Column="1" Spacing="8">
+          <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Left">
             <Grid ColumnDefinitions="*,Auto,Auto">
-              <TextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="Path to Helldivers 2" />
+              <shared:ContentSizedTextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="Path to Helldivers 2" />
               <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseCommand}" Margin="8,0" />
               <Button Grid.Column="2" Content="Find Steam installs" Command="{Binding DiscoverCommand}" />
             </Grid>
@@ -38,8 +49,8 @@
         <TextBlock Text="Downloads" Classes="sectionTitle" />
         <Grid ColumnDefinitions="180,*">
           <StackPanel Spacing="4"><TextBlock Text="Download folder" FontWeight="SemiBold" /><TextBlock Text="Used for download scanning" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
-          <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8">
-            <TextBox x:Name="DownloadFolderInput" Text="{Binding DownloadFolder, Mode=TwoWay}" PlaceholderText="Browser download folder" />
+          <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" HorizontalAlignment="Left">
+            <shared:ContentSizedTextBox x:Name="DownloadFolderInput" Text="{Binding DownloadFolder, Mode=TwoWay}" PlaceholderText="Browser download folder" />
             <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDownloadsCommand}" />
           </Grid>
         </Grid>

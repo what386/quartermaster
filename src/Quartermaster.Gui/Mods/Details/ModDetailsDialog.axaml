@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModDetailsDialog" x:DataType="vm:ModDetailsViewModel" Width="520" Height="540">
+  <Grid RowDefinitions="*,Auto,Auto">
+    <Grid.Resources>
+      <DataTemplate x:Key="RelationshipTemplate" x:DataType="vm:ModRelationshipItem">
+        <StackPanel Spacing="4" Margin="0,0,0,8">
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <HyperlinkButton Command="{Binding OpenPageCommand}" IsVisible="{Binding HasPage}" Padding="0" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}">
+              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+            </HyperlinkButton>
+            <TextBlock Text="{Binding Name}" IsVisible="{Binding !HasPage}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
+            <TextBlock Grid.Column="1" Text="{Binding Status}" IsVisible="{Binding HasStatus}" Classes="muted" FontSize="11" VerticalAlignment="Center" />
+          </Grid>
+          <TextBlock Text="{Binding Notes}" IsVisible="{Binding HasNotes}" Classes="muted" TextWrapping="Wrap" />
+        </StackPanel>
+      </DataTemplate>
+    </Grid.Resources>
+    <TabControl x:Name="DetailsTabs" Padding="24,16,24,0">
+      <TabControl.ItemsPanel>
+        <ItemsPanelTemplate><UniformGrid Rows="1" /></ItemsPanelTemplate>
+      </TabControl.ItemsPanel>
+      <TabControl.Template>
+        <ControlTemplate>
+          <Grid RowDefinitions="Auto,*">
+            <ItemsPresenter x:Name="PART_ItemsPresenter" ItemsPanel="{TemplateBinding ItemsPanel}" />
+            <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="1" Margin="{TemplateBinding Padding}"
+                              Content="{TemplateBinding SelectedContent}" ContentTemplate="{TemplateBinding SelectedContentTemplate}"
+                              HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+          </Grid>
+        </ControlTemplate>
+      </TabControl.Template>
+      <TabControl.Styles>
+        <Style Selector="TabItem">
+          <Setter Property="Padding" Value="10,10" />
+          <Setter Property="FontSize" Value="12" />
+          <Setter Property="Margin" Value="0" />
+          <Setter Property="Foreground" Value="{DynamicResource MutedBrush}" />
+          <Setter Property="Background" Value="{DynamicResource InputBackground}" />
+          <Setter Property="BorderBrush" Value="{DynamicResource LineBrush}" />
+          <Setter Property="BorderThickness" Value="1" />
+          <Setter Property="Template">
+            <ControlTemplate>
+              <Grid>
+              <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                      BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="5,5,0,0" Padding="{TemplateBinding Padding}">
+                <ContentPresenter Content="{TemplateBinding Header}" ContentTemplate="{TemplateBinding HeaderTemplate}"
+                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center" RecognizesAccessKey="True" />
+              </Border>
+                <Border x:Name="InactiveTabLine" BorderBrush="{DynamicResource AccentBrush}"
+                        BorderThickness="0,0,0,1" IsHitTestVisible="False" />
+              </Grid>
+            </ControlTemplate>
+          </Setter>
+        </Style>
+        <Style Selector="TabItem /template/ Border#InactiveTabLine">
+          <Setter Property="IsVisible" Value="False" />
+        </Style>
+        <Style Selector="TabItem:not(:selected) /template/ Border#InactiveTabLine">
+          <Setter Property="IsVisible" Value="True" />
+        </Style>
+        <Style Selector="TabItem:pointerover"><Setter Property="Background" Value="{DynamicResource TileBackground}" /></Style>
+        <Style Selector="TabItem:selected">
+          <Setter Property="Background" Value="{DynamicResource CardBackground}" />
+          <Setter Property="BorderThickness" Value="1,1,1,0" />
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+          <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+          <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+      </TabControl.Styles>
+      <TabItem Header="Overview">
+        <ScrollViewer><StackPanel Spacing="12">
+          <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
+          <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+            <TextBlock Text="Version" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding Version}" />
+            <TextBlock Grid.Row="1" Text="Imported" Classes="muted" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ImportedAt}" />
+          </Grid>
+          <TextBlock Text="{Binding ResourceSummary}" TextWrapping="Wrap" />
+          <StackPanel Spacing="4">
+            <TextBlock Text="Collisions" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding CollisionSummary}" IsVisible="{Binding HasCollisions}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" />
+            <TextBlock Text="No collisions." IsVisible="{Binding !HasCollisions}" Classes="muted" />
+          </StackPanel>
+          <vm:ModPageLinkView />
+          <TextBlock Text="This mod has options. Configure them in Profiles." IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />
+        </StackPanel></ScrollViewer>
+      </TabItem>
+      <TabItem Header="Dependencies">
+        <ScrollViewer><StackPanel Spacing="12">
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Depends on" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button x:Name="ResolveDependenciesButton" Grid.Column="1" Content="Refresh" Command="{Binding ResolveDependenciesCommand}" IsVisible="{Binding CanResolveDependencies}" />
+          </Grid>
+          <TextBlock Text="{Binding DependencySummary}" Classes="muted" TextWrapping="Wrap" />
+          <Button x:Name="GetDependenciesButton" Content="{Binding DependencyActionLabel}" Classes="primary" Command="{Binding GetDependenciesCommand}" IsVisible="{Binding HasDependencyAction}" HorizontalAlignment="Left" />
+          <ItemsControl x:Name="DependenciesList" ItemsSource="{Binding Dependencies}" ItemTemplate="{StaticResource RelationshipTemplate}" />
+          <TextBlock Text="Required by" FontWeight="SemiBold" />
+          <TextBlock Text="No dependents in your library." IsVisible="{Binding !HasDependents}" Classes="muted" />
+          <ItemsControl x:Name="DependentsList" ItemsSource="{Binding Dependents}" ItemTemplate="{StaticResource RelationshipTemplate}" />
+        </StackPanel></ScrollViewer>
+      </TabItem>
+      <TabItem Header="Files">
+        <ScrollViewer><StackPanel Spacing="12">
+          <TextBlock Text="Archives" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding Archives}" />
+          <TextBlock Text="Patch files" FontWeight="SemiBold" />
+          <ItemsControl ItemsSource="{Binding Files}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          <StackPanel IsVisible="{Binding HasCollisions}" Spacing="8">
+            <TextBlock Text="Collisions" FontWeight="SemiBold" />
+            <ItemsControl x:Name="CollisionsList" ItemsSource="{Binding Collisions}">
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8" />
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel></ScrollViewer>
+      </TabItem>
+    </TabControl>
+    <TextBlock Grid.Row="1" Text="{Binding Operations.Message}" IsVisible="{Binding Operations.IsError}" Classes="error" TextWrapping="Wrap" Margin="24,12,24,0" />
+    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="24,16,24,16">
+      <TextBlock Text="{Binding Name}" Classes="sectionTitle" TextTrimming="CharacterEllipsis"
+                 ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" />
+      <Button Grid.Column="1" Content="Close" Click="CloseDialog" />
+    </Grid>
+  </Grid>
+</UserControl>

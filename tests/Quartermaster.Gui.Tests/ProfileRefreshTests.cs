@@ -18,7 +18,7 @@ public class ProfileRefreshTests
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         foreach (var name in new[] { "Armor", "Cape", "Helmet" })
-            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+            await f.Services.Session.ImportAsync(f.Source(name, name == "Armor" ? 1UL : name == "Cape" ? 2UL : 3UL), CancellationToken.None);
         var model = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
         for (var index = 0; index < 3; index++) await model.AddCommand.ExecuteAsync();
         f.Dialogs.InputText = "Equipment"; await model.AddGroupCommand.ExecuteAsync();

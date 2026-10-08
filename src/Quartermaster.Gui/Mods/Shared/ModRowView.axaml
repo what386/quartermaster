@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared" x:Class="Quartermaster.Gui.Mods.ModRowView" x:DataType="vm:IModRow">
+  <Grid ColumnDefinitions="32,Auto,56,*,Auto" Margin="10,6" MinHeight="48">
+    <TextBlock Text="{Binding Number}" Classes="muted" FontSize="11" VerticalAlignment="Center" HorizontalAlignment="Center" />
+    <Button Grid.Column="1" Classes="rowSwitch" Classes.active="{Binding IsEnabled}" Command="{Binding EnableCommand}" IsVisible="{Binding HasToggle}" AutomationProperties.Name="{Binding ToggleDescription}" VerticalAlignment="Center" Margin="8,0,14,0">
+      <Grid Width="30"><Ellipse Fill="{DynamicResource SwitchKnobBrush}" Width="14" Height="14" HorizontalAlignment="{Binding KnobAlignment}" /></Grid>
+    </Button>
+    <Border Grid.Column="2" Classes="modTile" ClipToBounds="True" Classes.loaded="{Binding IsLoaded}" Classes.unloaded="{Binding IsUnloaded}" Classes.warning="{Binding HasDeploymentWarning}" ToolTip.Tip="{Binding DeploymentDescription}" HorizontalAlignment="Left" VerticalAlignment="Center">
+      <Grid>
+        <Image x:Name="ModIcon" Stretch="UniformToFill" />
+        <TextBlock x:Name="ModMonogram" Text="{Binding Monogram}" FontSize="14" FontWeight="SemiBold" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
+      </Grid>
+    </Border>
+    <StackPanel Grid.Column="3" Spacing="0" VerticalAlignment="Center" Margin="4,0,12,0">
+      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+      <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+    </StackPanel>
+    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+      <Border x:Name="DependencyIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding InstalledAsDependency}"
+              ToolTip.Tip="Installed as a dependency" AutomationProperties.Name="Installed as a dependency">
+        <Path Data="M4,3 L10,3 L10,9 L4,9 Z M14,15 L20,15 L20,21 L14,21 Z M7,9 L7,18 L14,18" Stretch="Uniform"
+              Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.5" Margin="3" IsHitTestVisible="False" />
+      </Border>
+      <Button x:Name="UpdateModButton" Content="Update" Classes="primary" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"
+              ToolTip.Tip="{Binding UpdateDescription}" AutomationProperties.Name="Update mod" Padding="8,4" MinHeight="0" />
+      <Border x:Name="ModWarning" Width="24" Height="24" Background="Transparent" IsVisible="{Binding HasWarnings}"
+              ToolTip.Tip="{Binding WarningDescription}" AutomationProperties.Name="{Binding WarningDescription}">
+        <Path Data="M12,2 L22,21 L2,21 Z M12,8 L12,14 M12,17 L12,18" Stretch="Uniform"
+              Stroke="{DynamicResource ClashBrush}" StrokeThickness="1.7" Margin="2" IsHitTestVisible="False" />
+      </Border>
+      <Button x:Name="ModOptionsButton" Width="28" Height="28" MinHeight="0" Padding="5" Background="Transparent" BorderThickness="0"
+              IsVisible="{Binding HasToggle}" IsEnabled="{Binding HasOptions}" Click="RequestOptions" ToolTip.Tip="Mod options" AutomationProperties.Name="Mod options">
+        <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/sliders.svg" Width="18" Height="18"
+                        Foreground="{Binding $parent[Button].Foreground}" />
+      </Button>
+      <Path Data="M0,2 L18,2 M0,8 L18,8 M0,14 L18,14" Width="18" Height="16" Stroke="{DynamicResource DragHandleBrush}" StrokeThickness="1.3" IsVisible="{Binding HasToggle}" ToolTip.Tip="Drag to reorder; right-click for mod actions" />
+    </StackPanel>
+  </Grid>
+</UserControl>

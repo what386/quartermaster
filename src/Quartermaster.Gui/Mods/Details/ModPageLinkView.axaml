@@ -1,0 +1,7 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModPageLinkView" x:DataType="vm:ModDetailsViewModel">
+  <StackPanel Spacing="8">
+    <TextBlock Text="Mod page" FontWeight="SemiBold" />
+    <shared:ContentSizedTextBox x:Name="PageLinkInput" Text="{Binding PageLink, Mode=TwoWay}" PlaceholderText="https://…" />
+  </StackPanel>
+</UserControl>

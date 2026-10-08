@@ -1,0 +1,118 @@
+{
+  "dependencies": [
+    {
+      "id": "606882",
+      "candidate_mod_files": [
+        {
+          "id": "7987482",
+          "name": "Bingus Shared Loader",
+          "mod": {
+            "id": "26280904900516",
+            "game_scoped_id": "16292",
+            "name": "Bingus Shared Loader",
+            "game": {
+              "id": "6119",
+              "name": "Helldivers 2",
+              "domain_name": "helldivers2"
+            },
+            "status": "published"
+          },
+          "candidate_versions": [
+            {
+              "id": "26280904950057",
+              "file": {
+                "id": "7987482",
+                "name": "Bingus Shared Loader"
+              },
+              "position": "3.0",
+              "game_scoped_id": "65833",
+              "name": "Bingus Shared Loader",
+              "version": "16",
+              "category": "archived",
+              "uploaded_at": "2026-09-22T19:04:43Z",
+              "is_primary": false
+            },
+            {
+              "id": "26280904950327",
+              "file": {
+                "id": "7987482",
+                "name": "Bingus Shared Loader"
+              },
+              "position": "4.0",
+              "game_scoped_id": "66103",
+              "name": "Bingus Shared Loader",
+              "version": "17",
+              "category": "old_version",
+              "uploaded_at": "2026-09-24T15:14:40Z",
+              "is_primary": false
+            },
+            {
+              "id": "26280904950615",
+              "file": {
+                "id": "7987482",
+                "name": "Bingus Shared Loader"
+              },
+              "position": "5.0",
+              "game_scoped_id": "66391",
+              "name": "Bingus Shared Loader",
+              "version": "18",
+              "category": "old_version",
+              "uploaded_at": "2026-09-26T18:00:38Z",
+              "is_primary": false
+            },
+            {
+              "id": "26280904951709",
+              "file": {
+                "id": "7987482",
+                "name": "Bingus Shared Loader"
+              },
+              "position": "6.0",
+              "game_scoped_id": "67485",
+              "name": "Bingus Shared Loader",
+              "version": "19",
+              "category": "main",
+              "uploaded_at": "2026-10-05T00:28:50Z",
+              "is_primary": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "606885",
+      "candidate_mod_files": [
+        {
+          "id": "2510521",
+          "name": "1 - HD2 Arsenal - Mod Manager - Windows Setup",
+          "mod": {
+            "id": "26280904888888",
+            "game_scoped_id": "4664",
+            "name": "HD2 Arsenal - Mod Manager - Companion Desktop App",
+            "game": {
+              "id": "6119",
+              "name": "Helldivers 2",
+              "domain_name": "helldivers2"
+            },
+            "status": "published"
+          },
+          "candidate_versions": [
+            {
+              "id": "26280904943335",
+              "file": {
+                "id": "2510521",
+                "name": "1 - HD2 Arsenal - Mod Manager - Windows Setup"
+              },
+              "position": "8.0",
+              "game_scoped_id": "59111",
+              "name": "1 - HD2 Arsenal - Windows Setup",
+              "version": "0.36.2",
+              "category": "main",
+              "uploaded_at": "2026-06-19T01:48:40Z",
+              "is_primary": false
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

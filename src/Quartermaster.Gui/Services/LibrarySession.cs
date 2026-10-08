@@ -205,7 +205,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         finally { await ReloadAsync(CancellationToken.None); }
     }
     public async Task SaveSettingsAsync(string gamePath, RepatchMode mode, Guid? profileId, PriorityDirection priority, CancellationToken ct,
-        ThemePreset? theme = null, string? accentColor = null)
+        ThemePreset? theme = null, string? accentColor = null, bool? allowAutomaticUpdate = null)
     {
         if (!Enum.IsDefined(mode) || !Enum.IsDefined(priority)) throw new ArgumentException("Invalid settings choice.");
         var directory = string.IsNullOrWhiteSpace(gamePath) ? null :
@@ -217,7 +217,8 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             GameDataDirectory = directory,
             Repatch = mode,
             Theme = theme ?? Settings.Theme,
-            AccentColor = accentColor ?? Settings.AccentColor
+            AccentColor = accentColor ?? Settings.AccentColor,
+            AllowAutomaticUpdate = allowAutomaticUpdate ?? Settings.AllowAutomaticUpdate
         };
         ThemeManager.Validate(updated.Theme, updated.AccentColor);
         // Validate the complete draft before persisting any fields.
@@ -235,6 +236,22 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             Settings = await Task.Run(() => settingsStore.LoadAsync(CancellationToken.None));
             await ReloadAsync(CancellationToken.None);
         }
+    }
+    public async Task SkipAppUpdateAsync(string version, CancellationToken ct)
+    {
+        var settings = Settings with { SkippedAppUpdateVersion = version };
+        await settingsStore.SaveAsync(settings, ct);
+        Settings = settings; Publish();
+    }
+    public async Task SetOnboardingPreferencesAsync(bool? automaticUpdates, bool? completed, CancellationToken ct)
+    {
+        var settings = Settings with
+        {
+            AllowAutomaticUpdate = automaticUpdates ?? Settings.AllowAutomaticUpdate,
+            OnboardingCompleted = completed ?? Settings.OnboardingCompleted
+        };
+        await settingsStore.SaveAsync(settings, ct);
+        Settings = settings; Publish();
     }
     public async Task SetRepatchModeAsync(RepatchMode mode, CancellationToken ct)
     {

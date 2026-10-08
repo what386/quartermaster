@@ -12,6 +12,7 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
   result's download page from the app.
 - **Mod updates:** check your library or a profile for updates, then install
   replacements without losing mod order, groups, or compatible option selections.
+
 - **Profiles:** enable mods, select their options, organize them into collapsible
   groups, and drag them to change load order.
 - **Repatching:** repair outdated unit formats during deployment while keeping
@@ -23,11 +24,13 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
 
 Download the latest archive for your operating system and architecture:
 
-Choose a `bundled` archive to run without installing .NET. The smaller `runtime`
-archives require the .NET 10 runtime. Builds are available for Linux, Windows,
-and macOS on x64 and ARM64.
+Download the `bundled` archive for Windows x64 or Linux x64. These releases
+include the .NET runtime.
 
 ## Getting started
+
+First launch offers optional setup and a quick tour. Skip any step, and replay
+them later from **Settings → Getting started → Setup and quick tour**.
 
 1. Open **Settings** and select your Helldivers 2 installation, or use
    **Find Steam installs**. Configure provider credentials here if you want
@@ -52,6 +55,13 @@ ZIP through the create-profile dialog or by dropping it into the sidebar.
 Use **Search** to find Helldivers 2 mods on Nexus Mods. Choose **Open download
 page** to start an import. Quartermaster opens your browser and watches your
 configured download folder; once the ZIP finishes downloading, it imports the mod.
+Search results also show Nexus's virus-scan status for available ZIP files.
+
+Nexus installs check the mod's requirements and offer to include missing
+dependencies, including dependencies of dependencies. They go into the same
+library or profile as the requested mod. Dependencies already in your library
+can be added to a profile without downloading them again. External requirements
+are listed for manual installation.
 
 **Check updates** in Library checks all tracked mods. In a profile, it checks
 that profile's mods. When updates are found, you can apply them from the prompt

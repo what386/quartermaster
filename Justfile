@@ -21,7 +21,6 @@ test:
 
 test-all:
     dotnet test "Quartermaster.slnx" --runtime linux-x64
-    dotnet test "Quartermaster.slnx" --runtime osx-arm64
     dotnet test "Quartermaster.slnx" --runtime win-x64
 
 verify-release:

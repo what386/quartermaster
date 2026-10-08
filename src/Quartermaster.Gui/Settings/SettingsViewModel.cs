@@ -13,6 +13,11 @@ public sealed partial class SettingsViewModel : SessionViewModel
     private string search = "";
     private int repatchChoice;
     private int priorityChoice;
+    private bool allowAutomaticUpdate;
+    public bool AllowAutomaticUpdate { get => allowAutomaticUpdate; set { if (Set(ref allowAutomaticUpdate, value)) SaveCommand.Refresh(); } }
+    public AppUpdates AppUpdates => Services.AppUpdates;
+    public AsyncCommand CheckAppUpdatesCommand { get; }
+    public AsyncCommand ReplayOnboardingCommand { get; }
     private ApplicationSettings? saved;
     private Guid? profileId;
     private int savedPriority;
@@ -34,7 +39,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
                 nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(ShowAppearance),
-                nameof(ShowDownloads), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
+                nameof(ShowDownloads), nameof(ShowAppUpdates), nameof(ShowOnboarding), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
         }
     }
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || keywords.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -48,7 +53,9 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowLogs => Matches("App information Log file diagnostics troubleshooting " + LogFilePath);
     public bool ShowConfiguration => Matches("App information Settings configuration file " + ConfigurationFilePath);
     public bool ShowDownloads => Matches("Downloads download scanning browser ZIP watch folder directory manual updates");
-    public bool ShowAppSettings => ShowAppearance;
+    public bool ShowAppUpdates => Matches("App settings Allow automatic update Check app updates startup Quartermaster");
+    public bool ShowOnboarding => Matches("App settings setup onboarding tutorial tour help getting started");
+    public bool ShowAppSettings => ShowAppearance || ShowAppUpdates || ShowOnboarding;
     public bool ShowGameSettings => ShowInstallation || ShowPriority || ShowRepatch;
     public bool ShowProviderSettings => ShowNexus || ShowGitHub;
     public bool ShowAppInformation => ShowStorage || ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
@@ -68,18 +75,24 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public Command ResetCommand { get; }
     public AsyncCommand BrowseCommand { get; }
     public AsyncCommand DiscoverCommand { get; }
-    public SettingsViewModel(AppServices services) : base(services)
+    public SettingsViewModel(AppServices services, Func<Task>? replayOnboarding = null) : base(services)
     {
         SaveCommand = Operations.CreateCommand("Saving settings", async ct =>
         {
             var account = await ValidateProviderDraftAsync(ct);
             await Session.SaveSettingsAsync(GamePath.Trim(), (RepatchMode)RepatchChoice, profileId, (PriorityDirection)PriorityChoice, ct,
-                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor));
+                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor), AllowAutomaticUpdate);
             await SaveProviderDraftAsync(account, ct);
             LoadDrafts();
         }, () => ValidAppearance && RepatchChoice >= 0 && RepatchChoice < RepatchChoices.Count && PriorityChoice >= 0 && PriorityChoice < PriorityChoices.Count &&
             (GamePath.Trim() != Session.GameDirectory || RepatchChoice != (int)Session.Settings.Repatch ||
-             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged));
+             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged || AllowAutomaticUpdate != Session.Settings.AllowAutomaticUpdate));
+        CheckAppUpdatesCommand = new(() => AppUpdates.CheckAsync(), () => Operations.CanInteract && !AppUpdates.IsChecking, Operations.ReportError);
+        AppUpdates.PropertyChanged += (_, _) => CheckAppUpdatesCommand.Refresh();
+        Operations.PropertyChanged += (_, _) => CheckAppUpdatesCommand.Refresh();
+        ReplayOnboardingCommand = new(() => replayOnboarding?.Invoke() ?? Task.CompletedTask,
+            () => Operations.CanInteract && replayOnboarding is not null, Operations.ReportError);
+        Operations.PropertyChanged += (_, _) => ReplayOnboardingCommand.Refresh();
         ResetCommand = new(() =>
         {
             var defaults = new ApplicationSettings();
@@ -89,6 +102,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             PriorityChoice = (int)PriorityDirection.LastWins;
             ThemeChoice = (int)defaults.Theme;
             AccentColor = Avalonia.Media.Color.Parse(defaults.AccentColor);
+            AllowAutomaticUpdate = defaults.AllowAutomaticUpdate;
             ResetProviderDraft();
         }, () => Operations.CanInteract);
         BrowseCommand = Operations.CreateCommand("Selecting game folder", async _ =>
@@ -111,6 +125,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
         savedPriority = (int)(Session.ActiveProfile?.Priority ?? PriorityDirection.LastWins);
         GamePath = Session.GameDirectory; RepatchChoice = (int)Session.Settings.Repatch; PriorityChoice = savedPriority;
         LoadAppearance();
+        AllowAutomaticUpdate = Session.Settings.AllowAutomaticUpdate;
         SaveCommand.Refresh();
     }
     protected override void Refresh()
@@ -124,6 +139,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             var currentPriority = (int)(Session.ActiveProfile?.Priority ?? PriorityDirection.LastWins);
             if (profileId != Session.ActiveProfile?.Id || PriorityChoice == savedPriority) PriorityChoice = currentPriority;
             RefreshAppearance(saved);
+            if (AllowAutomaticUpdate == saved.AllowAutomaticUpdate) AllowAutomaticUpdate = Session.Settings.AllowAutomaticUpdate;
             saved = Session.Settings; profileId = Session.ActiveProfile?.Id; savedPriority = currentPriority;
         }
         Notify(nameof(ActiveProfileName)); Notify(nameof(HasProfile)); Notify(nameof(ShowPriority)); Notify(nameof(ShowGameSettings)); Notify(nameof(HasMatches)); SaveCommand.Refresh();

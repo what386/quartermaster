@@ -74,7 +74,6 @@ body:
       label: Operating system
       options:
         - Linux
-        - macOS
         - Windows
         - Other
     validations:

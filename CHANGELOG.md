@@ -1,6 +1,17 @@
 # Changelog — Untitled
 
-*Generated on 2026-10-06*
+*Generated on 2026-10-08*
+
+## 0.5.0 — 2026-10-08
+
+### Changes
+
+- feat: warn if bingus load order is wrong
+- feat: track mod dependencies from nexusmods
+- feat: automatic update check/install
+- feat: dynamic sizing for text input boxes
+- feat: onboarding
+
 
 ## 0.4.0 — 2026-10-06
 

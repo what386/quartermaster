@@ -6,6 +6,19 @@ namespace Quartermaster.Gui;
 public partial class MainWindow : Window
 {
     public Task<T> ShowDialogAsync<T>(Control dialog) => DialogOverlay.ShowAsync<T>(dialog);
+    public async Task WaitForDialogAsync(CancellationToken ct)
+    {
+        while (DialogOverlay.IsOpen) await DialogOverlay.WhenClosed.WaitAsync(ct);
+    }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (!e.Handled && e.Key == Key.Escape && DialogOverlay.IsOpen)
+        {
+            DialogOverlay.CancelActiveDialog();
+            e.Handled = true;
+        }
+        else base.OnKeyDown(e);
+    }
     private async void DeployProfile(object? sender, TappedEventArgs e)
     {
         if (sender is not Button { DataContext: SidebarProfile profile } || DataContext is not MainWindowViewModel model) return;
@@ -18,6 +31,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         ConfigureModDrops();
+        ConfigureOnboarding();
         Closing += async (_, e) =>
         {
             DialogOverlay.CancelActiveDialog();

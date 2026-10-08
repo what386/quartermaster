@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Quartermaster.SelfUpdate/Quartermaster.SelfUpdate.csproj" />
     <Project Path="src/Quartermaster.Providers/Quartermaster.Providers.csproj" />
     <Project Path="src/Quartermaster.Gui/Quartermaster.Gui.csproj" />
     <Project Path="src/Quartermaster.Repatcher/Quartermaster.Repatcher.csproj" />
@@ -7,6 +8,7 @@
     <Project Path="src/Quartermaster.Library/Quartermaster.Library.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/Quartermaster.SelfUpdate.Tests/Quartermaster.SelfUpdate.Tests.csproj" />
     <Project Path="tests/Quartermaster.Providers.Tests/Quartermaster.Providers.Tests.csproj" />
     <Project Path="tests/Quartermaster.Gui.Tests/Quartermaster.Gui.Tests.csproj" />
     <Project Path="tests/Quartermaster.Repatcher.Tests/Quartermaster.Repatcher.Tests.csproj" />

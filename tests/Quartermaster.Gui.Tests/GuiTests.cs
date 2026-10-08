@@ -242,11 +242,12 @@ public class GuiTests
             Click("Helmet", MouseButton.Right);
             Assert.Equal(2, list.SelectedItems.Count);
             var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
-            Assert.Equal(new[] { "Add to", "Remove from library", "Export repatched ZIP", "Mod details" },
+            Assert.Equal(new[] { "Add to", "Remove from library", "Export repatched ZIP", "Mod details", "Install missing dependencies (0)" },
                 menu.Items.OfType<MenuItem>().Select(item => item.Header));
             Assert.IsType<Separator>(menu.Items[2]);
             Assert.False(Assert.IsType<MenuItem>(menu.Items[3]).Command!.CanExecute(null));
             Assert.False(Assert.IsType<MenuItem>(menu.Items[4]).IsEnabled);
+            Assert.False(Assert.IsType<MenuItem>(menu.Items[5]).Command!.CanExecute(null));
             var addTo = Assert.IsType<MenuItem>(menu.Items[0]);
             var addTarget = addTo.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Target"));
             await Assert.IsType<AsyncCommand>(addTarget.Command).ExecuteAsync(); menu.Close();
@@ -602,6 +603,14 @@ public class GuiTests
             window.CaptureRenderedFrame()?.Dispose();
             var list = window.GetVisualDescendants().OfType<ListBox>().Single(box => box.Name == "ProfileModsList");
             list.ContextMenu!.Open(list); Dispatcher.UIThread.RunJobs();
+            Assert.Equal("Options", Assert.IsType<MenuItem>(list.ContextMenu.Items[0]).Header);
+            Assert.Equal("Mod details", Assert.IsType<MenuItem>(list.ContextMenu.Items[1]).Header);
+            Assert.IsType<MenuItem>(list.ContextMenu.Items[1]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
+            window.CaptureRenderedFrame()?.Dispose();
+            var details = Assert.Single(window.GetVisualDescendants().OfType<ModDetailsDialog>());
+            Assert.DoesNotContain(details.GetVisualDescendants().OfType<ModOptionsView>(), _ => true);
+            details.Cancel(); Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
+            list.ContextMenu.Open(list); Dispatcher.UIThread.RunJobs();
             Assert.IsType<MenuItem>(list.ContextMenu.Items[0]).RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(MenuItem.ClickEvent));
             window.CaptureRenderedFrame()?.Dispose();
             var dialog = Assert.Single(window.GetVisualDescendants().OfType<ModSettingsDialog>());
@@ -1088,7 +1097,8 @@ public class GuiTests
             Assert.Equal("Cape", profiles.SelectedMod!.Name);
             var menu = list.ContextMenu!;
             if (!menu.IsOpen) menu.Open(list);
-            var toggle = Assert.IsType<MenuItem>(menu.Items[1]);
+            Assert.False(Assert.IsType<MenuItem>(menu.Items[0]).IsEnabled);
+            var toggle = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, profiles.ToggleLabel));
             await Assert.IsType<AsyncCommand>(toggle.Command).ExecuteAsync(); menu.Close();
             Assert.False(profiles.Entries.Single(row => row.Name == "Cape").IsEnabled);
             window.CaptureRenderedFrame()?.Dispose();
@@ -1128,7 +1138,7 @@ public class GuiTests
             Assert.Equal(new[] { "Armor", "Cape", "Helmet" }, profiles.Entries.Select(row => row.Name));
             profiles.SelectedMod = profiles.Entries.Single(row => row.Name == "Helmet");
             menu.Open(list); Dispatcher.UIThread.RunJobs();
-            var remove = Assert.IsType<MenuItem>(menu.Items[3]);
+            var remove = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Remove from profile"));
             await Assert.IsType<AsyncCommand>(remove.Command).ExecuteAsync(); menu.Close();
             Assert.DoesNotContain(profiles.Entries, row => row.Name == "Helmet");
         }
@@ -1490,6 +1500,35 @@ public class GuiTests
             naming.FindControl<TextBox>("NameInput")!.Text = "Named profile";
             naming.RaiseEvent(new Avalonia.Input.KeyEventArgs { RoutedEvent = Avalonia.Input.InputElement.KeyDownEvent, Key = Avalonia.Input.Key.Enter });
             Assert.Equal("Named profile", await text);
+        }
+        finally { owner.Close(); }
+    }
+
+    [AvaloniaFact]
+    public async Task EscapeClosesTheActiveDialogWhenFocusIsOutsideIt()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var owner = new MainWindow { DataContext = f.Shell }; owner.Show();
+        try
+        {
+            var parent = new ModDetailsDialog();
+            var parentResult = owner.ShowDialogAsync<object?>(parent);
+            var dialogs = new DialogService(() => owner);
+            var answer = dialogs.ConfirmAsync("Confirm", "Continue?", "Continue");
+            owner.CaptureRenderedFrame()?.Dispose(); Dispatcher.UIThread.RunJobs();
+            owner.Focus();
+            owner.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            owner.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            Assert.False(await answer);
+            Assert.False(parentResult.IsCompleted);
+            Assert.True(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+
+            owner.Focus();
+            owner.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            owner.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            await parentResult;
+            Assert.False(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+            Assert.True(owner.IsVisible);
         }
         finally { owner.Close(); }
     }

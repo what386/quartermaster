@@ -12,6 +12,178 @@ namespace Quartermaster.Providers.Tests;
 
 public sealed class NexusTests
 {
+    [Theory]
+    [InlineData(4664)]
+    [InlineData(109)]
+    public async Task MigratedReticleAmmoHudUsesSelectedFileRequirementsInsteadOfEmptyLegacyRequirements(int managerId)
+    {
+        var selected = new List<string>();
+        using var api = new HttpClient(new Handler(async request =>
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            if (path == "/v2/graphql")
+            {
+                using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+                var query = body.RootElement.GetProperty("query").GetString()!;
+                if (query.Contains("game(domainName")) return Json(new { data = new { game = new { id = 6119 } } });
+                Assert.Contains("legacyModRequirementsEnabled", query);
+                return Json(new
+                {
+                    data = new
+                    {
+                        mod = new
+                        {
+                            legacyModRequirementsEnabled = false,
+                            modRequirements = new { nexusRequirements = new { totalCount = 0, nodes = Array.Empty<object>() } }
+                        }
+                    }
+                });
+            }
+            Assert.Equal("test-api-key", request.Headers.GetValues("apikey").Single());
+            if (path.StartsWith("/v3/games/helldivers2/mod-file-versions/"))
+            {
+                selected.Add(Path.GetFileName(path));
+                return Json(new { data = new { id = Path.GetFileName(path) == "67401" ? "reticle-current" : "reticle-other" } });
+            }
+            if (path.Contains("reticle-current"))
+                return new(HttpStatusCode.OK)
+                {
+                    Content = new StringContent((await System.IO.File.ReadAllTextAsync(
+                    Path.Combine(AppContext.BaseDirectory, "Fixtures", "nexus-16467-file-requirements.json"))).Replace("\"4664\"", $"\"{managerId}\""), Encoding.UTF8, "application/json")
+                };
+            return Json(new { dependencies = Array.Empty<object>() });
+        }));
+        using var client = Client(api); var adapter = new NexusAdapter(client);
+        var requirements = await adapter.GetRequirementsAsync("https://www.nexusmods.com/helldivers2/mods/16467?tab=files&file_id=67401");
+        var loader = Assert.Single(requirements);
+        Assert.Equal("Bingus Shared Loader", loader.Name);
+        Assert.Equal("https://www.nexusmods.com/helldivers2/mods/16292", loader.Page.AbsoluteUri);
+        Assert.Equal(new[] { "65833", "66103", "66391", "67485" }, loader.AllowedFileIds);
+        using var f = new Fixture(); var installed = await f.Library.ImportAsync(f.Source("Loader"));
+        installed = installed with { Sources = [new("nexusmods", "16292", "66103")] };
+        Assert.True(ModDependencyMatching.Matches(installed, loader.ToDependency()));
+        Assert.False(ModDependencyMatching.Matches(installed with { Sources = [new("nexusmods", "16292", "1")] }, loader.ToDependency()));
+        Assert.Empty(await adapter.GetRequirementsAsync("https://www.nexusmods.com/helldivers2/mods/16467?tab=files&file_id=67402"));
+        Assert.Equal(new[] { "67401", "67402" }, selected);
+    }
+
+    [Fact]
+    public async Task LegacyRequirementsExcludeManagersByNexusIdentityRatherThanName()
+    {
+        using var api = new HttpClient(new Handler(async request =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            if (body.RootElement.GetProperty("query").GetString()!.Contains("game(domainName"))
+                return Json(new { data = new { game = new { id = 6119 } } });
+            var nodes = new[] { 109, 4664, 16292, 200 }.Select(id => new
+            {
+                modName = id == 200 ? "HD2 Arsenal themed addon" : "Requirement " + id,
+                modId = id.ToString(),
+                gameId = "6119",
+                notes = "",
+                externalRequirement = false,
+                url = $"https://www.nexusmods.com/helldivers2/mods/{id}"
+            });
+            return Json(new
+            {
+                data = new
+                {
+                    mod = new
+                    {
+                        legacyModRequirementsEnabled = true,
+                        modRequirements = new { nexusRequirements = new { totalCount = 4, nodes } }
+                    }
+                }
+            });
+        }));
+        using var client = Client(api);
+        var requirements = await client.GetRequirementsAsync(16467);
+        Assert.Equal(new[] { "/helldivers2/mods/16292", "/helldivers2/mods/200" }, requirements.Select(item => item.Page.AbsolutePath));
+    }
+
+    [Fact]
+    public async Task FailedFileRequirementRequestsAreErrorsRatherThanNoDependencies()
+    {
+        using var api = new HttpClient(new Handler(async request =>
+        {
+            if (request.RequestUri!.AbsolutePath.StartsWith("/v3/")) return new(HttpStatusCode.Forbidden);
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            return body.RootElement.GetProperty("query").GetString()!.Contains("game(domainName")
+                ? Json(new { data = new { game = new { id = 6119 } } })
+                : Json(new { data = new { mod = new { legacyModRequirementsEnabled = false } } });
+        }));
+        using var client = Client(api);
+        await Assert.ThrowsAsync<NexusApiException>(() => client.GetRequirementsAsync(16467, fileId: 67401));
+    }
+
+    [Fact]
+    public async Task RequirementsArePaginatedAndExternalRequirementsCannotBeInstalledAutomatically()
+    {
+        var gameRequests = 0; var offsets = new List<int>();
+        using var api = new HttpClient(new Handler(async request =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            var query = body.RootElement.GetProperty("query").GetString()!;
+            if (query.Contains("game(domainName")) { gameRequests++; return Json(new { data = new { game = new { id = 42 } } }); }
+            var variables = body.RootElement.GetProperty("variables");
+            Assert.Equal("42", variables.GetProperty("game").GetString());
+            var offset = variables.GetProperty("offset").GetInt32(); offsets.Add(offset);
+            var nodes = Enumerable.Range(offset, offset == 0 ? 100 : 1).Select(index => new
+            {
+                modName = "Requirement " + index,
+                modId = (index + 2).ToString(),
+                gameId = "42",
+                notes = "Author notes",
+                url = index == 100 ? "https://example.com/tool" : $"https://www.nexusmods.com/helldivers2/mods/{index + 2}",
+                externalRequirement = index == 100
+            });
+            return Json(new { data = new { mod = new { modRequirements = new { nexusRequirements = new { totalCount = 101, nodes } } } } });
+        }));
+        using var client = Client(api);
+        var requirements = await client.GetRequirementsAsync(1);
+        Assert.Equal(101, requirements.Count); Assert.Equal(new[] { 0, 100 }, offsets);
+        Assert.All(requirements.Take(100), requirement => Assert.True(requirement.CanInstall));
+        Assert.False(requirements.Last().CanInstall); Assert.Equal("Author notes", requirements.Last().Notes);
+        Assert.Equal("https://example.com/tool", requirements.Last().Page.AbsoluteUri);
+        await client.GetRequirementsAsync(1); Assert.Equal(1, gameRequests);
+    }
+
+    [Fact]
+    public async Task SearchScanResultReflectsTheLeastVerifiedAvailableZip()
+    {
+        using var api = new HttpClient(new Handler(async request =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            if (body.RootElement.GetProperty("query").GetString()!.Contains("modFiles"))
+                return Json(new
+                {
+                    data = new
+                    {
+                        m0 = new[]
+                {
+                    new { categoryId = 1, detectedFileExtension = "zip", scannedV2 = "VERIFIED" },
+                    new { categoryId = 3, detectedFileExtension = "zip", scannedV2 = "NOT_SCANNED" },
+                    new { categoryId = 7, detectedFileExtension = "zip", scannedV2 = "QUARANTINED" },
+                    new { categoryId = 1, detectedFileExtension = "exe", scannedV2 = "QUARANTINED" }
+                }
+                    }
+                });
+            return Json(new
+            {
+                data = new
+                {
+                    mods = new
+                    {
+                        nodes = new[] { new { modId = 1, gameId = 42,
+                name = "Mod", summary = "Description", version = "1" } }
+                    }
+                }
+            });
+        }));
+        using var client = Client(api);
+        Assert.Equal("NOT_SCANNED", Assert.Single(await client.SearchAsync("Mod")).VirusScanStatus);
+    }
+
     private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> send) : HttpMessageHandler
     { protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) => send(request); }
     private static HttpResponseMessage Json(object body) => new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json") };
