@@ -9,7 +9,8 @@ using Quartermaster.Repatcher.Formats;
 namespace Quartermaster.Library.Importing;
 
 internal sealed record Manifest(int Version = 1, string? Guid = null, string? Name = null,
-    string? Description = null, string? ModVersion = null, IReadOnlyList<ManifestOption>? Options = null, string? IconPath = null);
+    string? Description = null, string? ModVersion = null, IReadOnlyList<ManifestOption>? Options = null, string? IconPath = null,
+    IReadOnlyList<string>? Tags = null);
 internal sealed record ManifestOption(string Name = "", string Description = "", IReadOnlyList<string>? Include = null,
     IReadOnlyList<ManifestChoice>? SubOptions = null, string? Image = null);
 internal sealed record ManifestChoice(string Name = "", IReadOnlyList<string>? Include = null, string? Image = null, string Description = "");

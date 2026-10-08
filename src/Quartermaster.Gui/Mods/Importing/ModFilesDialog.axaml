@@ -1,16 +1,16 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:p="clr-namespace:Quartermaster.Providers.Clients;assembly=Quartermaster.Providers"
              x:Class="Quartermaster.Gui.Mods.ModFilesDialog" x:DataType="p:ProviderMod" Width="500">
   <StackPanel Spacing="16">
     <TextBlock Text="{Binding Name}" Classes="pageTitle" TextWrapping="Wrap" />
     <ScrollViewer MaxHeight="180"><TextBlock Text="{Binding Summary}" Classes="muted" TextWrapping="Wrap" /></ScrollViewer>
-    <TextBlock Text="Choose the file to add to your library." />
+    <TextBlock Text="{loc:Loc 'Choose the file to add to your library.'}" />
     <ComboBox x:Name="FileChoices" ItemsSource="{Binding Files}" HorizontalAlignment="Stretch" SelectionChanged="FileChanged">
       <ComboBox.ItemTemplate><DataTemplate x:DataType="p:ProviderFile"><StackPanel><TextBlock Text="{Binding Name}" /><TextBlock Text="{Binding FileName}" Classes="muted" FontSize="11" /></StackPanel></DataTemplate></ComboBox.ItemTemplate>
     </ComboBox>
     <TextBlock Text="{Binding DownloadExplanation}" Classes="muted" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="Cancel" Click="CancelInput" />
+      <Button Content="{loc:Loc 'Cancel'}" Click="CancelInput" />
       <Button x:Name="AcceptButton" Content="{Binding DownloadAction}" Classes="primary" Click="AcceptInput" />
     </StackPanel>
   </StackPanel>

@@ -1,4 +1,4 @@
-<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<Window xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
         xmlns:local="clr-namespace:Quartermaster.Gui" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
         xmlns:mods="clr-namespace:Quartermaster.Gui.Mods" xmlns:profiles="clr-namespace:Quartermaster.Gui.Profiles"
         xmlns:search="clr-namespace:Quartermaster.Gui.Search" xmlns:settings="clr-namespace:Quartermaster.Gui.Settings"
@@ -20,7 +20,7 @@
         <Grid RowDefinitions="70,1,*,Auto">
           <ContentControl Content="{Binding LibraryNavigation}" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
             <ContentControl.ContentTemplate><DataTemplate x:DataType="local:NavigationItem">
-              <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Classes.tourTarget="{Binding IsTourTarget}" Command="{Binding OpenCommand}" ToolTip.Tip="Library" AutomationProperties.Name="Library">
+              <Button x:Name="LibraryButton" Classes="profileButton" Classes.active="{Binding IsActive}" Classes.tourTarget="{Binding IsTourTarget}" Command="{Binding OpenCommand}" ToolTip.Tip="{loc:Loc 'Library'}" AutomationProperties.Name="{loc:Loc 'Library'}">
                 <shared:SvgIcon Source="{Binding IconSource}" Width="26" Height="26" Foreground="{Binding $parent[Button].Foreground}" />
               </Button>
             </DataTemplate></ContentControl.ContentTemplate>
@@ -31,20 +31,28 @@
               <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding !Operations.IsProgressVisible}" IsHitTestVisible="{Binding Operations.CanInteract}">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
-                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
+                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
+                    <Border CornerRadius="11" ClipToBounds="True" Width="42" Height="42">
+                      <Grid>
+                        <TextBlock x:Name="ProfileMonogram" Text="{Binding Monogram}" IsVisible="{Binding !IsVisible, ElementName=ProfileThumbnail}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <shared:ProfileThumbnailImage x:Name="ProfileThumbnail" Thumbnail="{Binding Thumbnail}" Stretch="UniformToFill" />
+                      </Grid>
+                    </Border>
                     <Button.ContextMenu><ContextMenu>
-                      <MenuItem Header="Rename" Command="{Binding RenameCommand}" />
-                      <MenuItem Header="Duplicate profile" Command="{Binding DuplicateCommand}" />
-                      <MenuItem Header="Delete" Command="{Binding DeleteCommand}" />
+                      <MenuItem Header="{loc:Loc 'Rename'}" Command="{Binding RenameCommand}" />
+                      <MenuItem Header="{loc:Loc 'Duplicate profile'}" Command="{Binding DuplicateCommand}" />
+                      <MenuItem Header="{loc:Loc 'Change thumbnail'}" Command="{Binding ChangeThumbnailCommand}" />
+                      <MenuItem Header="{loc:Loc 'Remove thumbnail'}" Command="{Binding RemoveThumbnailCommand}" IsVisible="{Binding HasThumbnail}" />
+                      <MenuItem Header="{loc:Loc 'Delete'}" Command="{Binding DeleteCommand}" />
                       <Separator />
-                      <MenuItem Header="Export profile ZIP" Command="{Binding ExportCommand}" />
+                      <MenuItem Header="{loc:Loc 'Export profile ZIP'}" Command="{Binding ExportCommand}" />
                     </ContextMenu></Button.ContextMenu>
                   </Button>
                 </DataTemplate></ItemsControl.ItemTemplate>
               </ItemsControl>
-              <Button x:Name="AddProfileButton" Classes="profileButton" Classes.tourTarget="{Binding Onboarding.IsProfileStep}" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="Create a profile · Right-click to import" AutomationProperties.Name="Create a profile" FontSize="23" HorizontalAlignment="Center">
+              <Button x:Name="AddProfileButton" Classes="profileButton" Classes.tourTarget="{Binding Onboarding.IsProfileStep}" Content="+" Command="{Binding AddProfileCommand}" ToolTip.Tip="{loc:Loc 'Create a profile · Right-click to import'}" AutomationProperties.Name="{loc:Loc 'Create a profile'}" FontSize="23" HorizontalAlignment="Center">
                 <Button.ContextMenu><ContextMenu>
-                  <MenuItem Header="Import profile ZIP" Command="{Binding ImportProfileCommand}" />
+                  <MenuItem Header="{loc:Loc 'Import profile ZIP'}" Command="{Binding ImportProfileCommand}" />
                 </ContextMenu></Button.ContextMenu>
               </Button>
             </StackPanel>
@@ -87,7 +95,7 @@
       <Grid ColumnDefinitions="*,Auto,Auto">
         <TextBlock Text="{Binding Operations.Message}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
         <ProgressBar Grid.Column="1" IsIndeterminate="True" Width="90" Height="3" VerticalAlignment="Center" Margin="16,0" />
-        <Button Grid.Column="2" Content="Cancel" Command="{Binding Operations.CancelCommand}" />
+        <Button Grid.Column="2" Content="{loc:Loc 'Cancel'}" Command="{Binding Operations.CancelCommand}" />
       </Grid>
     </Border>
     </StackPanel>

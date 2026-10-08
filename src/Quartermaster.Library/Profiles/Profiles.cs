@@ -8,10 +8,15 @@ public sealed record ProfileEntry(Guid ModId, bool Enabled, IReadOnlyList<Option
 {
     public Guid? GroupId { get; init; }
 }
-public sealed record ProfileGroup(Guid Id, string Name, bool IsExpanded = true);
+public sealed record ProfileGroup(Guid Id, string Name, bool IsExpanded = true)
+{
+    public string? BackgroundColor { get; init; }
+    public string? TextColor { get; init; }
+}
 public sealed record Profile(Guid Id, string Name, PriorityDirection Priority, IReadOnlyList<ProfileEntry> Entries)
 {
     public IReadOnlyList<ProfileGroup> Groups { get; init; } = [];
+    public string? Thumbnail { get; init; }
 }
 
 public static class ProfileEditor
@@ -68,6 +73,9 @@ public static class ProfileEditor
     }
     public static Profile RenameGroup(Profile profile, Guid groupId, string name) => ChangeGroup(profile, groupId, group => group with { Name = Name(name) });
     public static Profile SetGroupExpanded(Profile profile, Guid groupId, bool expanded) => ChangeGroup(profile, groupId, group => group with { IsExpanded = expanded });
+    public static Profile SetGroupColors(Profile profile, Guid groupId, string? background, string? text) =>
+        ChangeGroup(profile, groupId, group => group with
+        { BackgroundColor = ProfileAppearance.NormalizeColor(background), TextColor = ProfileAppearance.NormalizeColor(text) });
     public static Profile RemoveGroup(Profile profile, Guid groupId)
     {
         RequireGroup(profile, groupId);

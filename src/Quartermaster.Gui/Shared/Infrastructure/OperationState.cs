@@ -16,7 +16,8 @@ public sealed class OperationState : ViewModelBase
     public bool IsBusy { get => busy; private set { if (Set(ref busy, value)) { Notify(nameof(CanInteract)); Notify(nameof(IsProgressVisible)); } } }
     public bool CanInteract => !IsBusy;
     public bool IsProgressVisible => IsBusy && showProgress;
-    public string Message { get => message; private set => Set(ref message, value); }
+    public string Message { get => Localizer.Text(message); private set => Set(ref message, value); }
+    public string SourceMessage => message;
     public bool IsError { get => error; private set => Set(ref error, value); }
     public string NotificationMessage { get => notificationMessage; private set => Set(ref notificationMessage, value); }
     public bool IsErrorNotificationVisible { get => notificationVisible; private set => Set(ref notificationVisible, value); }
@@ -54,9 +55,9 @@ public sealed class OperationState : ViewModelBase
         try
         {
             if (log is not null) await log(label, "started", null, CancellationToken.None);
-            await action(source.Token); Message = label + " complete";
+            await action(source.Token); Message = Localizer.Interpolate($"{Localizer.Text(label)} complete");
         }
-        catch (OperationCanceledException) when (source.IsCancellationRequested) { Message = "Operation cancelled"; }
+        catch (OperationCanceledException) when (source.IsCancellationRequested) { Message = Localizer.Text("Operation cancelled"); }
         catch (Exception ex) { ReportError(ex); }
         finally
         {

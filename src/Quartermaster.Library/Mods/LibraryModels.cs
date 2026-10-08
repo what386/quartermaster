@@ -16,6 +16,20 @@ public sealed record Mod(Guid Id, string Name, string Description, string? Versi
     public string? ImportedFileName { get; init; }
     public bool Superseded { get; init; }
     public bool InstalledAsDependency { get; init; }
+    public IReadOnlyList<string> Tags { get; init; } = [];
+}
+
+public static class ModTags
+{
+    public static IReadOnlyList<string> Normalize(IEnumerable<string> tags)
+    {
+        var normalized = tags.Select(tag => tag.Trim()).Where(tag => tag.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        if (normalized.Length > 32 || normalized.Any(tag => tag.Length > 64 || tag.Contains(',') || tag.Any(char.IsControl)))
+            throw new ArgumentException("Use up to 32 tags, each 64 characters or fewer, separated by commas.");
+        return normalized;
+    }
+    public static bool Matches(Mod mod, string query) => mod.Name.Contains(query, StringComparison.OrdinalIgnoreCase) ||
+        mod.Tags.Any(tag => tag.Contains(query, StringComparison.OrdinalIgnoreCase));
 }
 
 public sealed record ModDependency(string Name, string Page, string? Notes = null, bool CanInstall = true)
@@ -58,7 +72,7 @@ public sealed record UpdateCheck(Guid ModId, string Provider, DateTimeOffset Che
     string? AvailableVersion, string? AvailableFileId, string? Error = null);
 
 /// <summary>Import identity uses patch contents and options, independent of generated IDs and ZIP wrapper folders.</summary>
-internal static class ModIdentity
+public static class ModIdentity
 {
     public static string GetKey(Mod mod)
     {

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
         xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
         x:Class="Quartermaster.Gui.Profiles.ModSettingsDialog" x:DataType="vm:ProfilesViewModel"
         Width="520" Height="540">
@@ -7,16 +7,16 @@
       <Border IsEnabled="{Binding Operations.CanInteract}">
         <Border Classes="card"><ScrollViewer><StackPanel Spacing="12">
           <mods:ModOptionsView DataContext="{Binding Options}" PreviewRequested="OpenPreview" />
-          <Button Content="Apply options" Classes="primary" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
-          <TextBlock Text="Choose variants above, then apply them to this profile." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+          <Button Content="{loc:Loc 'Apply options'}" Classes="primary" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
+          <TextBlock Text="{loc:Loc 'Choose variants above, then apply them to this profile.'}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
         </StackPanel></ScrollViewer></Border>
       </Border>
       <TextBlock Grid.Row="1" Text="{Binding Operations.Message}" IsVisible="{Binding Operations.IsError}"
                  Classes="error" TextWrapping="Wrap" Margin="16,12,16,0" />
       <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="16,12,16,16">
-        <TextBlock Text="{Binding SelectedModName, StringFormat='Options: {0}'}" Classes="sectionTitle" TextTrimming="CharacterEllipsis"
+        <TextBlock Text="{Binding OptionsTitle}" Classes="sectionTitle" TextTrimming="CharacterEllipsis"
                    ToolTip.Tip="{Binding SelectedModName}" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Content="Close" Click="CloseDialog" />
+        <Button Grid.Column="1" Content="{loc:Loc 'Close'}" Click="CloseDialog" />
       </Grid>
     </Grid>
   <mods:ModImagePreview x:Name="ImagePreview" IsVisible="False" BackRequested="ClosePreview" />

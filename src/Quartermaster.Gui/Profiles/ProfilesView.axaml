@@ -1,9 +1,9 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
              xmlns:model="clr-namespace:Quartermaster.Library.Mods;assembly=Quartermaster.Library"
              x:Class="Quartermaster.Gui.Profiles.ProfilesView" x:DataType="vm:ProfilesViewModel">
   <UserControl.ContextMenu><ContextMenu>
-    <MenuItem Header="Create group" Command="{Binding AddGroupCommand}" />
+    <MenuItem Header="{loc:Loc 'Create group'}" Command="{Binding AddGroupCommand}" />
   </ContextMenu></UserControl.ContextMenu>
   <UserControl.DataTemplates>
     <DataTemplate DataType="{x:Type vm:ProfileModItem}">
@@ -19,41 +19,41 @@
   <Grid Background="Transparent" RowDefinitions="Auto,Auto,*" IsEnabled="{Binding !Operations.IsProgressVisible}" IsHitTestVisible="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBlock x:Name="ProfileTitle" Text="{Binding SelectedProfile.Name}" Classes="pageTitle" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedProfile.Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
-      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search mods in this profile…" Margin="0,0,8,0" />
-      <Button Grid.Column="2" Content="Add mod" IsEnabled="{Binding HasProfile}" Margin="0,0,8,0">
+      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Search mods in this profile…'}" Margin="0,0,8,0" />
+      <Button Grid.Column="2" Content="{loc:Loc 'Add mod'}" IsEnabled="{Binding HasProfile}" Margin="0,0,8,0">
         <Button.Flyout><Flyout Placement="BottomEdgeAlignedRight"><StackPanel Spacing="10" Width="320">
-          <TextBlock Text="Add a library mod to this profile" FontWeight="SemiBold" />
-          <ComboBox ItemsSource="{Binding AvailableMods}" SelectedItem="{Binding ModToAdd, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Choose a library mod">
+          <TextBlock Text="{loc:Loc 'Add a library mod to this profile'}" FontWeight="SemiBold" />
+          <ComboBox ItemsSource="{Binding AvailableMods}" SelectedItem="{Binding ModToAdd, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="{loc:Loc 'Choose a library mod'}">
             <ComboBox.ItemTemplate><DataTemplate x:DataType="model:Mod"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
           </ComboBox>
-          <Button Content="Add to profile" Command="{Binding AddCommand}" Classes="primary" />
+          <Button Content="{loc:Loc 'Add to profile'}" Command="{Binding AddCommand}" Classes="primary" />
           <Separator />
-          <Button Content="Add from link or local files…" Command="{Binding ImportModCommand}" />
+          <Button Content="{loc:Loc 'Add from link or local files…'}" Command="{Binding ImportModCommand}" />
         </StackPanel></Flyout></Button.Flyout>
       </Button>
-      <Button Grid.Column="3" Content="Check updates" Command="{Binding CheckUpdatesCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="4" Content="Purge" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="5" x:Name="DeployButton" Content="Deploy" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="6" Content="▶  Run" Command="{Binding RunCommand}" />
+      <Button Grid.Column="3" Content="{loc:Loc 'Check updates'}" Command="{Binding CheckUpdatesCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="4" Content="{loc:Loc 'Purge'}" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="5" x:Name="DeployButton" Content="{loc:Loc 'Deploy'}" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="6" Content="{loc:Loc '▶  Run'}" Command="{Binding RunCommand}" />
     </Grid>
     <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4">
-      <Grid ColumnDefinitions="*,Auto,Auto"><TextBlock Text="LOADOUT" FontWeight="SemiBold" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="{Binding EntrySummary}" VerticalAlignment="Center" />
-        <Button Grid.Column="2" Content="+ Group" Command="{Binding AddGroupCommand}" Background="Transparent" Foreground="{DynamicResource AccentForegroundBrush}" MinHeight="0" Padding="8,1" Margin="12,0,0,0" FontSize="11" />
+      <Grid ColumnDefinitions="*,Auto,Auto"><TextBlock Text="{loc:Loc 'LOADOUT'}" FontWeight="SemiBold" VerticalAlignment="Center" /><TextBlock Grid.Column="1" Text="{Binding EntrySummary}" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Content="{loc:Loc '+ Group'}" Command="{Binding AddGroupCommand}" Background="Transparent" Foreground="{DynamicResource AccentForegroundBrush}" MinHeight="0" Padding="8,1" Margin="12,0,0,0" FontSize="11" />
       </Grid>
     </Border>
     <Grid Grid.Row="2" RowDefinitions="24,*">
-      <Border Background="{DynamicResource TableHeaderBackground}" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="Mod" Classes="muted" FontSize="11" Margin="106,0,0,0" /></Grid></Border>
+      <Border Background="{DynamicResource TableHeaderBackground}" Padding="12,3"><Grid ColumnDefinitions="32,*"><TextBlock Text="#" Classes="muted" FontSize="11" /><TextBlock Grid.Column="1" Text="{loc:Loc 'Mod'}" Classes="muted" FontSize="11" Margin="106,0,0,0" /></Grid></Border>
       <ListBox Grid.Row="1" x:Name="ProfileModsList" AutoScrollToSelectedItem="False" Focusable="True" Classes="modList" SelectionMode="Multiple" ItemsSource="{Binding VisibleItems}" SelectedItem="{Binding SelectedListItem, Mode=TwoWay}" DoubleTapped="QueueModDetails">
         <ListBox.ContextMenu><ContextMenu>
-          <MenuItem x:Name="ModOptionsMenuItem" Header="Options" IsEnabled="{Binding SelectedMod.HasOptions}" Click="OpenModOptions" />
-          <MenuItem x:Name="ModDetailsMenuItem" Header="Mod details" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
+          <MenuItem x:Name="ModOptionsMenuItem" Header="{loc:Loc 'Options'}" IsEnabled="{Binding SelectedMod.HasOptions}" Click="OpenModOptions" />
+          <MenuItem x:Name="ModDetailsMenuItem" Header="{loc:Loc 'Mod details'}" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
           <MenuItem Header="{Binding DependencyActionLabel}" IsVisible="{Binding HasDependencyAction}" Command="{Binding GetDependenciesCommand}" />
           <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" />
           <Separator />
-          <MenuItem Header="Remove from profile" Command="{Binding RemoveCommand}" />
-          <MenuItem x:Name="MoveToGroupMenuItem" Header="Move to group" IsEnabled="{Binding HasSelectedMod}" />
+          <MenuItem Header="{loc:Loc 'Remove from profile'}" Command="{Binding RemoveCommand}" />
+          <MenuItem x:Name="MoveToGroupMenuItem" Header="{loc:Loc 'Move to group'}" IsEnabled="{Binding HasSelectedMod}" />
           <Separator />
-          <MenuItem x:Name="CreateGroupMenuItem" Header="Create group" IsEnabled="{Binding HasProfile}" Click="CreateGroupFromSelection" />
+          <MenuItem x:Name="CreateGroupMenuItem" Header="{loc:Loc 'Create group'}" IsEnabled="{Binding HasProfile}" Click="CreateGroupFromSelection" />
         </ContextMenu></ListBox.ContextMenu>
       </ListBox>
       <Border Grid.Row="1" x:Name="DragPreview" IsHitTestVisible="False" IsVisible="False" ZIndex="100"

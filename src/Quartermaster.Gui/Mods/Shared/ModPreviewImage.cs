@@ -38,7 +38,7 @@ public sealed class ModPreviewImage : Image
     public ModPreviewImage()
     {
         IsVisible = false; Focusable = true; Cursor = new Cursor(StandardCursorType.Hand);
-        ToolTip.SetTip(this, "Click to enlarge preview");
+        ToolTip.SetTip(this, Localizer.Text("Click to enlarge preview"));
         AttachedToVisualTree += (_, _) => LoadImage();
         DetachedFromVisualTree += (_, _) => ClearImage();
     }
@@ -49,7 +49,7 @@ public sealed class ModPreviewImage : Image
         if (change.Property == CanPreviewProperty)
         {
             Focusable = CanPreview; Cursor = CanPreview ? new Cursor(StandardCursorType.Hand) : null;
-            ToolTip.SetTip(this, CanPreview ? "Click to enlarge preview" : null);
+            ToolTip.SetTip(this, CanPreview ? Localizer.Text("Click to enlarge preview") : null);
         }
     }
     private void ClearImage()

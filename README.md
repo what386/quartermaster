@@ -14,7 +14,9 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
   replacements without losing mod order, groups, or compatible option selections.
 
 - **Profiles:** enable mods, select their options, organize them into collapsible
-  groups, and drag them to change load order.
+  groups, and drag them to change load order. Set profile thumbnails from the sidebar
+  and organize mods with searchable tags in mod details.
+
 - **Repatching:** repair outdated unit formats during deployment while keeping
   the original mod files. Choose automatic repatching, confirmation, or disable it.
 - **Profile sharing:** export a profile and its mods in one ZIP, or import someone
@@ -49,6 +51,11 @@ Use **Purge** to remove any deployed patches and have a vanilla game.
 
 Right-click a profile to rename, duplicate, delete, or export it. Import a profile
 ZIP through the create-profile dialog or by dropping it into the sidebar.
+
+To migrate from HD2 Arsenal, use **Settings → Imports → Import Arsenal profiles**.
+This copies the profiles and their mods, preserving colored groups, thumbnails,
+tags, load order, enabled states, and option choices.
+See [Arsenal importing](docs/interop.md) for details.
 
 ## Search and updates
 
@@ -136,6 +143,8 @@ just package linux-x64
 
 See the [repatcher documentation](src/Quartermaster.Repatcher/README.md) for
 patching details and the [changelog](CHANGELOG.md) for release changes.
+
+See [localization](docs/localization.md) for adding language packs and translating UI text.
 
 ## License
 

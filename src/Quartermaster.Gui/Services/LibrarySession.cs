@@ -20,15 +20,18 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public string DeploymentProblem { get; private set; } = "";
     public Profile? ActiveProfile => State.Profiles.FirstOrDefault(p => p.Id == State.ActiveProfileId);
     public string GameDirectory => Settings.GameDataDirectory ?? "";
-    public string DeploymentStatus => GameDirectory == "" ? "Choose your game folder in Settings" :
-        DeploymentProblem != "" ? DeploymentProblem : Inspection is null ? "Not inspected" :
-        Inspection.NeedsPurge ? "Deployment incomplete or unknown. Purge patches, then redeploy." :
-        Inspection.Ledger.Files.Count == 0 ? "No managed patches deployed" : $"{Inspection.Ledger.Files.Count} managed files deployed";
-    public string DeployedProfileName => Inspection?.Ledger.SelectionName ?? State.Profiles.FirstOrDefault(p => p.Id == Inspection?.Ledger.SelectionId)?.Name ?? "None";
+    public string DeploymentStatus => GameDirectory == "" ? Localizer.Text("Choose your game folder in Settings") :
+        DeploymentProblem != "" ? DeploymentProblem : Inspection is null ? Localizer.Text("Not inspected") :
+        Inspection.NeedsPurge ? Localizer.Text("Deployment incomplete or unknown. Purge patches, then redeploy.") :
+        Inspection.Ledger.Files.Count == 0 ? Localizer.Text("No managed patches deployed") : Localizer.Interpolate($"{Inspection.Ledger.Files.Count} managed files deployed");
+    public string DeployedProfileName => Inspection?.Ledger.SelectionName ?? State.Profiles.FirstOrDefault(p => p.Id == Inspection?.Ledger.SelectionId)?.Name ?? Localizer.Text("None");
 
     public async Task InitializeAsync(CancellationToken ct)
     {
         Settings = await Task.Run(() => settingsStore.LoadAsync(ct), ct);
+        Localization.Localizer.Current.LoadDirectory(Path.Combine(AppContext.BaseDirectory, "Localization"));
+        Localization.Localizer.Current.LoadDirectory(settingsStore.LocalizationDirectory);
+        Localization.Localizer.Current.SetLanguage(Settings.Language);
         State = await Task.Run(() => library.LoadAsync(ct), ct);
         if (State.Profiles.Count == 0)
         {
@@ -97,7 +100,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         {
             var relative = Path.GetRelativePath(GameDirectory, Path.GetFullPath(destination));
             if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
-                throw new ArgumentException("Export outside the game directory.");
+                throw new ArgumentException(Localizer.Text("Export outside the game directory."));
         }
         return Task.Run(() => archives.ExportAsync(profileId, destination, ct), ct);
     }
@@ -152,7 +155,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public async Task SetGameDirectoryAsync(string path, CancellationToken ct)
     {
         var resolved = await Task.Run(() => SteamGameDiscovery.ResolveDataDirectory(path), ct)
-            ?? throw new ArgumentException("Choose a Helldivers 2 installation or its data folder.");
+            ?? throw new ArgumentException(Localizer.Text("Choose a Helldivers 2 installation or its data folder."));
         var settings = Settings with { GameDataDirectory = resolved };
         await Task.Run(() => settingsStore.SaveAsync(settings, ct), ct);
         Settings = settings;
@@ -165,7 +168,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         try { Inspection = await Task.Run(() => new DeploymentService(storage).InspectAsync(GameDirectory, ct), ct); }
         catch (Exception ex) when (ex is IOException or ArgumentException) { DeploymentProblem = ex.Message; }
     }
-    private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException("Choose your game folder in Settings first.");
+    private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException(Localizer.Text("Choose your game folder in Settings first."));
     public async Task DeployAsync(Guid profileId, IDialogService dialogs, CancellationToken ct, IProgress<DeploymentProgress>? progress = null)
     {
         var request = ProfilePatches.Resolve(State, profileId); var target = RequireGame();
@@ -181,7 +184,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
                     var file = patch.Files.Single(f => f.Kind == PatchFileKind.Main);
                     var original = await contents.ReadVerifiedAsync(patch.SourceId, file, ct);
                     var result = adapter.Repair(original, ct);
-                    if (result.RemovedUnits > 0) throw new InvalidDataException("Repatching would remove missing units. Use an updated mod.");
+                    if (result.RemovedUnits > 0) throw new InvalidDataException(Localizer.Text("Repatching would remove missing units. Use an updated mod."));
                     if (!original.AsSpan().SequenceEqual(result.Data)) changed.Add(patch.SourceId);
                 }
                 return changed;
@@ -190,7 +193,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             else if (Settings.Repatch == RepatchMode.Ask)
             {
                 var names = string.Join("\n", State.Mods.Where(m => affected.Contains(m.Id)).Select(m => m.Name));
-                if (!await dialogs.ConfirmAsync("Repatch required", $"These mods need repatching for the installed game:\n\n{names}\n\nRepatch and deploy? Originals will remain unchanged.", "Repatch and deploy")) return;
+                if (!await dialogs.ConfirmAsync(Localizer.Text("Repatch required"), Localizer.Interpolate($"These mods need repatching for the installed game:\n\n{names}\n\nRepatch and deploy? Originals will remain unchanged."), Localizer.Text("Repatch and deploy"))) return;
             }
         }
         ct.ThrowIfCancellationRequested();
@@ -205,12 +208,12 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         finally { await ReloadAsync(CancellationToken.None); }
     }
     public async Task SaveSettingsAsync(string gamePath, RepatchMode mode, Guid? profileId, PriorityDirection priority, CancellationToken ct,
-        ThemePreset? theme = null, string? accentColor = null, bool? allowAutomaticUpdate = null)
+        ThemePreset? theme = null, string? accentColor = null, bool? allowAutomaticUpdate = null, string? language = null)
     {
-        if (!Enum.IsDefined(mode) || !Enum.IsDefined(priority)) throw new ArgumentException("Invalid settings choice.");
+        if (!Enum.IsDefined(mode) || !Enum.IsDefined(priority)) throw new ArgumentException(Localizer.Text("Invalid settings choice."));
         var directory = string.IsNullOrWhiteSpace(gamePath) ? null :
             await Task.Run(() => SteamGameDiscovery.ResolveDataDirectory(gamePath), ct)
-            ?? throw new ArgumentException("Choose a Helldivers 2 installation or its data folder.");
+            ?? throw new ArgumentException(Localizer.Text("Choose a Helldivers 2 installation or its data folder."));
         var profile = profileId is null ? null : State.Profiles.Single(p => p.Id == profileId);
         var updated = Settings with
         {
@@ -218,7 +221,8 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             Repatch = mode,
             Theme = theme ?? Settings.Theme,
             AccentColor = accentColor ?? Settings.AccentColor,
-            AllowAutomaticUpdate = allowAutomaticUpdate ?? Settings.AllowAutomaticUpdate
+            AllowAutomaticUpdate = allowAutomaticUpdate ?? Settings.AllowAutomaticUpdate,
+            Language = language ?? Settings.Language
         };
         ThemeManager.Validate(updated.Theme, updated.AccentColor);
         // Validate the complete draft before persisting any fields.
@@ -243,6 +247,14 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         await settingsStore.SaveAsync(settings, ct);
         Settings = settings; Publish();
     }
+    public async Task SetLanguageAsync(string language, CancellationToken ct)
+    {
+        var settings = Settings with { Language = language };
+        await settingsStore.SaveAsync(settings, ct);
+        Settings = settings;
+        Localizer.Current.SetLanguage(language);
+        Publish();
+    }
     public async Task SetOnboardingPreferencesAsync(bool? automaticUpdates, bool? completed, CancellationToken ct)
     {
         var settings = Settings with
@@ -255,7 +267,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     }
     public async Task SetRepatchModeAsync(RepatchMode mode, CancellationToken ct)
     {
-        if (!Enum.IsDefined(mode)) throw new ArgumentException("Invalid repatch setting.");
+        if (!Enum.IsDefined(mode)) throw new ArgumentException(Localizer.Text("Invalid repatch setting."));
         var settings = Settings with { Repatch = mode };
         await Task.Run(() => settingsStore.SaveAsync(settings, ct), ct);
         Settings = settings; Publish();
@@ -265,7 +277,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         var game = RequireGame();
         var relative = Path.GetRelativePath(game, Path.GetFullPath(destination));
         if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
-            throw new ArgumentException("Export outside the game directory.");
+            throw new ArgumentException(Localizer.Text("Export outside the game directory."));
         return Task.Run(() => contents.ExportRepatchedAsync(mod, destination, new RepatcherAdapter(GameArchives.Open(game, ct)), ct), ct);
     }
     public async Task PurgeAsync(CancellationToken ct)
@@ -276,12 +288,12 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public async Task<string?> GetLaunchWarningAsync(Guid profileId, CancellationToken ct)
     {
         await RefreshInspectionAsync(ct); Publish();
-        if (DeploymentProblem != "") return DeploymentProblem + " Purge patches, then redeploy.";
-        if (Inspection is null) return "Deployment could not be inspected. Choose a game folder in Settings.";
-        if (Inspection.NeedsPurge) return "Deployment is incomplete or unknown. Purge patches, then redeploy before running the game.";
+        if (DeploymentProblem != "") return DeploymentProblem + Localizer.Text(" Purge patches, then redeploy.");
+        if (Inspection is null) return Localizer.Text("Deployment could not be inspected. Choose a game folder in Settings.");
+        if (Inspection.NeedsPurge) return Localizer.Text("Deployment is incomplete or unknown. Purge patches, then redeploy before running the game.");
         var plan = DeploymentPlanner.Create(ProfilePatches.Resolve(State, profileId));
         if (Inspection.Ledger.SelectionId != profileId || Inspection.Ledger.Signature != plan.Signature)
-            return $"The selected profile or its loadout is not deployed. Currently deployed profile: {DeployedProfileName}. Deploy the selected profile before running, or continue with the installed loadout.";
+            return Localizer.Interpolate($"The selected profile or its loadout is not deployed. Currently deployed profile: {DeployedProfileName}. Deploy the selected profile before running, or continue with the installed loadout.");
         return null;
     }
 }

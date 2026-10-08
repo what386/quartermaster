@@ -9,7 +9,7 @@ public partial class AppUpdateDialog : UserControl, IModalDialog
     public AppUpdateDialog() => InitializeComponent();
     public AppUpdateDialog(string version, string notes) : this()
     {
-        TitleText.Text = $"Quartermaster {version} is available";
+        TitleText.Text = Localizer.Interpolate($"Quartermaster {version} is available");
         NotesText.Text = notes;
         NotesText.IsVisible = !string.IsNullOrWhiteSpace(notes);
     }

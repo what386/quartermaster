@@ -7,7 +7,7 @@ namespace Quartermaster.Gui.Search;
 public sealed class SearchViewModel : SessionViewModel
 {
     private string query = "";
-    private string resultSummary = "Enter a mod name to search.";
+    private string resultSummary = Localizer.Text("Enter a mod name to search.");
     private SearchProvider? selectedProvider;
     public IReadOnlyList<SearchProvider> Providers { get; }
     public SearchProvider? SelectedProvider
@@ -17,13 +17,13 @@ public sealed class SearchViewModel : SessionViewModel
         {
             if (!Set(ref selectedProvider, value)) return;
             Results = []; Notify(nameof(Results));
-            ResultSummary = "Enter a mod name to search.";
+            ResultSummary = Localizer.Text("Enter a mod name to search.");
             SearchCommand.Refresh();
         }
     }
     public string Query { get => query; set { if (Set(ref query, value)) SearchCommand.Refresh(); } }
     public IReadOnlyList<SearchModItem> Results { get; private set; } = [];
-    public string ResultSummary { get => resultSummary; private set => Set(ref resultSummary, value); }
+    public string ResultSummary { get => Localizer.Text(resultSummary); private set => Set(ref resultSummary, value); }
     public AsyncCommand SearchCommand { get; }
     public SearchViewModel(AppServices services) : base(services)
     {
@@ -33,18 +33,18 @@ public sealed class SearchViewModel : SessionViewModel
         {
             var provider = SelectedProvider!;
             Results = []; Notify(nameof(Results));
-            ResultSummary = $"Searching {provider.Name}…";
+            ResultSummary = Localizer.Interpolate($"Searching {provider.Name}…");
             try
             {
                 var result = await Services.Providers.SearchAsync(provider.Id, Query.Trim(), ct);
                 Results = result.Select(item => new SearchModItem(item, Services)).ToArray();
                 Notify(nameof(Results));
-                ResultSummary = result.Count == 0 ? "No matching mods." : $"{result.Count} results";
+                ResultSummary = result.Count == 0 ? Localizer.Text("No matching mods.") : Localizer.Interpolate($"{result.Count} results");
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            { ResultSummary = "Search cancelled."; throw; }
+            { ResultSummary = Localizer.Text("Search cancelled."); throw; }
             catch (Exception ex)
-            { ResultSummary = $"Search failed: {ex.Message}"; throw; }
+            { ResultSummary = Localizer.Interpolate($"Search failed: {ex.Message}"); throw; }
         }, () => SelectedProvider is not null && !string.IsNullOrWhiteSpace(Query));
         Operations.PropertyChanged += (_, e) =>
         {
@@ -66,19 +66,19 @@ public sealed class SearchModItem
     public bool HasVirusResult => result.VirusScanStatus is not null;
     public bool VirusPassed => result.VirusScanStatus is "VERIFIED" or "INTERNALLY_VERIFIED" or "MANUALLY_VERIFIED";
     public bool VirusQuarantined => result.VirusScanStatus == "QUARANTINED";
-    public string VirusResult => "Virus scan: " + (result.VirusScanStatus switch
+    public string VirusResult => Localizer.Text("Virus scan: ") + (result.VirusScanStatus switch
     {
-        "VERIFIED" => "Passed",
-        "INTERNALLY_VERIFIED" => "Verified by Nexus",
-        "MANUALLY_VERIFIED" => "Manually verified",
-        "QUARANTINED" => "Quarantined",
-        "QUEUED" => "Queued",
-        "WAITING_REPORT" => "Awaiting report",
-        "NOT_SCANNED" => "Not scanned",
-        "TOO_LARGE" => "Too large to scan",
-        "PARTIAL" => "Partially scanned",
-        "REPORT_ERROR" => "Scan error",
-        _ => "Unknown"
+        "VERIFIED" => Localizer.Text("Passed"),
+        "INTERNALLY_VERIFIED" => Localizer.Text("Verified by Nexus"),
+        "MANUALLY_VERIFIED" => Localizer.Text("Manually verified"),
+        "QUARANTINED" => Localizer.Text("Quarantined"),
+        "QUEUED" => Localizer.Text("Queued"),
+        "WAITING_REPORT" => Localizer.Text("Awaiting report"),
+        "NOT_SCANNED" => Localizer.Text("Not scanned"),
+        "TOO_LARGE" => Localizer.Text("Too large to scan"),
+        "PARTIAL" => Localizer.Text("Partially scanned"),
+        "REPORT_ERROR" => Localizer.Text("Scan error"),
+        _ => Localizer.Text("Unknown")
     });
     public AsyncCommand AddCommand { get; }
     public AsyncCommand OpenCommand { get; }

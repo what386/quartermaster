@@ -19,19 +19,19 @@ internal static class ModWarnings
                 var matches = state.Mods.Where(mod => ModDependencyMatching.Matches(mod, dependency)).ToArray();
                 if (matches.Any(mod => enabled.Contains(mod.Id))) continue;
                 var disabled = matches.Where(mod => warnings.ContainsKey(mod.Id)).ToArray();
-                warnings[id].Add($"Requires {dependency.Name} ({(disabled.Length > 0 ? "disabled" : "missing from this profile")}).");
-                foreach (var mod in disabled) warnings[mod.Id].Add($"Required by enabled mod {mods[id].Name}.");
+                warnings[id].Add(Localizer.Interpolate($"Requires {dependency.Name} ({(disabled.Length > 0 ? Localizer.Text("disabled") : Localizer.Text("missing from this profile"))})."));
+                foreach (var mod in disabled) warnings[mod.Id].Add(Localizer.Interpolate($"Required by enabled mod {mods[id].Name}."));
             }
         }
         var last = ProfileEditor.InDeploymentOrder(profile).LastOrDefault(entry => entry.Enabled)?.ModId;
         foreach (var id in enabled.Where(id => id != last && IsBingusSharedLoader(mods[id])))
-            warnings[id].Add($"Bingus Shared Loader should load last. Move it to the {(profile.Priority == PriorityDirection.FirstWins ? "top" : "bottom")} of the enabled mods.");
+            warnings[id].Add(Localizer.Interpolate($"Bingus Shared Loader should load last. Move it to the {(profile.Priority == PriorityDirection.FirstWins ? Localizer.Text("top") : Localizer.Text("bottom"))} of the enabled mods."));
         report ??= ConflictAnalyzer.Analyze(ProfilePatches.Resolve(state, profile));
         foreach (var id in enabled)
         {
             foreach (var clashes in report.Resources.Where(conflict => conflict.SourceIds.Contains(id))
                 .GroupBy(conflict => (conflict.Archive, conflict.WinningSourceId, Others: string.Join(", ", conflict.SourceIds.Where(other => other != id).Select(other => mods[other].Name).Order()))))
-                warnings[id].Add($"Clashes with {clashes.Key.Others} in {clashes.Key.Archive} ({ModPresentation.Count(clashes.Count(), "overlapping resource")}); {mods[clashes.Key.WinningSourceId].Name} wins.");
+                warnings[id].Add(Localizer.Interpolate($"Clashes with {clashes.Key.Others} in {clashes.Key.Archive} ({ModPresentation.Count(clashes.Count(), "overlapping resource")}); {mods[clashes.Key.WinningSourceId].Name} wins."));
         }
         return warnings.ToDictionary(pair => pair.Key, pair => string.Join("\n", pair.Value.Distinct()));
     }
@@ -39,7 +39,7 @@ internal static class ModWarnings
     public static string ForLibraryMod(LibraryState state, Mod mod, IReadOnlyDictionary<Guid, string> profileWarnings)
     {
         var missing = mod.Dependencies.Where(dependency => dependency.CanInstall && !state.Mods.Any(installed => !installed.Superseded && ModDependencyMatching.Matches(installed, dependency)))
-            .Select(dependency => $"Requires {dependency.Name} (missing from your library).");
+            .Select(dependency => Localizer.Interpolate($"Requires {dependency.Name} (missing from your library)."));
         return string.Join("\n", missing.Prepend(profileWarnings.GetValueOrDefault(mod.Id, "")).Where(text => text.Length > 0).Distinct());
     }
 

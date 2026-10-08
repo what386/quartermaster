@@ -7,7 +7,7 @@ public sealed partial class SettingsViewModel
 {
     private int themeChoice;
     private Color accentColor = Color.Parse(ThemeManager.DefaultAccent);
-    public IReadOnlyList<string> ThemeChoices { get; } = ["Dark", "Slate", "Light"];
+    public IReadOnlyList<string> ThemeChoices => Localizer.Current.Choices("Dark", "Slate", "Light");
     public int ThemeChoice
     {
         get => themeChoice;

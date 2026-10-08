@@ -14,6 +14,7 @@ public static class StateValidation
         {
             if (string.IsNullOrWhiteSpace(mod.Name) || mod.PatchSets.Count == 0) throw new ArgumentException("Invalid mod metadata.");
             ModLinks.ValidatePage(mod.PageLink);
+            ModTags.Normalize(mod.Tags);
             if (mod.ImportedFileName is { } filename && (string.IsNullOrWhiteSpace(filename) || filename.IndexOfAny(['/', '\\']) >= 0))
                 throw new ArgumentException("Invalid imported filename.");
             Unique(mod.PatchSets.Select(p => p.Id)); Unique(mod.Options.Select(o => o.Id));
@@ -32,6 +33,9 @@ public static class StateValidation
         }
         foreach (var profile in state.Profiles)
         {
+            ProfileAppearance.ValidateThumbnail(profile.Thumbnail);
+            foreach (var group in profile.Groups)
+            { ProfileAppearance.NormalizeColor(group.BackgroundColor); ProfileAppearance.NormalizeColor(group.TextColor); }
             Unique(profile.Entries.Select(e => e.ModId)); Unique(profile.Groups.Select(group => group.Id));
             if (profile.Groups.Any(group => string.IsNullOrWhiteSpace(group.Name))) throw new ArgumentException("Invalid group metadata.");
             var groupOrder = profile.Groups.Select((group, index) => (group.Id, index)).ToDictionary(item => item.Id, item => item.index);

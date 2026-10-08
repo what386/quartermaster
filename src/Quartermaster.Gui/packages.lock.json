@@ -219,6 +219,12 @@
           "Quartermaster.Repatcher": "[0.5.0, )"
         }
       },
+      "quartermaster.interop": {
+        "type": "Project",
+        "dependencies": {
+          "Quartermaster.Library": "[0.5.0, )"
+        }
+      },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {

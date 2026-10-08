@@ -1,93 +1,116 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.SettingsView" x:DataType="vm:SettingsViewModel">
   <Grid RowDefinitions="Auto,*" IsEnabled="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
-      <TextBlock Text="Settings" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
-      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search settings…" Margin="0,0,8,0" />
-      <Button Grid.Column="2" Content="Reset" Command="{Binding ResetCommand}" ToolTip.Tip="Restore defaults. Click Save to keep them." Margin="0,0,8,0" />
-      <Button Grid.Column="3" Content="Save" Classes="primary" Command="{Binding SaveCommand}" />
+      <TextBlock Text="{loc:Loc 'Settings'}" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Search settings…'}" Margin="0,0,8,0" />
+      <Button Grid.Column="2" Content="{loc:Loc 'Reset'}" Command="{Binding ResetCommand}" ToolTip.Tip="{loc:Loc 'Restore defaults. Click Save to keep them.'}" Margin="0,0,8,0" />
+      <Button Grid.Column="3" Content="{loc:Loc 'Save'}" Classes="primary" Command="{Binding SaveCommand}" />
     </Grid>
     <ScrollViewer Grid.Row="1"><StackPanel Spacing="12">
       <Border x:Name="AppSettingsSection" Classes="card" IsVisible="{Binding ShowAppSettings}"><StackPanel Spacing="16">
-        <TextBlock Text="App settings" Classes="sectionTitle" />
+        <TextBlock Text="{loc:Loc 'App settings'}" Classes="sectionTitle" />
         <vm:AppearanceSettingsView IsVisible="{Binding ShowAppearance}" />
+        <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowLanguage}">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{loc:Loc 'Language'}" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc 'Restart Quartermaster after saving'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" />
+          </StackPanel>
+          <ComboBox x:Name="LanguageSelector" Grid.Column="1" ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
+        </Grid>
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowOnboarding}">
-          <TextBlock Text="Getting started" FontWeight="SemiBold" VerticalAlignment="Center" />
-          <Button x:Name="ReplayOnboardingButton" Grid.Column="1" Content="Setup and tour" Command="{Binding ReplayOnboardingCommand}" HorizontalAlignment="Left" />
+          <TextBlock Text="{loc:Loc 'Getting started'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <Button x:Name="ReplayOnboardingButton" Grid.Column="1" Content="{loc:Loc 'Setup and tour'}" Command="{Binding ReplayOnboardingCommand}" HorizontalAlignment="Left" />
         </Grid>
         <StackPanel Spacing="8" IsVisible="{Binding ShowAppUpdates}">
           <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="12" HorizontalAlignment="Left">
-            <CheckBox x:Name="AutomaticAppUpdateToggle" Content="Allow automatic update" IsChecked="{Binding AllowAutomaticUpdate, Mode=TwoWay}" ToolTip.Tip="Check at startup and ask before updating." />
-            <Button x:Name="CheckAppUpdatesButton" Grid.Column="1" Content="Check app updates" Command="{Binding CheckAppUpdatesCommand}" HorizontalAlignment="Left" />
+            <CheckBox x:Name="AutomaticAppUpdateToggle" Content="{loc:Loc 'Allow automatic update'}" IsChecked="{Binding AllowAutomaticUpdate, Mode=TwoWay}" ToolTip.Tip="{loc:Loc 'Check at startup and ask before updating.'}" />
+            <Button x:Name="CheckAppUpdatesButton" Grid.Column="1" Content="{loc:Loc 'Check app updates'}" Command="{Binding CheckAppUpdatesCommand}" HorizontalAlignment="Left" />
           </Grid>
           <TextBlock Text="{Binding AppUpdates.Status}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
         </StackPanel>
       </StackPanel></Border>
       <Border x:Name="GameSettingsSection" Classes="card" IsVisible="{Binding ShowGameSettings}"><StackPanel Spacing="16">
-        <TextBlock Text="Game and deployment" Classes="sectionTitle" />
+        <TextBlock Text="{loc:Loc 'Game and deployment'}" Classes="sectionTitle" />
         <Grid x:Name="InstallationSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowInstallation}">
-          <StackPanel Spacing="4"><TextBlock Text="Game folder" FontWeight="SemiBold" /><TextBlock Text="Installation or data folder" Classes="muted" FontSize="11" /></StackPanel>
+          <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Game folder'}" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc 'Installation or data folder'}" Classes="muted" FontSize="11" /></StackPanel>
           <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Left">
             <Grid ColumnDefinitions="*,Auto,Auto">
-              <shared:ContentSizedTextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="Path to Helldivers 2" />
-              <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseCommand}" Margin="8,0" />
-              <Button Grid.Column="2" Content="Find Steam installs" Command="{Binding DiscoverCommand}" />
+              <shared:ContentSizedTextBox x:Name="GamePathInput" Text="{Binding GamePath, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Path to Helldivers 2'}" />
+              <Button Grid.Column="1" Content="{loc:Loc 'Browse'}" Command="{Binding BrowseCommand}" Margin="8,0" />
+              <Button Grid.Column="2" Content="{loc:Loc 'Find Steam installs'}" Command="{Binding DiscoverCommand}" />
             </Grid>
-            <ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="Discovered installations" IsVisible="{Binding HasInstallations}" />
+            <ComboBox ItemsSource="{Binding Installations}" SelectedItem="{Binding SelectedInstallation, Mode=TwoWay}" HorizontalAlignment="Stretch" PlaceholderText="{loc:Loc 'Discovered installations'}" IsVisible="{Binding HasInstallations}" />
           </StackPanel>
         </Grid>
         <Grid x:Name="PrioritySettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowPriority}">
-          <StackPanel Spacing="4"><TextBlock Text="Load priority" FontWeight="SemiBold" /><TextBlock Text="{Binding ActiveProfileName}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" /></StackPanel>
+          <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Load priority'}" FontWeight="SemiBold" /><TextBlock Text="{Binding ActiveProfileName}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" Margin="0,0,12,0" /></StackPanel>
           <ComboBox Grid.Column="1" ItemsSource="{Binding PriorityChoices}" SelectedIndex="{Binding PriorityChoice, Mode=TwoWay}" IsEnabled="{Binding HasProfile}" Width="320" HorizontalAlignment="Left" />
         </Grid>
         <Grid x:Name="RepatchSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowRepatch}">
-          <StackPanel Spacing="4"><TextBlock Text="Repatching" FontWeight="SemiBold" /><TextBlock Text="Before deployment" Classes="muted" FontSize="11" /></StackPanel>
+          <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Repatching'}" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc 'Before deployment'}" Classes="muted" FontSize="11" /></StackPanel>
           <ComboBox Grid.Column="1" ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
         </Grid>
       </StackPanel></Border>
       <Border x:Name="DownloadsSettingsSection" Classes="card" IsVisible="{Binding ShowDownloads}"><StackPanel Spacing="16">
-        <TextBlock Text="Downloads" Classes="sectionTitle" />
+        <TextBlock Text="{loc:Loc 'Downloads'}" Classes="sectionTitle" />
         <Grid ColumnDefinitions="180,*">
-          <StackPanel Spacing="4"><TextBlock Text="Download folder" FontWeight="SemiBold" /><TextBlock Text="Used for download scanning" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
+          <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Download folder'}" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc 'Used for download scanning'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
           <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" HorizontalAlignment="Left">
-            <shared:ContentSizedTextBox x:Name="DownloadFolderInput" Text="{Binding DownloadFolder, Mode=TwoWay}" PlaceholderText="Browser download folder" />
-            <Button Grid.Column="1" Content="Browse" Command="{Binding BrowseDownloadsCommand}" />
+            <shared:ContentSizedTextBox x:Name="DownloadFolderInput" Text="{Binding DownloadFolder, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Browser download folder'}" />
+            <Button Grid.Column="1" Content="{loc:Loc 'Browse'}" Command="{Binding BrowseDownloadsCommand}" />
           </Grid>
         </Grid>
       </StackPanel></Border>
       <Border x:Name="ProviderSettingsSection" Classes="card" IsVisible="{Binding ShowProviderSettings}"><StackPanel Spacing="16">
-        <TextBlock Text="Providers" Classes="sectionTitle" />
+        <TextBlock Text="{loc:Loc 'Providers'}" Classes="sectionTitle" />
         <vm:NexusSettingsView IsVisible="{Binding ShowNexus}" />
         <vm:GitHubSettingsView IsVisible="{Binding ShowGitHub}" />
       </StackPanel></Border>
+      <Border x:Name="ImportsSettingsSection" Classes="card" IsVisible="{Binding ShowImports}"><StackPanel Spacing="16">
+        <TextBlock Text="{loc:Loc 'Imports'}" Classes="sectionTitle" />
+        <Grid ColumnDefinitions="180,*">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{loc:Loc 'Arsenal profiles'}" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc 'Includes mods, groups, load order and option choices'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Left">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <shared:ContentSizedTextBox x:Name="ArsenalDirectoryInput" Text="{Binding ArsenalDirectory, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Arsenal data folder'}" />
+              <Button Content="{loc:Loc 'Browse'}" Command="{Binding BrowseArsenalCommand}" Grid.Column="1" />
+            </Grid>
+            <Button x:Name="ImportArsenalButton" Content="{loc:Loc 'Import Arsenal profiles'}" Classes="primary" Command="{Binding ImportArsenalCommand}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Grid>
+      </StackPanel></Border>
       <Border x:Name="AppInformationSection" Classes="card" IsVisible="{Binding ShowAppInformation}"><StackPanel Spacing="16">
-        <TextBlock Text="App information" Classes="sectionTitle" />
+        <TextBlock Text="{loc:Loc 'App information'}" Classes="sectionTitle" />
         <Grid x:Name="StorageSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowStorage}">
-          <TextBlock Text="Library storage" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Library storage'}" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" />
         </Grid>
         <Grid x:Name="VersionInformation" ColumnDefinitions="180,*" IsVisible="{Binding ShowVersion}">
-          <TextBlock Text="App version" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'App version'}" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding ApplicationVersion}" Classes="muted" TextWrapping="Wrap" />
         </Grid>
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowPlatform}">
-          <TextBlock Text="Operating system" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Operating system'}" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding PlatformInformation}" Classes="muted" TextWrapping="Wrap" />
         </Grid>
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowRuntime}">
-          <TextBlock Text="Runtime" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Runtime'}" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding RuntimeVersion}" Classes="muted" TextWrapping="Wrap" />
         </Grid>
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowConfiguration}">
-          <TextBlock Text="Settings file" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Settings file'}" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding ConfigurationFilePath}" Classes="muted" TextWrapping="Wrap" />
         </Grid>
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowLogs}">
-          <TextBlock Text="Log file" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Log file'}" FontWeight="SemiBold" />
           <SelectableTextBlock Grid.Column="1" Text="{Binding LogFilePath}" Classes="muted" TextWrapping="Wrap" />
         </Grid>
       </StackPanel></Border>
-      <TextBlock Text="No matching settings." Classes="muted" IsVisible="{Binding !HasMatches}" Margin="16" />
+      <TextBlock Text="{loc:Loc 'No matching settings.'}" Classes="muted" IsVisible="{Binding !HasMatches}" Margin="16" />
     </StackPanel></ScrollViewer>
   </Grid>
 </UserControl>

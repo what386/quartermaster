@@ -31,6 +31,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(Title), Title, value.Title),
             (nameof(Number), Number, value.Number),
             (nameof(Description), Description, value.Description),
+            (nameof(TagSummary), TagSummary, value.TagSummary),
+            (nameof(HasTags), HasTags, value.HasTags),
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
@@ -67,25 +69,27 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
     public string Description => ModPresentation.Description(Mod);
+    public string TagSummary => string.Join(" · ", Mod.Tags);
+    public bool HasTags => Mod.Tags.Count > 0;
     public string Monogram => ModPresentation.Monogram(Mod);
     public bool IsLoaded => DeploymentState == ModDeploymentState.Loaded;
     public bool IsUnloaded => DeploymentState == ModDeploymentState.Unloaded;
     public bool HasDeploymentWarning => DeploymentState is ModDeploymentState.Warning or ModDeploymentState.Unknown;
     public string DeploymentDescription => DeploymentState switch
     {
-        ModDeploymentState.Unloaded => "Disabled and unloaded",
-        ModDeploymentState.Loaded => "Enabled and deployed",
-        ModDeploymentState.Unknown => "Deployment state could not be verified. Check the game folder or purge and redeploy.",
-        _ => Entry.Enabled ? "Enabled but not deployed as configured. Deploy this profile to apply changes." :
-            "Disabled but still deployed. Redeploy or purge to unload."
+        ModDeploymentState.Unloaded => Localizer.Text("Disabled and unloaded"),
+        ModDeploymentState.Loaded => Localizer.Text("Enabled and deployed"),
+        ModDeploymentState.Unknown => Localizer.Text("Deployment state could not be verified. Check the game folder or purge and redeploy."),
+        _ => Entry.Enabled ? Localizer.Text("Enabled but not deployed as configured. Deploy this profile to apply changes.") :
+            Localizer.Text("Disabled but still deployed. Redeploy or purge to unload.")
     };
     public bool HasOptions => Mod.Options.Count > 0;
     public bool HasToggle => true;
     public bool IsGrouped => Entry.GroupId is not null;
     public bool IsEnabled => Entry.Enabled;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Entry.Enabled ? Avalonia.Layout.HorizontalAlignment.Right : Avalonia.Layout.HorizontalAlignment.Left;
-    public string ToggleDescription => (Entry.Enabled ? "Disable " : "Enable ") + Name;
-    public string Status => Entry.Enabled ? "Enabled" : "Disabled";
+    public string ToggleDescription => Entry.Enabled ? Localizer.Interpolate($"Disable {Name}") : Localizer.Interpolate($"Enable {Name}");
+    public string Status => Entry.Enabled ? Localizer.Text("Enabled") : Localizer.Text("Disabled");
 }
 
 public sealed partial class ProfilesViewModel : SessionViewModel
@@ -99,14 +103,15 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
     public IReadOnlyList<string> Conflicts { get; private set; } = [];
     public string ArchiveSummary { get; private set; } = "";
-    public IReadOnlyList<ProfileModItem> VisibleEntries => Entries.Where(e => e.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    public IReadOnlyList<ProfileModItem> VisibleEntries => Entries.Where(e => ModTags.Matches(e.Mod, Search)).ToArray();
     public string Search { get => search; set { if (Set(ref search, value)) Notify(nameof(VisibleEntries)); RebuildVisibleItems(); } }
-    public string EntrySummary => $"{Entries.Count} mods · {Entries.Count(e => e.Entry.Enabled)} on";
-    public string SelectedModName => SelectedMod?.Name ?? "Select a mod";
+    public string EntrySummary => Localizer.Interpolate($"{Entries.Count} mods · {Entries.Count(e => e.Entry.Enabled)} on");
+    public string SelectedModName => SelectedMod?.Name ?? Localizer.Text("Select a mod");
+    public string OptionsTitle => Localizer.Interpolate($"Options: {SelectedModName}");
     public bool HasSelectedMod => SelectedMod is not null;
     public bool HasProfile => SelectedProfile is not null;
     public bool HasConflicts => Conflicts.Count > 0;
-    public string ActiveLabel => SelectedProfile?.Id == Session.State.ActiveProfileId ? "Active profile" : "";
+    public string ActiveLabel => SelectedProfile?.Id == Session.State.ActiveProfileId ? Localizer.Text("Active profile") : "";
     public Profile? SelectedProfile
     {
         get => profile;
@@ -126,12 +131,12 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     private void RefreshSelectedMod()
     {
         Options = SelectedMod is null ? null : new(SelectedMod.Mod, SelectedMod.Entry.Options, Session.GetOptionImages(SelectedMod.Mod));
-        Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel)); RefreshCommands();
+        Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(OptionsTitle)); Notify(nameof(HasSelectedMod)); Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel)); RefreshCommands();
     }
     public ModOptionsViewModel? Options { get; private set; }
     public ModDetailsViewModel? Details => SelectedMod is null ? null : new(SelectedMod.Mod, Services, SelectedProfile?.Id);
     public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value) && (!Operations.IsBusy || Operations.IsProgressVisible)) AddCommand.Refresh(); } }
-    public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
+    public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? Localizer.Text("Disable") : Localizer.Text("Enable");
     public AsyncCommand MakeActiveCommand { get; }
     public AsyncCommand AddCommand { get; }
     public AsyncCommand RemoveCommand { get; }
@@ -145,7 +150,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public AsyncCommand GetDependenciesCommand { get; }
     public bool HasDependencyAction => HasProfile && SelectedMod is { } row && Services.Downloads.CanResolveDependencies(row.Mod) &&
         ModDependencyState.MissingCount(row.Mod, Session.State, SelectedProfile!.Id) > 0;
-    public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, SelectedProfile?.Id) : "Add dependencies to profile";
+    public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, SelectedProfile?.Id) : Localizer.Text("Add dependencies to profile");
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
@@ -165,25 +170,25 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         {
             var current = SelectedProfile!;
             var warnings = Entries.Where(row => row.HasWarnings).Select(row => $"• {row.Name}: {row.WarningDescription.Replace("\n", "\n  ")}").ToArray();
-            var warningSummary = warnings.Length > 0 ? "\n\nActive warnings:\n" + string.Join("\n", warnings) : "";
-            if (await Services.Dialogs.ConfirmAsync("Deploy profile", $"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout." + warningSummary, "Deploy"))
+            var warningSummary = warnings.Length > 0 ? Localizer.Text("\n\nActive warnings:\n") + string.Join("\n", warnings) : "";
+            if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Deploy profile"), Localizer.Interpolate($"Deploy {current.Name} to {Session.GameDirectory}? This replaces all mod patches in the game folder with the selected loadout.") + warningSummary, "Deploy"))
             {
                 var names = Session.State.Mods.ToDictionary(mod => mod.Id, mod => mod.Name);
                 var progress = Operations.CreateProgress<DeploymentProgress>(update =>
-                    $"{update.Phase} {update.Current} of {update.Total}: {names.GetValueOrDefault(update.SourceId, "Unknown mod")}");
+                    Localizer.Interpolate($"{update.Phase} {update.Current} of {update.Total}: {names.GetValueOrDefault(update.SourceId, Localizer.Text("Unknown mod"))}"));
                 await Session.DeployAsync(current.Id, Services.Dialogs, ct, progress);
             }
         }, () => HasProfile && Session.GameDirectory != "");
         RunCommand = Operations.CreateCommand("Launching game", async ct =>
         {
             var warning = await Session.GetLaunchWarningAsync(SelectedProfile!.Id, ct);
-            if (warning is not null && !await Services.Dialogs.ConfirmAsync("Deployment warning", warning, "Run anyway")) return;
+            if (warning is not null && !await Services.Dialogs.ConfirmAsync(Localizer.Text("Deployment warning"), warning, Localizer.Text("Run anyway"))) return;
             ct.ThrowIfCancellationRequested();
             Services.LaunchGame();
         }, () => HasProfile && Session.GameDirectory != "");
         PurgeCommand = Operations.CreateCommand("Purging patches", async ct =>
         {
-            if (await Services.Dialogs.ConfirmAsync("Purge patches", "Remove all mod patch files from the selected game folder? Imported originals and profiles will remain.", "Purge"))
+            if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Purge patches"), Localizer.Text("Remove all mod patch files from the selected game folder? Imported originals and profiles will remain."), "Purge"))
                 await Session.PurgeAsync(ct);
         }, () => Session.GameDirectory != "");
         Operations.PropertyChanged += (_, e) =>
@@ -191,7 +196,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
             if (e.PropertyName != nameof(OperationState.IsBusy) || Operations.IsBusy && !Operations.IsProgressVisible) return;
             foreach (var row in Entries) { row.EnableCommand.Refresh(); row.UpdateCommand?.Refresh(); }
             foreach (var group in VisibleItems.OfType<ProfileGroupItem>())
-            { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); }
+            { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); group.ColorsCommand.Refresh(); }
         };
         WatchSession();
     }
@@ -243,7 +248,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
             : VisibleItems.OfType<ProfileModItem>().FirstOrDefault(e => e.Mod.Id == id) ?? VisibleItems.OfType<ProfileModItem>().FirstOrDefault();
         RefreshSelectedMod();
         ModToAdd = AvailableMods.FirstOrDefault();
-        Conflicts = report.Resources.Select(c => $"{c.Archive} · {c.Resource.Id:x16}/{c.Resource.Type:x16} · {mods[c.WinningSourceId].Name} wins").ToArray();
+        Conflicts = report.Resources.Select(c => Localizer.Interpolate($"{c.Archive} · {c.Resource.Id:x16}/{c.Resource.Type:x16} · {mods[c.WinningSourceId].Name} wins")).ToArray();
         ArchiveSummary = $"{ModPresentation.Count(report.Archives.Count, "shared archive")} · {ModPresentation.Count(Conflicts.Count, "overlapping resource")}";
         Notify(nameof(Conflicts)); Notify(nameof(HasConflicts)); Notify(nameof(ArchiveSummary));
         Notify(nameof(HasProfile)); Notify(nameof(ActiveLabel));

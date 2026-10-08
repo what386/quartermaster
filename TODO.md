@@ -6,6 +6,6 @@
 
 ## Tasks
 
-- [ ] profile icon selection
-      @created 2026-10-03 23:30
+- [ ] browser extension
+      @created 2026-10-08 22:56
 

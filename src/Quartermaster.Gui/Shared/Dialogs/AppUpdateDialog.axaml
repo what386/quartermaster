@@ -1,16 +1,16 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              x:Class="Quartermaster.Gui.Shared.AppUpdateDialog" Width="480">
-  <StackPanel Spacing="16">
+  <StackPanel Spacing="16" Margin="20">
     <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
-    <TextBlock Text="Update Quartermaster and restart?" TextWrapping="Wrap" />
+    <TextBlock Text="{loc:Loc 'Update Quartermaster and restart?'}" TextWrapping="Wrap" />
     <ScrollViewer MaxHeight="280" HorizontalScrollBarVisibility="Disabled">
       <TextBlock x:Name="NotesText" TextWrapping="Wrap" />
     </ScrollViewer>
-    <TextBlock Text="Skip stops startup prompts for this version." Classes="muted" FontSize="11" TextWrapping="Wrap" />
+    <TextBlock Text="{loc:Loc 'Skip stops startup prompts for this version.'}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="Cancel" Click="CancelUpdate" />
-      <Button Content="Skip" Click="SkipUpdate" />
-      <Button Content="Update" Classes="primary" Click="AcceptUpdate" />
+      <Button Content="{loc:Loc 'Cancel'}" Click="CancelUpdate" />
+      <Button Content="{loc:Loc 'Skip'}" Click="SkipUpdate" />
+      <Button Content="{loc:Loc 'Update'}" Classes="primary" Click="AcceptUpdate" />
     </StackPanel>
   </StackPanel>
 </UserControl>

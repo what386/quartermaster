@@ -17,7 +17,7 @@ public sealed partial class ModDownloads : ViewModelBase
     public string Search { get => search; set { if (Set(ref search, value)) { NotifyList(); Notify(nameof(VisibleManualChecks)); Notify(nameof(HasManualChecks)); } } }
     public IReadOnlyList<DownloadRow> VisibleJobs => Jobs.Where(row => row.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
     public bool HasVisibleJobs => VisibleJobs.Count > 0;
-    public string EmptyMessage => Jobs.Count == 0 ? "No downloads queued." : "No downloads match your search.";
+    public string EmptyMessage => Jobs.Count == 0 ? Localizer.Text("No downloads queued.") : Localizer.Text("No downloads match your search.");
     public string CountLabel => ModPresentation.Count(Jobs.Count, "download");
     public OperationState Operations => services.Operations;
     public bool HasPendingDownloads => Jobs.Any(row => row.IsActive);
@@ -27,16 +27,16 @@ public sealed partial class ModDownloads : ViewModelBase
         {
             var waiting = Jobs.Count(row => row.IsWaiting);
             if (waiting > 0 && Jobs.Where(row => row.IsWaiting).All(row => row.IsManual))
-                return $"Waiting for {ModPresentation.Count(waiting, "matching ZIP")}";
-            return waiting > 0 ? $"Waiting for {ModPresentation.Count(waiting, "browser download")}" :
-                $"Processing {ModPresentation.Count(Jobs.Count(row => row.IsActive), "download")}";
+                return Localizer.Interpolate($"Waiting for {ModPresentation.Count(waiting, "matching ZIP")}");
+            return waiting > 0 ? Localizer.Interpolate($"Waiting for {ModPresentation.Count(waiting, "browser download")}") :
+                Localizer.Interpolate($"Processing {ModPresentation.Count(Jobs.Count(row => row.IsActive), "download")}");
         }
     }
     public string PendingExplanation => Jobs.Any(row => row.IsWaiting && row.IsManual)
-        ? "Watching your download folder for matching ZIPs."
+        ? Localizer.Text("Watching your download folder for matching ZIPs.")
         : Jobs.Any(row => row.IsWaiting)
-        ? "Finish the download in your browser. Quartermaster watches your download folder and imports verified files automatically."
-        : "Quartermaster is downloading or importing your mods. You can keep using the app.";
+        ? Localizer.Text("Finish the download in your browser. Quartermaster watches your download folder and imports verified files automatically.")
+        : Localizer.Text("Quartermaster is downloading or importing your mods. You can keep using the app.");
     public ModDownloads(AppServices services)
     {
         this.services = services;
@@ -44,7 +44,7 @@ public sealed partial class ModDownloads : ViewModelBase
         services.Session.Changed += (_, _) => RefreshManualChecks();
         services.Providers.DownloadFailed += job => Dispatcher.UIThread.Post(() =>
         {
-            if (!services.IsDisposed) services.Operations.ShowErrorNotification($"Could not import {job.File.Name}: {job.Error}");
+            if (!services.IsDisposed) services.Operations.ShowErrorNotification(Localizer.Interpolate($"Could not import {job.File.Name}: {job.Error}"));
         });
         services.Providers.Changed += (_, _) => Dispatcher.UIThread.Post(Refresh);
         services.Providers.LibraryChanged += (_, _) => Dispatcher.UIThread.Post(async () =>
@@ -77,7 +77,7 @@ public sealed partial class ModDownloads : ViewModelBase
         ct.ThrowIfCancellationRequested();
         if (request.Kind == ModImportKind.Link)
         { await AddLinkAsync(request.Link ?? "", ct, profileId); return; }
-        var path = request.Kind == ModImportKind.Zip ? await services.Dialogs.PickModZipAsync() : await services.Dialogs.PickFolderAsync("Import mod folder");
+        var path = request.Kind == ModImportKind.Zip ? await services.Dialogs.PickModZipAsync() : await services.Dialogs.PickFolderAsync(Localizer.Text("Import mod folder"));
         if (path is not null) await services.Session.ImportAsync(path, ct, profileId);
     }
     public async Task AddLinkAsync(string link, CancellationToken ct, Guid? profileId = null)
@@ -124,15 +124,15 @@ public sealed partial class ModDownloads : ViewModelBase
         await services.Session.ReloadAsync(ct);
         var errors = services.Session.State.UpdateChecks.Where(check => check.CheckedAt >= started && check.Error is not null &&
             (modIds is null || modIds.Contains(check.ModId))).ToArray();
-        if (errors.Length > 0) throw new InvalidOperationException($"Could not check {ModPresentation.Count(errors.Length, "mod")}: " +
+        if (errors.Length > 0) throw new InvalidOperationException(Localizer.Interpolate($"Could not check {ModPresentation.Count(errors.Length, "mod")}: ") +
             string.Join(" ", errors.Select(check => check.Error).Distinct().Take(3)));
         var updates = AvailableUpdates(modIds).Where(CanQueueUpdate).ToArray();
         Exception? applyError = null;
-        if (updates.Length > 0 && await services.Dialogs.ConfirmAsync("Mod updates",
-            $"Found {ModPresentation.Count(updates.Length, "update")}:\n" +
+        if (updates.Length > 0 && await services.Dialogs.ConfirmAsync(Localizer.Text("Mod updates"),
+            Localizer.Interpolate($"Found {ModPresentation.Count(updates.Length, "update")}:\n") +
             string.Join("\n", updates.Select(mod => "• " + mod.Name +
                 (AvailableUpdate(mod)?.AvailableVersion is { } version ? $" → {version}" : ""))) +
-            "\n\nWould you like to apply them now?", "Update all", "Not now"))
+            Localizer.Text("\n\nWould you like to apply them now?"), Localizer.Text("Update all"), Localizer.Text("Not now")))
         {
             try { await ApplyUpdatesAsync(ct, updates.Select(mod => mod.Id).ToArray()); }
             catch (Exception ex) when (ex is not OperationCanceledException) { applyError = ex; }
@@ -140,9 +140,11 @@ public sealed partial class ModDownloads : ViewModelBase
         ct.ThrowIfCancellationRequested();
         var manualMods = services.Session.State.Mods.Where(mod => !mod.Superseded &&
             (modIds is null || modIds.Contains(mod.Id)) && !services.Providers.IsTracked(mod)).ToArray();
-        if (manualMods.Length > 0 && await services.Dialogs.ConfirmAsync("Manual update checks",
-            $"{ModPresentation.Count(manualMods.Length, "mod")} {(manualMods.Length == 1 ? "needs" : "need")} a manual update check. Open the checklist now?",
-            "Open manual checks", "Not now"))
+        if (manualMods.Length > 0 && await services.Dialogs.ConfirmAsync(Localizer.Text("Manual update checks"),
+            manualMods.Length == 1
+                ? Localizer.Interpolate($"{ModPresentation.Count(manualMods.Length, "mod")} needs a manual update check. Open the checklist now?")
+                : Localizer.Interpolate($"{ModPresentation.Count(manualMods.Length, "mod")} need a manual update check. Open the checklist now?"),
+            Localizer.Text("Open manual checks"), Localizer.Text("Not now")))
             ShowManualChecks(manualMods.Select(mod => mod.Id).ToArray());
         if (applyError is not null) throw applyError;
     }
@@ -163,7 +165,7 @@ public sealed partial class ModDownloads : ViewModelBase
             }
             catch (Exception ex) when (ex is not OperationCanceledException) { failures.Add($"{mod.Name}: {ex.Message}"); }
         }
-        if (failures.Count > 0) throw new InvalidOperationException("Could not start updates:\n" + string.Join("\n", failures));
+        if (failures.Count > 0) throw new InvalidOperationException(Localizer.Text("Could not start updates:\n") + string.Join("\n", failures));
     }
     public UpdateCheck? AvailableUpdate(Mod mod) => services.Session.State.UpdateChecks.FirstOrDefault(check =>
         check.ModId == mod.Id && check.Error is null && check.AvailableFileId is not null &&
@@ -174,7 +176,7 @@ public sealed partial class ModDownloads : ViewModelBase
             await QueueModUpdateAsync(mod, ct);
         }), () => !services.Operations.IsProgressVisible && CanQueueUpdate(mod), services.Operations.ReportError);
     public string? UpdateDescription(Mod mod) => AvailableUpdate(mod) is { } check
-        ? $"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Click Update to upgrade." : null;
+        ? Localizer.Interpolate($"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Click Update to upgrade.") : null;
 }
 
 public sealed class DownloadRow : ViewModelBase
@@ -184,7 +186,7 @@ public sealed class DownloadRow : ViewModelBase
     public string Name => job.File.Name + (job.File.Version is null ? "" : " · " + job.File.Version);
     public bool IsWaiting => job.Status == DownloadStatus.Waiting && !downloadsDirectly;
     public bool IsActive => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.Importing;
-    public string Status => (CanConfirm ? "Review update" : IsManual && IsWaiting ? "Waiting for a matching ZIP filename" : IsWaiting ? "Waiting for your browser download" : job.Status == DownloadStatus.Waiting ? "Queued" : job.Status.ToString()) + (job.Error is null ? "" : " · " + job.Error) + (job.Warning is null ? "" : " · " + job.Warning);
+    public string Status => (CanConfirm ? Localizer.Text("Review update") : IsManual && IsWaiting ? Localizer.Text("Waiting for a matching ZIP filename") : IsWaiting ? Localizer.Text("Waiting for your browser download") : job.Status == DownloadStatus.Waiting ? Localizer.Text("Queued") : Localizer.Text(job.Status.ToString())) + (job.Error is null ? "" : " · " + job.Error) + (job.Warning is null ? "" : " · " + job.Warning);
     public AsyncCommand OpenCommand { get; }
     public AsyncCommand RetryCommand { get; }
     public AsyncCommand CancelCommand { get; }
@@ -193,7 +195,7 @@ public sealed class DownloadRow : ViewModelBase
     public bool CanConfirm => job.Status == DownloadStatus.NeedsConfirmation;
     public AsyncCommand RemoveCommand { get; }
     public bool IsManual => job.File.Provider == "manual";
-    public string OpenLabel => IsManual ? "Open mod page" : "Open download page";
+    public string OpenLabel => IsManual ? Localizer.Text("Open mod page") : Localizer.Text("Open download page");
     public bool CanAttach => job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled or DownloadStatus.NeedsConfirmation;
     public bool CanCancel => job.Status is DownloadStatus.Waiting or DownloadStatus.Downloading or DownloadStatus.NeedsConfirmation;
     public bool CanRetry => job.Status is DownloadStatus.Failed or DownloadStatus.Cancelled or DownloadStatus.NeedsConfirmation;

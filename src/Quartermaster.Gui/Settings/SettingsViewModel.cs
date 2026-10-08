@@ -14,6 +14,23 @@ public sealed partial class SettingsViewModel : SessionViewModel
     private int repatchChoice;
     private int priorityChoice;
     private bool allowAutomaticUpdate;
+    private LanguageOption selectedLanguage = new("", "System default");
+    public IReadOnlyList<LanguageOption> Languages
+    {
+        get
+        {
+            var options = Localizer.Current.Languages;
+            var code = Session.Settings.Language;
+            // Keep a saved preference if its pack is unavailable or uses a regional fallback.
+            return string.IsNullOrEmpty(code) || options.Any(option => option.Code == code) ? options :
+                options.Append(new LanguageOption(code, Localizer.Interpolate($"Saved language ({code})"))).ToArray();
+        }
+    }
+    public LanguageOption SelectedLanguage
+    {
+        get => selectedLanguage;
+        set { if (value is not null && Set(ref selectedLanguage, value)) SaveCommand.Refresh(); }
+    }
     public bool AllowAutomaticUpdate { get => allowAutomaticUpdate; set { if (Set(ref allowAutomaticUpdate, value)) SaveCommand.Refresh(); } }
     public AppUpdates AppUpdates => Services.AppUpdates;
     public AsyncCommand CheckAppUpdatesCommand { get; }
@@ -21,8 +38,8 @@ public sealed partial class SettingsViewModel : SessionViewModel
     private ApplicationSettings? saved;
     private Guid? profileId;
     private int savedPriority;
-    public IReadOnlyList<string> RepatchChoices { get; } = ["Ask when needed", "Automatically repatch when needed", "Never repatch"];
-    public IReadOnlyList<string> PriorityChoices { get; } = ["Later entries win", "Earlier entries win"];
+    public IReadOnlyList<string> RepatchChoices => Localizer.Current.Choices("Ask when needed", "Automatically repatch when needed", "Never repatch");
+    public IReadOnlyList<string> PriorityChoices => Localizer.Current.Choices("Later entries win", "Earlier entries win");
     public int RepatchChoice { get => repatchChoice; set { if (Set(ref repatchChoice, value)) SaveCommand.Refresh(); } }
     public int PriorityChoice { get => priorityChoice; set { if (Set(ref priorityChoice, value)) SaveCommand.Refresh(); } }
     public string GamePath { get => gamePath; set { if (Set(ref gamePath, value)) SaveCommand.Refresh(); } }
@@ -39,10 +56,10 @@ public sealed partial class SettingsViewModel : SessionViewModel
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
                 nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(ShowAppearance),
-                nameof(ShowDownloads), nameof(ShowAppUpdates), nameof(ShowOnboarding), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
+                nameof(ShowImports), nameof(ShowDownloads), nameof(ShowAppUpdates), nameof(ShowOnboarding), nameof(ShowLanguage), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
         }
     }
-    private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || keywords.Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
+    private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || Localizer.Current.SearchTerms(keywords).Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
     public bool ShowInstallation => Matches("Game and deployment Helldivers 2 installation folder Steam path");
     public bool ShowPriority => Matches("Game and deployment Profile load priority earlier later entries order " + ActiveProfileName);
     public bool ShowRepatch => Matches("Game and deployment Repatching repair automatic ask never patches");
@@ -55,21 +72,22 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowDownloads => Matches("Downloads download scanning browser ZIP watch folder directory manual updates");
     public bool ShowAppUpdates => Matches("App settings Allow automatic update Check app updates startup Quartermaster");
     public bool ShowOnboarding => Matches("App settings setup onboarding tutorial tour help getting started");
-    public bool ShowAppSettings => ShowAppearance || ShowAppUpdates || ShowOnboarding;
+    public bool ShowLanguage => Matches("App settings language localization translation English");
+    public bool ShowAppSettings => ShowAppearance || ShowAppUpdates || ShowOnboarding || ShowLanguage;
     public bool ShowGameSettings => ShowInstallation || ShowPriority || ShowRepatch;
     public bool ShowProviderSettings => ShowNexus || ShowGitHub;
     public bool ShowAppInformation => ShowStorage || ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
-    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowProviderSettings || ShowAppInformation;
+    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowProviderSettings || ShowAppInformation || ShowImports;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;
     public string ApplicationVersion { get; } = typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? "Unknown";
+        ?? typeof(App).Assembly.GetName().Version?.ToString() ?? Localizer.Text("Unknown");
     public string PlatformInformation { get; } = $"{RuntimeInformation.OSDescription} ({RuntimeInformation.ProcessArchitecture})";
     public string RuntimeVersion { get; } = RuntimeInformation.FrameworkDescription;
     public string LogFilePath => Path.Combine(LibraryDirectory, "log.jsonl");
     public string ConfigurationFilePath => Path.Combine(LibraryDirectory, "settings.json");
-    public string ActiveProfileName => Session.ActiveProfile?.Name ?? "No profile selected";
+    public string ActiveProfileName => Session.ActiveProfile?.Name ?? Localizer.Text("No profile selected");
     public bool HasProfile => Session.ActiveProfile is not null;
     public AsyncCommand SaveCommand { get; }
     public Command ResetCommand { get; }
@@ -81,12 +99,13 @@ public sealed partial class SettingsViewModel : SessionViewModel
         {
             var account = await ValidateProviderDraftAsync(ct);
             await Session.SaveSettingsAsync(GamePath.Trim(), (RepatchMode)RepatchChoice, profileId, (PriorityDirection)PriorityChoice, ct,
-                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor), AllowAutomaticUpdate);
+                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor), AllowAutomaticUpdate, SelectedLanguage.Code);
             await SaveProviderDraftAsync(account, ct);
             LoadDrafts();
         }, () => ValidAppearance && RepatchChoice >= 0 && RepatchChoice < RepatchChoices.Count && PriorityChoice >= 0 && PriorityChoice < PriorityChoices.Count &&
             (GamePath.Trim() != Session.GameDirectory || RepatchChoice != (int)Session.Settings.Repatch ||
-             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged || AllowAutomaticUpdate != Session.Settings.AllowAutomaticUpdate));
+             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged || AllowAutomaticUpdate != Session.Settings.AllowAutomaticUpdate ||
+             SelectedLanguage.Code != (Session.Settings.Language ?? "")));
         CheckAppUpdatesCommand = new(() => AppUpdates.CheckAsync(), () => Operations.CanInteract && !AppUpdates.IsChecking, Operations.ReportError);
         AppUpdates.PropertyChanged += (_, _) => CheckAppUpdatesCommand.Refresh();
         Operations.PropertyChanged += (_, _) => CheckAppUpdatesCommand.Refresh();
@@ -103,11 +122,12 @@ public sealed partial class SettingsViewModel : SessionViewModel
             ThemeChoice = (int)defaults.Theme;
             AccentColor = Avalonia.Media.Color.Parse(defaults.AccentColor);
             AllowAutomaticUpdate = defaults.AllowAutomaticUpdate;
+            SelectedLanguage = Languages[0];
             ResetProviderDraft();
         }, () => Operations.CanInteract);
         BrowseCommand = Operations.CreateCommand("Selecting game folder", async _ =>
         {
-            var path = await Services.Dialogs.PickFolderAsync("Choose Helldivers 2 installation or data folder");
+            var path = await Services.Dialogs.PickFolderAsync(Localizer.Text("Choose Helldivers 2 installation or data folder"));
             if (path is not null) GamePath = path;
         });
         DiscoverCommand = Operations.CreateCommand("Finding Steam installations", async ct =>
@@ -117,6 +137,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             SelectedInstallation = Installations.FirstOrDefault();
         });
         InitializeProviderCommands();
+        InitializeInteropCommands();
         WatchSession();
     }
     private void LoadDrafts()
@@ -126,10 +147,14 @@ public sealed partial class SettingsViewModel : SessionViewModel
         GamePath = Session.GameDirectory; RepatchChoice = (int)Session.Settings.Repatch; PriorityChoice = savedPriority;
         LoadAppearance();
         AllowAutomaticUpdate = Session.Settings.AllowAutomaticUpdate;
+        Notify(nameof(Languages));
+        SelectedLanguage = Languages.FirstOrDefault(language => language.Code == (Session.Settings.Language ?? "")) ?? Languages[0];
+        Notify(nameof(RepatchChoices)); Notify(nameof(PriorityChoices)); Notify(nameof(ThemeChoices));
         SaveCommand.Refresh();
     }
     protected override void Refresh()
     {
+        Notify(nameof(Languages)); Notify(nameof(RepatchChoices)); Notify(nameof(PriorityChoices)); Notify(nameof(ThemeChoices));
         if (saved is null) LoadDrafts();
         else
         {
@@ -140,6 +165,8 @@ public sealed partial class SettingsViewModel : SessionViewModel
             if (profileId != Session.ActiveProfile?.Id || PriorityChoice == savedPriority) PriorityChoice = currentPriority;
             RefreshAppearance(saved);
             if (AllowAutomaticUpdate == saved.AllowAutomaticUpdate) AllowAutomaticUpdate = Session.Settings.AllowAutomaticUpdate;
+            if (SelectedLanguage.Code == (saved.Language ?? ""))
+                SelectedLanguage = Languages.FirstOrDefault(language => language.Code == (Session.Settings.Language ?? "")) ?? Languages[0];
             saved = Session.Settings; profileId = Session.ActiveProfile?.Id; savedPriority = currentPriority;
         }
         Notify(nameof(ActiveProfileName)); Notify(nameof(HasProfile)); Notify(nameof(ShowPriority)); Notify(nameof(ShowGameSettings)); Notify(nameof(HasMatches)); SaveCommand.Refresh();

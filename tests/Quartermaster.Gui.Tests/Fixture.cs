@@ -69,6 +69,10 @@ internal sealed class FakeDialogs : IDialogService
     public Task<string?> SaveProfileZipAsync(string suggestedName)
     { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }
     public Task<string?> PickFolderAsync(string title) => Task.FromResult(FolderPath);
+    public string? ImagePath { get; set; }
+    public GroupColors? Colors { get; set; }
+    public Task<string?> PickProfileImageAsync() => Task.FromResult(ImagePath);
+    public Task<GroupColors?> RequestGroupColorsAsync(string? background, string? text) => Task.FromResult(Colors);
     public Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel")
     { Confirmations.Add((title, message, acceptLabel, cancelLabel)); return Task.FromResult(ConfirmationAnswers.TryDequeue(out var answer) ? answer : Confirm); }
 }

@@ -40,9 +40,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
     public ViewModelBase CurrentPage => pages[SelectedNavigation.Page];
     private Profile? DisplayProfile => services.Session.ActiveProfile;
-    public string ProfileLabel => DisplayProfile?.Name ?? "No active profile";
+    public string ProfileLabel => DisplayProfile?.Name ?? Localizer.Text("No active profile");
     public string LibraryCount => services.Session.State.Mods.Count.ToString();
-    public string SelectionSummary => $"{DisplayProfile?.Entries.Count(e => e.Enabled) ?? 0} selected for deployment";
+    public string SelectionSummary => Localizer.Interpolate($"{DisplayProfile?.Entries.Count(e => e.Enabled) ?? 0} selected for deployment");
     public string CollisionCount => DisplayProfile is { } profile
         ? ConflictAnalyzer.Analyze(ProfilePatches.Resolve(services.Session.State, profile)).Resources.Count.ToString() : "0";
     public ObservableCollection<SidebarProfile> SidebarProfiles { get; } = [];
@@ -102,7 +102,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (e.PropertyName != nameof(OperationState.IsBusy) || Operations.IsBusy && !Operations.IsProgressVisible) return;
             foreach (var entry in SidebarProfiles)
-            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); entry.DuplicateCommand.Refresh(); }
+            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); entry.DuplicateCommand.Refresh(); entry.ChangeThumbnailCommand.Refresh(); entry.RemoveThumbnailCommand.Refresh(); }
         };
         RefreshProfiles();
         ((ProfilesViewModel)pages[PageKind.Profiles]).PropertyChanged += (_, e) =>
@@ -143,7 +143,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => ExportProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
-                new AsyncCommand(() => DuplicateProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
+                new AsyncCommand(() => DuplicateProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => ChangeProfileThumbnailAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => ChangeProfileThumbnailAsync(profile.Id, remove: true), () => Operations.CanInteract && services.Session.State.Profiles.Any(p => p.Id == profile.Id && p.Thumbnail is not null), Operations.ReportError))
             { IsDeployed = deployed });
         }
     }
@@ -168,7 +170,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             // A double-click can arrive while its first click is still saving the selection.
             if (Operations.IsBusy)
             {
-                if (Operations.Message != "Selecting profile") return;
+                if (Operations.SourceMessage != "Selecting profile") return;
                 await Operations.WhenIdle;
                 if (Operations.IsError) return;
             }
@@ -185,6 +187,24 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         foreach (var name in new[] { nameof(ProfileLabel), nameof(LibraryCount), nameof(SelectionSummary), nameof(CollisionCount) }) Notify(name);
     }
+    private Task ChangeProfileThumbnailAsync(Guid id, bool remove = false) => Operations.RunAsync("Changing profile thumbnail", async ct =>
+    {
+        string? thumbnail = null;
+        if (!remove)
+        {
+            var path = await services.Dialogs.PickProfileImageAsync();
+            if (path is null) return;
+            thumbnail = await ProfileAppearance.ReadThumbnailAsync(path, ct);
+            using var stream = new MemoryStream(Convert.FromBase64String(thumbnail));
+            using var image = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 256);
+            using var output = new MemoryStream();
+            image.Save(output, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+            thumbnail = Convert.ToBase64String(output.ToArray());
+            ProfileAppearance.ValidateThumbnail(thumbnail);
+        }
+        var profile = services.Session.State.Profiles.Single(p => p.Id == id);
+        await services.Session.SaveProfileAsync(profile with { Thumbnail = thumbnail }, false, ct);
+    });
     private Task DuplicateProfileAsync(Guid id) => Operations.RunAsync("Duplicating profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);
@@ -194,14 +214,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     private Task RenameProfileAsync(Guid id) => Operations.RunAsync("Renaming profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);
-        var name = await services.Dialogs.RequestTextAsync("Rename profile", "Profile name", "Rename", profile.Name);
+        var name = await services.Dialogs.RequestTextAsync(Localizer.Text("Rename profile"), Localizer.Text("Profile name"), Localizer.Text("Rename"), profile.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Trim() == profile.Name) return;
         await services.Session.SaveProfileAsync(profile with { Name = name.Trim() }, false, ct);
     });
     private Task DeleteProfileAsync(Guid id) => Operations.RunAsync("Deleting profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);
-        if (await services.Dialogs.ConfirmAsync("Delete profile", $"Delete {profile.Name}? Your imported mods and deployed game files will remain.", "Delete"))
+        if (await services.Dialogs.ConfirmAsync(Localizer.Text("Delete profile"), Localizer.Interpolate($"Delete {profile.Name}? Your imported mods and deployed game files will remain."), Localizer.Text("Delete")))
             await services.Session.DeleteProfileAsync(id, ct);
     });
     private Task ExportProfileAsync(Guid id) => Operations.RunAsync("Exporting profile", async ct =>

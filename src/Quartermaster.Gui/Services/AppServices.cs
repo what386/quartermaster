@@ -22,6 +22,7 @@ public sealed class AppServices : IAsyncDisposable
     public Quartermaster.Library.Mods.LibraryService Library { get; }
     public string DataDirectory { get; }
     public LibrarySession Session { get; }
+    public Interop.Arsenal.ArsenalImporter ArsenalImporter { get; }
     public ThemeManager Theme { get; } = new();
     public OperationState Operations { get; }
     public Action LaunchGame { get; }
@@ -37,13 +38,14 @@ public sealed class AppServices : IAsyncDisposable
             new global::System.Diagnostics.ProcessStartInfo("steam://rungameid/553850") { UseShellExecute = true }));
         OpenBrowser = uri =>
         {
-            if (!uri.IsAbsoluteUri || uri.Scheme != "https" || uri.UserInfo.Length != 0) throw new ArgumentException("Only public HTTPS pages can be opened.");
+            if (!uri.IsAbsoluteUri || uri.Scheme != "https" || uri.UserInfo.Length != 0) throw new ArgumentException(Localizer.Text("Only public HTTPS pages can be opened."));
             if (openBrowser is not null) openBrowser(uri);
             else global::System.Diagnostics.Process.Start(new global::System.Diagnostics.ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
         };
         var content = new ModContentStore(DataDirectory);
         var store = new JsonLibraryStore(DataDirectory);
         Library = new LibraryService(store, content);
+        ArsenalImporter = new(store, content);
         Keys = new(DataDirectory);
         Nexus = new(ct => Keys.GetAsync("nexusmods", ct), nexusApi, nexusDownloads);
         ValidateNexusKeyAsync = async (key, ct) =>
@@ -59,7 +61,7 @@ public sealed class AppServices : IAsyncDisposable
         Session.Changed += (_, _) => Theme.Load(Session.Settings);
         Downloads = new(this);
         AppUpdates = new(this, appUpdateManager, shutdownForUpdate ?? (() =>
-            throw new InvalidOperationException("Application shutdown was not configured.")));
+            throw new InvalidOperationException(Localizer.Text("Application shutdown was not configured."))));
     }
     public async ValueTask DisposeAsync() { IsDisposed = true; lifetime.Cancel(); AppUpdates.Dispose(); await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
     public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")

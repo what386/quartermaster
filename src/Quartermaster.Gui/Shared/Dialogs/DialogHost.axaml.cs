@@ -28,8 +28,8 @@ public partial class DialogHost : UserControl
     public Task<T> ShowAsync<T>(Control content)
     {
         if (active is not null && active is not IModalParentDialog)
-            throw new InvalidOperationException("Close the current dialog first.");
-        if (content is not IModalDialog dialog) throw new ArgumentException("Content must be a modal dialog.", nameof(content));
+            throw new InvalidOperationException(Localizer.Text("Close the current dialog first."));
+        if (content is not IModalDialog dialog) throw new ArgumentException(Localizer.Text("Content must be a modal dialog."), nameof(content));
         var parent = active;
         var parentContent = DialogContent.Content;
         var parentClosed = closed;

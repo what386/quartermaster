@@ -20,7 +20,7 @@ public sealed class AppUpdates : ViewModelBase, IDisposable
         this.shutdown = shutdown;
         this.createManager = createManager ?? (() => new(SelfUpdateOptions.ForCurrentApplication(
             typeof(App).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                ?? throw new InvalidOperationException("The application version is unavailable."),
+                ?? throw new InvalidOperationException(Localizer.Text("The application version is unavailable.")),
             Path.Combine(services.DataDirectory, "self-update"))));
     }
     private void SetStatus(string text) { Status = text; Notify(nameof(Status)); }
@@ -44,7 +44,7 @@ public sealed class AppUpdates : ViewModelBase, IDisposable
     {
         if (IsChecking || lifetime.IsCancellationRequested) return;
         IsChecking = true;
-        SetStatus("Checking for app updates…");
+        SetStatus(Localizer.Text("Checking for app updates…"));
         try
         {
             manager ??= createManager();
@@ -59,13 +59,13 @@ public sealed class AppUpdates : ViewModelBase, IDisposable
                     linked.Token.ThrowIfCancellationRequested();
                     completed = true;
                 });
-                if (services.Operations.IsError) { SetStatus("Update check failed."); return; }
-                if (!completed) { SetStatus("Update check cancelled."); return; }
+                if (services.Operations.IsError) { SetStatus(Localizer.Text("Update check failed.")); return; }
+                if (!completed) { SetStatus(Localizer.Text("Update check cancelled.")); return; }
             }
             else release = await manager.CheckAsync(lifetime.Token);
             lifetime.Token.ThrowIfCancellationRequested();
-            if (release is null) { SetStatus("Quartermaster is up to date."); return; }
-            SetStatus($"Quartermaster {release.Version} is available.");
+            if (release is null) { SetStatus(Localizer.Text("Quartermaster is up to date.")); return; }
+            SetStatus(Localizer.Interpolate($"Quartermaster {release.Version} is available."));
             if (!manual && (!services.Session.Settings.AllowAutomaticUpdate ||
                 release.Version == services.Session.Settings.SkippedAppUpdateVersion)) return;
             // Wait for imports, manual checks, and other operations before opening a prompt.
@@ -82,27 +82,27 @@ public sealed class AppUpdates : ViewModelBase, IDisposable
                 if (choice == AppUpdateChoice.Skip)
                 {
                     await services.Session.SkipAppUpdateAsync(release.Version, token);
-                    SetStatus($"Skipped {release.Version}.");
+                    SetStatus(Localizer.Interpolate($"Skipped {release.Version}."));
                     return;
                 }
                 if (choice != AppUpdateChoice.Update) return;
                 var progress = services.Operations.CreateProgress<SelfUpdateProgress>(value => value.Phase switch
                 {
-                    SelfUpdatePhase.Downloading => $"Downloading app update · {value.Bytes / 1024 / 1024} MB",
-                    SelfUpdatePhase.Verifying => "Verifying app update",
-                    SelfUpdatePhase.Extracting => "Preparing app update",
-                    _ => "Restarting Quartermaster",
+                    SelfUpdatePhase.Downloading => Localizer.Interpolate($"Downloading app update · {value.Bytes / 1024 / 1024} MB"),
+                    SelfUpdatePhase.Verifying => Localizer.Text("Verifying app update"),
+                    SelfUpdatePhase.Extracting => Localizer.Text("Preparing app update"),
+                    _ => Localizer.Text("Restarting Quartermaster"),
                 });
                 using var prepared = await manager.PrepareAsync(release, progress, token);
                 manager.Start(prepared, token);
                 shutdown();
             });
-            if (services.Operations.IsError) SetStatus("App update failed.");
+            if (services.Operations.IsError) SetStatus(Localizer.Text("App update failed."));
         }
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception ex)
         {
-            if (!lifetime.IsCancellationRequested) { SetStatus("Update check failed."); services.Operations.ReportError(ex); }
+            if (!lifetime.IsCancellationRequested) { SetStatus(Localizer.Text("Update check failed.")); services.Operations.ReportError(ex); }
         }
         finally { IsChecking = false; }
     }

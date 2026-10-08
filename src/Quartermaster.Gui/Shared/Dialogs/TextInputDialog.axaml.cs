@@ -10,7 +10,7 @@ public partial class TextInputDialog : UserControl, IModalDialog
     public event Action<object?>? Completed;
     public TextInputDialog() => InitializeComponent();
     public TextInputDialog(string title, string prompt, string acceptLabel, string? initialValue = null, bool allowFileChoice = false) : this()
-    { TitleText.Text = title; PromptText.Text = prompt; AcceptButton.Content = acceptLabel; NameInput.Text = initialValue; ChooseFileButton.IsVisible = allowFileChoice; }
+    { TitleText.Text = title; PromptText.Text = prompt; AcceptButton.Content = Localizer.Text(acceptLabel); NameInput.Text = initialValue; ChooseFileButton.IsVisible = allowFileChoice; }
     private void NameChanged(object? sender, TextChangedEventArgs e) =>
         AcceptButton.IsEnabled = !string.IsNullOrWhiteSpace(NameInput.Text);
     public bool TryAccept()
