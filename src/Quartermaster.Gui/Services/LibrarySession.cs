@@ -247,6 +247,14 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         await settingsStore.SaveAsync(settings, ct);
         Settings = settings; Publish();
     }
+    public async Task SetLanguageAsync(string language, CancellationToken ct)
+    {
+        var settings = Settings with { Language = language };
+        await settingsStore.SaveAsync(settings, ct);
+        Settings = settings;
+        Localizer.Current.SetLanguage(language);
+        Publish();
+    }
     public async Task SetOnboardingPreferencesAsync(bool? automaticUpdates, bool? completed, CancellationToken ct)
     {
         var settings = Settings with

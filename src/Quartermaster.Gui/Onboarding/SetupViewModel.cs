@@ -20,14 +20,16 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
     private string gamePath = "";
     private string nexusApiKey = "";
     private string gitHubToken = "";
+    private LanguageOption selectedLanguage = new("", "System default");
     public event Action<SetupOutcome>? Completed;
     public int Step => step;
-    public bool IsGame => step == 0;
-    public bool IsUpdates => step == 1;
-    public bool IsNexus => step == 2;
-    public bool IsGitHub => step == 3;
-    public bool IsDownloads => step == 4;
-    public bool IsReady => step == 5;
+    public bool IsLanguage => step == 0;
+    public bool IsGame => step == 1;
+    public bool IsUpdates => step == 2;
+    public bool IsNexus => step == 3;
+    public bool IsGitHub => step == 4;
+    public bool IsDownloads => step == 5;
+    public bool IsReady => step == 6;
     public bool CanGoBack => step > 0;
     public bool CanSkipStep =>
         IsReady
@@ -45,28 +47,43 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
         get => error;
         private set => Set(ref error, value);
     }
-    public string Progress => IsReady ? Localizer.Text("SETUP COMPLETE") : Localizer.Interpolate($"SETUP · {step + 1} / 5");
+    public string Progress => IsReady ? Localizer.Text("SETUP COMPLETE") : Localizer.Interpolate($"SETUP · {step + 1} / 6");
+    public IReadOnlyList<LanguageOption> Languages
+    {
+        get
+        {
+            var options = Localizer.Current.Languages;
+            return options.Any(option => option.Code == selectedLanguage.Code) ? options : options.Append(selectedLanguage).ToArray();
+        }
+    }
+    public LanguageOption SelectedLanguage
+    {
+        get => selectedLanguage;
+        set { if (value is not null) Set(ref selectedLanguage, value); }
+    }
     public string Title =>
         step switch
         {
-            0 => CanSkipStep ? Localizer.Text("Find your game") : Localizer.Text("Confirm your game folder"),
-            1 => Localizer.Text("Keep Quartermaster current"),
-            2 => Localizer.Text("Connect Nexus Mods"),
-            3 => Localizer.Text("Connect GitHub"),
-            4 => Localizer.Text("Watch your downloads"),
+            0 => Localizer.Text("Choose your language"),
+            1 => CanSkipStep ? Localizer.Text("Find your game") : Localizer.Text("Confirm your game folder"),
+            2 => Localizer.Text("Keep Quartermaster current"),
+            3 => Localizer.Text("Connect Nexus Mods"),
+            4 => Localizer.Text("Connect GitHub"),
+            5 => Localizer.Text("Watch your downloads"),
             _ => Localizer.Text("Ready to go"),
         };
     public string Description =>
         step switch
         {
-            0 => CanSkipStep
+            0 => Localizer.Text("Choose the language for setup and the application."),
+            1 => CanSkipStep
                 ? Localizer.Text("Choose Helldivers 2's installation or data folder. You can add mods now and set this before deploying.")
                 : Localizer.Text("Confirm Helldivers 2's folder below, or choose the correct installation or data folder."),
-            1 => Localizer.Text("Check for app updates at startup. You'll be asked before anything is installed."),
-            2 => Localizer.Text("Optional. A personal API key enables Nexus search and downloads."),
-            3 =>
-                Localizer.Text("Optional. Public GitHub downloads work without a token; adding one raises API rate limits."),
+            2 => Localizer.Text("Check for app updates at startup. You'll be asked before anything is installed."),
+            3 => Localizer.Text("Optional. A personal API key enables Nexus search and downloads."),
             4 =>
+                Localizer.Text("Optional. Public GitHub downloads work without a token; adding one raises API rate limits."),
+            5 =>
                 Localizer.Text("Choose where your browser saves mod ZIPs. Quartermaster picks them up when you start a download."),
             _ => Localizer.Text("Take a quick look around, or skip the tour."),
         };
@@ -130,6 +147,9 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
     public SetupViewModel(AppServices services, CancellationToken ct)
     {
         this.services = services;
+        var language = services.Session.Settings.Language ?? "";
+        SelectedLanguage = Languages.FirstOrDefault(option => option.Code == language)
+            ?? new LanguageOption(language, Localizer.Interpolate($"Saved language ({language})"));
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, services.Lifetime);
         GamePath = services.Session.GameDirectory;
         DownloadFolder =
@@ -225,6 +245,11 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
                 Finish(SetupOutcome.TakeTour);
                 return;
             }
+            if (IsLanguage)
+            {
+                await services.Session.SetLanguageAsync(SelectedLanguage.Code, ct);
+                SelectedLanguage = Languages.FirstOrDefault(option => option.Code == SelectedLanguage.Code) ?? SelectedLanguage;
+            }
             if (IsGame)
             {
                 if (string.IsNullOrWhiteSpace(GamePath) && !CanSkipStep)
@@ -301,12 +326,13 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
 
     private void Move(int value)
     {
-        step = Math.Clamp(value, 0, 5);
+        step = Math.Clamp(value, 0, 6);
         Error = "";
         foreach (
             var property in new[]
             {
                 nameof(Step),
+                nameof(IsLanguage),
                 nameof(IsGame),
                 nameof(IsUpdates),
                 nameof(IsNexus),

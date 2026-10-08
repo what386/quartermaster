@@ -7,6 +7,7 @@ using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Quartermaster.Gui.Onboarding;
+using Quartermaster.Gui.Localization;
 using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Settings;
 using Xunit;
@@ -15,6 +16,39 @@ namespace Quartermaster.Gui.Tests;
 
 public class OnboardingTests
 {
+    [AvaloniaFact]
+    public async Task LanguageIsFirstAndAppliesToTheRestOfSetupWithoutRestarting()
+    {
+        using var f = new Fixture();
+        var store = new SettingsStore(f.Data);
+        Directory.CreateDirectory(store.LocalizationDirectory);
+        await File.WriteAllTextAsync(Path.Combine(store.LocalizationDirectory, "de.json"), """
+            {"language":"de","name":"Deutsch","strings":{"Confirm your game folder":"Spielordner bestätigen"}}
+            """, TestContext.Current.CancellationToken);
+        await f.Shell.InitializeAsync();
+        using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        var dialog = new SetupDialog(model);
+        var window = new Window { Content = dialog, Width = 580, Height = 440 }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose(); Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsLanguage); Assert.False(model.CanGoBack); Assert.False(model.CanSkipSetup);
+            Assert.Equal("SETUP · 1 / 6", model.Progress);
+            var selector = dialog.FindControl<ComboBox>("LanguageSelector")!;
+            Assert.True(selector.IsEffectivelyVisible);
+            selector.SelectedItem = model.Languages.Single(language => language.Code == "de");
+            await model.NextCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsGame); Assert.Equal("Spielordner bestätigen", model.Title);
+            Assert.Equal("de", f.Services.Session.Settings.Language);
+            Assert.Equal("de", (await store.LoadAsync(TestContext.Current.CancellationToken)).Language);
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Contains(dialog.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Spielordner bestätigen");
+            model.BackCommand.Execute(null); Dispatcher.UIThread.RunJobs();
+            Assert.True(model.IsLanguage); Assert.Equal("de", model.SelectedLanguage.Code);
+        }
+        finally { window.Close(); Localizer.Current.SetLanguage("en"); }
+    }
+
     [AvaloniaTheory]
     [InlineData(true)]
     [InlineData(false)]
@@ -22,6 +56,7 @@ public class OnboardingTests
     {
         using var f = new Fixture(discoverGame: foundGame); await f.Shell.InitializeAsync();
         using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        await model.NextCommand.ExecuteAsync();
         var dialog = new SetupDialog(model);
         var window = new Window { Content = dialog, Width = 580, Height = 440 }; window.Show();
         try
@@ -96,7 +131,8 @@ public class OnboardingTests
         using var f = new Fixture(discoverGame: false); await f.Shell.InitializeAsync();
         await f.Services.Keys.SetAsync("nexusmods", "existing-nexus");
         await f.Services.Keys.SetAsync("github", "existing-github");
-        using var model = new SetupViewModel(f.Services, CancellationToken.None); await model.InitializeAsync();
+        using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        await model.InitializeAsync(); await model.NextCommand.ExecuteAsync();
         Assert.Matches(@"^\*+$", model.NexusApiKey); Assert.Matches(@"^\*+$", model.GitHubToken);
         model.GamePath = ""; model.NexusApiKey = ""; model.GitHubToken = "";
         await model.NextCommand.ExecuteAsync();
@@ -116,7 +152,8 @@ public class OnboardingTests
         using var f = new Fixture(nexusApi: api, githubApi: api); await f.Shell.InitializeAsync();
         await f.Services.Keys.SetAsync("nexusmods", "existing-nexus");
         await f.Services.Keys.SetAsync("github", "existing-github");
-        using var model = new SetupViewModel(f.Services, CancellationToken.None); await model.InitializeAsync();
+        using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        await model.InitializeAsync(); await model.NextCommand.ExecuteAsync();
         var dialog = new SetupDialog(model);
         await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync();
         var removeNexus = dialog.FindControl<Button>("RemoveNexusKeyButton")!;
@@ -148,6 +185,7 @@ public class OnboardingTests
         using var github = new HttpClient(new Handler(_ => Json("""{"login":"diver"}""")));
         using var f = new Fixture(discoverGame: false, nexusApi: nexus, githubApi: github); await f.Shell.InitializeAsync();
         using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        await model.NextCommand.ExecuteAsync();
         model.GamePath = Path.Combine(f.Root, "missing"); await model.NextCommand.ExecuteAsync();
         Assert.True(model.IsGame); Assert.NotEmpty(model.Error);
         model.GamePath = f.Game; await model.NextCommand.ExecuteAsync(); Assert.Equal(f.Game, f.Services.Session.GameDirectory);
@@ -171,6 +209,7 @@ public class OnboardingTests
         using var f = new Fixture(nexusApi: api, githubApi: api); await f.Shell.InitializeAsync();
         await f.Services.Keys.SetAsync("nexusmods", "saved");
         using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        await model.NextCommand.ExecuteAsync();
         await model.NextCommand.ExecuteAsync(); await model.NextCommand.ExecuteAsync();
         model.NexusApiKey = "bad-key"; await model.NextCommand.ExecuteAsync(); Assert.True(model.IsNexus); Assert.NotEmpty(model.Error);
         Assert.Equal("saved", await f.Services.Keys.GetAsync("nexusmods"));
@@ -233,6 +272,7 @@ public class OnboardingTests
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         using var model = new SetupViewModel(f.Services, CancellationToken.None);
+        await model.NextCommand.ExecuteAsync();
         var dialog = new SetupDialog(model);
         var window = new Window { Content = dialog, Width = 580, Height = 440 }; window.Show();
         try
