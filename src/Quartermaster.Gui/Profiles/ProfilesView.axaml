@@ -47,6 +47,7 @@
         <ListBox.ContextMenu><ContextMenu>
           <MenuItem x:Name="ModOptionsMenuItem" Header="Options" IsEnabled="{Binding SelectedMod.HasOptions}" Click="OpenModOptions" />
           <MenuItem x:Name="ModDetailsMenuItem" Header="Mod details" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
+          <MenuItem Header="{Binding DependencyActionLabel}" IsVisible="{Binding HasDependencyAction}" Command="{Binding GetDependenciesCommand}" />
           <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" />
           <Separator />
           <MenuItem Header="Remove from profile" Command="{Binding RemoveCommand}" />

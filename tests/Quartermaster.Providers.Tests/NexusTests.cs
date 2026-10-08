@@ -12,8 +12,10 @@ namespace Quartermaster.Providers.Tests;
 
 public sealed class NexusTests
 {
-    [Fact]
-    public async Task MigratedReticleAmmoHudUsesSelectedFileRequirementsInsteadOfEmptyLegacyRequirements()
+    [Theory]
+    [InlineData(4664)]
+    [InlineData(109)]
+    public async Task MigratedReticleAmmoHudUsesSelectedFileRequirementsInsteadOfEmptyLegacyRequirements(int managerId)
     {
         var selected = new List<string>();
         using var api = new HttpClient(new Handler(async request =>
@@ -35,13 +37,14 @@ public sealed class NexusTests
                 return Json(new { data = new { id = Path.GetFileName(path) == "67401" ? "reticle-current" : "reticle-other" } });
             }
             if (path.Contains("reticle-current"))
-                return new(HttpStatusCode.OK) { Content = new StringContent(await System.IO.File.ReadAllTextAsync(
-                    Path.Combine(AppContext.BaseDirectory, "Fixtures", "nexus-16467-file-requirements.json")), Encoding.UTF8, "application/json") };
+                return new(HttpStatusCode.OK) { Content = new StringContent((await System.IO.File.ReadAllTextAsync(
+                    Path.Combine(AppContext.BaseDirectory, "Fixtures", "nexus-16467-file-requirements.json"))).Replace("\"4664\"", $"\"{managerId}\""), Encoding.UTF8, "application/json") };
             return Json(new { dependencies = Array.Empty<object>() });
         }));
         using var client = Client(api); var adapter = new NexusAdapter(client);
         var requirements = await adapter.GetRequirementsAsync("https://www.nexusmods.com/helldivers2/mods/16467?tab=files&file_id=67401");
-        var loader = requirements.Single(item => item.Name == "Bingus Shared Loader");
+        var loader = Assert.Single(requirements);
+        Assert.Equal("Bingus Shared Loader", loader.Name);
         Assert.Equal("https://www.nexusmods.com/helldivers2/mods/16292", loader.Page.AbsoluteUri);
         Assert.Equal(new[] { "65833", "66103", "66391", "67485" }, loader.AllowedFileIds);
         using var f = new Fixture(); var installed = await f.Library.ImportAsync(f.Source("Loader"));
@@ -50,6 +53,28 @@ public sealed class NexusTests
         Assert.False(ModDependencyMatching.Matches(installed with { Sources = [new("nexusmods", "16292", "1")] }, loader.ToDependency()));
         Assert.Empty(await adapter.GetRequirementsAsync("https://www.nexusmods.com/helldivers2/mods/16467?tab=files&file_id=67402"));
         Assert.Equal(new[] { "67401", "67402" }, selected);
+    }
+
+    [Fact]
+    public async Task LegacyRequirementsExcludeManagersByNexusIdentityRatherThanName()
+    {
+        using var api = new HttpClient(new Handler(async request =>
+        {
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            if (body.RootElement.GetProperty("query").GetString()!.Contains("game(domainName"))
+                return Json(new { data = new { game = new { id = 6119 } } });
+            var nodes = new[] { 109, 4664, 16292, 200 }.Select(id => new
+            {
+                modName = id == 200 ? "HD2 Arsenal themed addon" : "Requirement " + id,
+                modId = id.ToString(), gameId = "6119", notes = "", externalRequirement = false,
+                url = $"https://www.nexusmods.com/helldivers2/mods/{id}"
+            });
+            return Json(new { data = new { mod = new { legacyModRequirementsEnabled = true,
+                modRequirements = new { nexusRequirements = new { totalCount = 4, nodes } } } } });
+        }));
+        using var client = Client(api);
+        var requirements = await client.GetRequirementsAsync(16467);
+        Assert.Equal(new[] { "/helldivers2/mods/16292", "/helldivers2/mods/200" }, requirements.Select(item => item.Page.AbsolutePath));
     }
 
     [Fact]

@@ -126,7 +126,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     private void RefreshSelectedMod()
     {
         Options = SelectedMod is null ? null : new(SelectedMod.Mod, SelectedMod.Entry.Options, Session.GetOptionImages(SelectedMod.Mod));
-        Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
+        Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel)); RefreshCommands();
     }
     public ModOptionsViewModel? Options { get; private set; }
     public ModDetailsViewModel? Details => SelectedMod is null ? null : new(SelectedMod.Mod, Services, SelectedProfile?.Id);
@@ -142,11 +142,18 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public AsyncCommand PurgeCommand { get; }
     public AsyncCommand CheckUpdatesCommand { get; }
     public AsyncCommand ImportModCommand { get; }
+    public AsyncCommand GetDependenciesCommand { get; }
+    public bool HasDependencyAction => HasProfile && SelectedMod is { } row && Services.Downloads.CanResolveDependencies(row.Mod) &&
+        ModDependencyState.MissingCount(row.Mod, Session.State, SelectedProfile!.Id) > 0;
+    public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, SelectedProfile?.Id) : "Add dependencies to profile";
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
         CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, Entries.Select(row => row.Mod.Id).ToArray()), () => HasProfile);
         ImportModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct, SelectedProfile!.Id), () => HasProfile);
+        GetDependenciesCommand = Operations.CreateCommand("Getting dependencies",
+            ct => Services.Downloads.GetDependenciesAsync(SelectedMod!.Mod.Id, ct, SelectedProfile!.Id),
+            () => HasDependencyAction);
         Services.Downloads.Changed += (_, _) => { foreach (var row in Entries) row.UpdateCommand?.Refresh(); };
         AddGroupCommand = Operations.CreateCommand("Adding group", AddGroupAsync, () => HasProfile);
         MakeActiveCommand = Operations.CreateCommand("Selecting active profile", ct => Session.SaveProfileAsync(SelectedProfile!, true, ct), () => HasProfile);
@@ -266,6 +273,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     {
         if (Operations.IsBusy && !Operations.IsProgressVisible) return;
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand, GetDependenciesCommand }) command.Refresh();
     }
 }

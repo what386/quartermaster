@@ -23,6 +23,7 @@
           <Separator />
           <MenuItem Header="Export repatched ZIP" Command="{Binding ExportRepatchedCommand}" />
           <MenuItem Header="Mod details" IsEnabled="{Binding HasSingleSelection}" Click="OpenModDetails" />
+          <MenuItem Header="{Binding DependencyActionLabel}" IsVisible="{Binding HasDependencyAction}" Command="{Binding GetDependenciesCommand}" />
         </ContextMenu></ListBox.ContextMenu>
         <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ModListItem"><vm:ModRowView /></DataTemplate></ListBox.ItemTemplate>
       </ListBox>

@@ -242,11 +242,12 @@ public class GuiTests
             Click("Helmet", MouseButton.Right);
             Assert.Equal(2, list.SelectedItems.Count);
             var menu = list.ContextMenu!; if (!menu.IsOpen) menu.Open(list);
-            Assert.Equal(new[] { "Add to", "Remove from library", "Export repatched ZIP", "Mod details" },
+            Assert.Equal(new[] { "Add to", "Remove from library", "Export repatched ZIP", "Mod details", "Install missing dependencies (0)" },
                 menu.Items.OfType<MenuItem>().Select(item => item.Header));
             Assert.IsType<Separator>(menu.Items[2]);
             Assert.False(Assert.IsType<MenuItem>(menu.Items[3]).Command!.CanExecute(null));
             Assert.False(Assert.IsType<MenuItem>(menu.Items[4]).IsEnabled);
+            Assert.False(Assert.IsType<MenuItem>(menu.Items[5]).Command!.CanExecute(null));
             var addTo = Assert.IsType<MenuItem>(menu.Items[0]);
             var addTarget = addTo.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Target"));
             await Assert.IsType<AsyncCommand>(addTarget.Command).ExecuteAsync(); menu.Close();

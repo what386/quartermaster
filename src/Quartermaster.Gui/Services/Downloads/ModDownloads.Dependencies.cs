@@ -1,4 +1,5 @@
 using Quartermaster.Library.Mods;
+using Quartermaster.Gui.Mods;
 using Quartermaster.Providers.Clients;
 using Quartermaster.Providers.Clients.NexusMods;
 
@@ -7,7 +8,6 @@ namespace Quartermaster.Gui.Services;
 public sealed partial class ModDownloads
 {
     private sealed record Dependency(ModRequirement Requirement, Mod? Installed, ProviderFile? File = null);
-    private sealed class DependencySelectionCancelledException : Exception;
     public async Task AddLibraryModsToProfileAsync(IReadOnlyCollection<Guid> modIds, Guid profileId, CancellationToken ct)
     {
         var dependencies = new List<Dependency>();
@@ -46,6 +46,9 @@ public sealed partial class ModDownloads
         var visited = new HashSet<long> { NexusLink.Parse(root.Page.AbsoluteUri).ModId };
         var missing = new List<Dependency>();
         var external = new Dictionary<string, ModRequirement>();
+        var choices = new Dictionary<string, string>();
+        var filesByMod = new Dictionary<string, IReadOnlyList<ProviderFile>>();
+        DependencyReviewViewModel? review = null;
         var profileIds = targetProfileIds ?? (profileId is { } id ? new[] { id } : []);
         var profiles = services.Session.State.Profiles.Where(profile => profileIds.Contains(profile.Id)).ToArray();
         var profileMods = profiles.Length > 0
@@ -59,6 +62,9 @@ public sealed partial class ModDownloads
             var link = NexusLink.Parse(page);
             var installedOwner = services.Session.State.Mods.Where(mod => MatchesNexusMod(mod, link.ModId) &&
                 (link.FileId is null || mod.Sources.Any(source => source.Provider == "nexusmods" && source.FileId == link.FileId.ToString()))).ToArray();
+            // Keep fetched metadata even when file selection or installation is declined.
+            foreach (var owner in installedOwner)
+                await services.Library.SetDependenciesAsync(owner.Id, snapshot, ct);
             foreach (var (requirement, requirementIndex) in requirements.Select((value, index) => (value, index)))
             {
                 ct.ThrowIfCancellationRequested();
@@ -103,9 +109,10 @@ public sealed partial class ModDownloads
                         snapshot[requirementIndex] = manual.ToDependency();
                         continue;
                     }
-                    selectedFile = await services.Dialogs.ChooseModFileAsync(resolved)
-                        ?? throw new DependencySelectionCancelledException();
-                    selectedFile = selectedFile with { Name = resolved.Name };
+                    var compatibleFiles = resolved.Files.Select(file => file with { Name = resolved.Name }).ToArray();
+                    filesByMod[resolved.ModId] = compatibleFiles;
+                    selectedFile = compatibleFiles.FirstOrDefault(file => choices.GetValueOrDefault(resolved.ModId) == file.FileId)
+                        ?? compatibleFiles.FirstOrDefault(file => file.IsPrimary) ?? compatibleFiles[0];
                     childPage = selectedFile.DownloadPage;
                 }
                 else
@@ -120,28 +127,47 @@ public sealed partial class ModDownloads
             foreach (var owner in installedOwner)
                 await services.Library.SetDependenciesAsync(owner.Id, snapshot, ct);
         }
-        try { await Visit(root.Page.AbsoluteUri); }
-        catch (DependencySelectionCancelledException) { await services.Session.ReloadAsync(ct); return null; }
-        await services.Session.ReloadAsync(ct);
+        async Task<DependencyReviewPlan> BuildPlan()
+        {
+            visited.Clear(); visited.Add(NexusLink.Parse(root.Page.AbsoluteUri).ModId);
+            missing.Clear(); external.Clear(); filesByMod.Clear();
+            await Visit(root.Page.AbsoluteUri);
+            await services.Session.ReloadAsync(ct);
+            var items = missing.Select(item => new DependencyReviewItem(item.Requirement.Name,
+                item.Installed is null ? (profileIds.Count == 0 ? "Download to library" : "Download and add to profile") :
+                    profiles.Any(profile => profile.Entries.Any(entry => entry.ModId == item.Installed.Id && !entry.Enabled))
+                        ? "Enable in profile (already in your library)" : "Add to profile (already in your library)",
+                item.File is { } file ? filesByMod[file.ModId] : [], item.File,
+                file => review!.ChangeFileAsync(file))).ToArray();
+            return new(items, external.Values.ToArray());
+        }
+        var plan = await BuildPlan();
         if (missing.Count == 0 && external.Count == 0) return [];
-        var message = missing.Count > 0
-            ? $"{root.Name} requires:\n" + string.Join("\n", missing.Select(item => "• " + item.Requirement.Name +
-                (item.Installed is null ? "" : " (already in your library)") +
-                (string.IsNullOrWhiteSpace(item.Requirement.Notes) ? "" : " — " + item.Requirement.Notes))) +
-                (profileIds.Count == 0 ? "\n\nInstall these alongside it?" : "\n\nInstall and add these to the same profiles?")
-            : $"{root.Name} has additional requirements.";
-        if (external.Count > 0)
-            message += "\n\nRequirements to install manually:\n" + string.Join("\n", external.Values.Select(item =>
-                $"• {item.Name}: {item.Page}" + (string.IsNullOrWhiteSpace(item.Notes) ? "" : " — " + item.Notes)));
-        return await services.Dialogs.ConfirmAsync("Mod requirements", message,
-            missing.Count > 0 ? "Include dependencies" : "Continue", declineLabel) ? missing : [];
+        review = new(root.Name, missing.Count == 0 ? "Continue" : profileIds.Count == 0 ? "Install dependencies" : "Add dependencies",
+            declineLabel, plan, async file =>
+            {
+                choices[file.ModId] = file.FileId;
+                return await BuildPlan();
+            });
+        return await services.Dialogs.ReviewDependenciesAsync(review, ct) ? missing.ToArray() : [];
     }
+
     public bool CanResolveDependencies(Mod mod) => NexusPage(mod) is not null;
 
     public async Task ResolveDependenciesAsync(Guid modId, CancellationToken ct)
     {
         var mod = services.Session.State.Mods.Single(item => item.Id == modId);
-        await PrepareModDependenciesAsync(mod, ct, "Not now");
+        if (NexusPage(mod) is not { } page) return;
+        var fileId = mod.Sources.FirstOrDefault(source => source.Provider == "nexusmods")?.FileId;
+        var requirements = await services.Providers.GetRequirementsAsync(RequirementPage(page, fileId).AbsoluteUri, ct);
+        await services.Library.SetDependenciesAsync(mod.Id, requirements.Select(item => item.ToDependency()).ToArray(), ct);
+        await services.Session.ReloadAsync(ct);
+    }
+
+    public async Task GetDependenciesAsync(Guid modId, CancellationToken ct, Guid? profileId = null)
+    {
+        var mod = services.Session.State.Mods.Single(item => item.Id == modId);
+        await PrepareModDependenciesAsync(mod, ct, "Not now", targetProfileIds: profileId is { } id ? [id] : []);
     }
 
     private static string? NexusPage(Mod mod)
@@ -153,11 +179,11 @@ public sealed partial class ModDownloads
         catch (ArgumentException) { return null; }
     }
 
-    private async Task<Dictionary<string, IReadOnlyList<ModDependency>>?> PrepareModDependenciesAsync(Mod root, CancellationToken ct, string declineLabel, string? fileId = null)
+    private async Task<Dictionary<string, IReadOnlyList<ModDependency>>?> PrepareModDependenciesAsync(Mod root, CancellationToken ct, string declineLabel, string? fileId = null, IReadOnlyList<Guid>? targetProfileIds = null)
     {
         var metadata = new Dictionary<string, IReadOnlyList<ModDependency>>();
         if (NexusPage(root) is not { } page) return metadata;
-        var profileIds = services.Session.State.Profiles.Where(profile => profile.Entries.Any(entry => entry.ModId == root.Id))
+        var profileIds = targetProfileIds?.ToArray() ?? services.Session.State.Profiles.Where(profile => profile.Entries.Any(entry => entry.ModId == root.Id))
             .Select(profile => profile.Id).ToArray();
         fileId ??= root.Sources.FirstOrDefault(source => source.Provider == "nexusmods")?.FileId;
         var dependencies = await PlanNexusDependenciesAsync(new(root.Id.ToString(), root.Name, root.Description, root.Version, RequirementPage(page, fileId), []),

@@ -34,7 +34,20 @@ internal sealed class FakeDialogs : IDialogService
     public List<string> ImportConfirmations { get; } = [];
     public Task<Quartermaster.Gui.Mods.LocalModImportOptions?> ConfirmModImportAsync(string source)
     { ImportConfirmations.Add(source); return Task.FromResult(ImportOptions); }
-    public Task<Quartermaster.Providers.Clients.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Clients.ProviderMod mod) => Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault());
+    public int ModFilePrompts { get; private set; }
+    public Task<Quartermaster.Providers.Clients.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Clients.ProviderMod mod)
+    { ModFilePrompts++; return Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault()); }
+    public List<Quartermaster.Gui.Mods.DependencyReviewViewModel> DependencyReviews { get; } = [];
+    public Func<Quartermaster.Gui.Mods.DependencyReviewViewModel, Task<bool>>? DependencyReviewHandler { get; set; }
+    public async Task<bool> ReviewDependenciesAsync(Quartermaster.Gui.Mods.DependencyReviewViewModel model, CancellationToken ct = default)
+    {
+        DependencyReviews.Add(model);
+        var message = string.Join("\n", model.Items.Select(item => item.Name + " — " + item.Action));
+        if (model.HasManual) message += "\nRequirements to install manually:\n" + string.Join("\n", model.Manual.Select(item => item.Name + ": " + item.Page));
+        Confirmations.Add(("Mod requirements", message, model.AcceptLabel, model.CancelLabel));
+        return DependencyReviewHandler is not null ? await DependencyReviewHandler(model) :
+            !CancelModFile && (ConfirmationAnswers.TryDequeue(out var answer) ? answer : Confirm);
+    }
     public string? ZipPath { get; set; }
     public string? FolderPath { get; set; }
     public string? SavePath { get; set; }

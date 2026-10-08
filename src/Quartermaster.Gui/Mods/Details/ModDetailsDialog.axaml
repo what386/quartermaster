@@ -4,9 +4,13 @@
     <Grid.Resources>
       <DataTemplate x:Key="RelationshipTemplate" x:DataType="vm:ModRelationshipItem">
         <StackPanel Spacing="4" Margin="0,0,0,8">
-          <HyperlinkButton Content="{Binding Name}" Command="{Binding OpenPageCommand}" IsVisible="{Binding HasPage}" Padding="0" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left" />
-          <TextBlock Text="{Binding Name}" IsVisible="{Binding !HasPage}" TextWrapping="Wrap" />
-          <TextBlock Text="{Binding Status}" IsVisible="{Binding HasStatus}" Classes="muted" FontSize="11" />
+          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+            <HyperlinkButton Command="{Binding OpenPageCommand}" IsVisible="{Binding HasPage}" Padding="0" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}">
+              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+            </HyperlinkButton>
+            <TextBlock Text="{Binding Name}" IsVisible="{Binding !HasPage}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Name}" />
+            <TextBlock Grid.Column="1" Text="{Binding Status}" IsVisible="{Binding HasStatus}" Classes="muted" FontSize="11" VerticalAlignment="Center" />
+          </Grid>
           <TextBlock Text="{Binding Notes}" IsVisible="{Binding HasNotes}" Classes="muted" TextWrapping="Wrap" />
         </StackPanel>
       </DataTemplate>
@@ -82,9 +86,12 @@
       </TabItem>
       <TabItem Header="Dependencies">
         <ScrollViewer><StackPanel Spacing="12">
-          <Button x:Name="ResolveDependenciesButton" Content="Resolve dependencies" Classes="primary" Command="{Binding ResolveDependenciesCommand}" IsVisible="{Binding CanResolveDependencies}" HorizontalAlignment="Left" />
-          <TextBlock Text="Depends on" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding DependencySummary}" IsVisible="{Binding !HasDependencies}" Classes="muted" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Text="Depends on" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button x:Name="ResolveDependenciesButton" Grid.Column="1" Content="Refresh" Command="{Binding ResolveDependenciesCommand}" IsVisible="{Binding CanResolveDependencies}" />
+          </Grid>
+          <TextBlock Text="{Binding DependencySummary}" Classes="muted" TextWrapping="Wrap" />
+          <Button x:Name="GetDependenciesButton" Content="{Binding DependencyActionLabel}" Classes="primary" Command="{Binding GetDependenciesCommand}" IsVisible="{Binding HasDependencyAction}" HorizontalAlignment="Left" />
           <ItemsControl x:Name="DependenciesList" ItemsSource="{Binding Dependencies}" ItemTemplate="{StaticResource RelationshipTemplate}" />
           <TextBlock Text="Required by" FontWeight="SemiBold" />
           <TextBlock Text="No dependents in your library." IsVisible="{Binding !HasDependents}" Classes="muted" />

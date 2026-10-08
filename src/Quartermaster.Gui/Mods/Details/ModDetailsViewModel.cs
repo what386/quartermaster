@@ -16,6 +16,10 @@ public sealed class ModDetailsViewModel : ViewModelBase
     public string PageLink { get => pageLink; set => Set(ref pageLink, value); }
     public OperationState Operations => services.Operations;
     public AsyncCommand ResolveDependenciesCommand { get; }
+    public AsyncCommand GetDependenciesCommand { get; }
+    public int MissingDependencyCount => ModDependencyState.MissingCount(mod, services.Session.State, profileId);
+    public bool HasDependencyAction => CanResolveDependencies && MissingDependencyCount > 0;
+    public string DependencyActionLabel => ModDependencyState.ActionLabel(mod, services.Session.State, profileId);
     public bool CanResolveDependencies => services.Downloads.CanResolveDependencies(mod);
     public ModDetailsViewModel(Mod mod, AppServices services, Guid? profileId = null)
     {
@@ -24,12 +28,18 @@ public sealed class ModDetailsViewModel : ViewModelBase
         this.profileId = profileId;
         pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
         RefreshRelationships();
-        ResolveDependenciesCommand = services.Operations.CreateCommand("Resolving dependencies", async ct =>
+        ResolveDependenciesCommand = services.Operations.CreateCommand("Refreshing dependencies", async ct =>
         {
             await SavePageAsync(ct);
             await services.Downloads.ResolveDependenciesAsync(this.mod.Id, ct);
             RefreshRelationships();
         }, () => CanResolveDependencies);
+        GetDependenciesCommand = services.Operations.CreateCommand("Getting dependencies", async ct =>
+        {
+            await SavePageAsync(ct);
+            await services.Downloads.GetDependenciesAsync(this.mod.Id, ct, profileId);
+            RefreshRelationships();
+        }, () => HasDependencyAction);
     }
     private async Task SavePageAsync(CancellationToken ct)
     {
@@ -66,7 +76,10 @@ public sealed class ModDetailsViewModel : ViewModelBase
     public bool HasCollisions => Collisions.Count > 0;
     public bool HasDependencies => Dependencies.Count > 0;
     public bool HasDependents => Dependents.Count > 0;
-    public string DependencySummary => mod.DependenciesKnown ? "No dependencies." : "Dependency information unavailable.";
+    public string DependencySummary => !mod.DependenciesKnown ? "Dependency information unavailable. Refresh to check." :
+        mod.Dependencies.Any(dependency => !dependency.CanInstall) ? "Additional requirements need manual installation." :
+        MissingDependencyCount == 0 ? "All dependencies available." : $"{MissingDependencyCount} dependencies need attention.";
+
     internal void StartWatching() { services.Session.Changed += SessionChanged; RefreshRelationships(); }
     internal void StopWatching() => services.Session.Changed -= SessionChanged;
     private void SessionChanged(object? sender, EventArgs args) => RefreshRelationships();
@@ -76,8 +89,7 @@ public sealed class ModDetailsViewModel : ViewModelBase
         var library = services.Session.State.Mods.Where(item => !item.Superseded).ToArray();
         Dependencies = mod.Dependencies.Select(dependency => new ModRelationshipItem(
             dependency.Name,
-            !dependency.CanInstall ? "External requirement" : library.Any(item => ModDependencyMatching.Matches(item, dependency))
-                ? "In library" : "Not in library",
+            ModDependencyState.Status(dependency, services.Session.State, profileId),
             dependency.Notes ?? "",
             dependency.Page,
             services)).ToArray();
@@ -86,7 +98,9 @@ public sealed class ModDetailsViewModel : ViewModelBase
             .Select(item => new ModRelationshipItem(item.Name, "", "", ModLinks.PageFor(item), services)).ToArray();
         Notify(nameof(Dependencies)); Notify(nameof(Dependents));
         Notify(nameof(HasDependencies)); Notify(nameof(HasDependents)); Notify(nameof(DependencySummary));
-        Notify(nameof(CanResolveDependencies)); ResolveDependenciesCommand?.Refresh();
+        Notify(nameof(CanResolveDependencies)); Notify(nameof(MissingDependencyCount)); Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel));
+        ResolveDependenciesCommand?.Refresh();
+        GetDependenciesCommand?.Refresh();
         RefreshCollisions();
     }
 

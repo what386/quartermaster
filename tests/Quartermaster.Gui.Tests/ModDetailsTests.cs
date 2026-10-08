@@ -13,6 +13,39 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDetailsTests
 {
     [AvaloniaFact]
+    public async Task DependencyStatesAndActionsFollowTheLibraryAndSelectedProfile()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var root = await f.Services.Library.ImportAsync(f.Source("Root", 9));
+        var installed = new List<Mod>();
+        for (var id = 1; id <= 3; id++)
+        {
+            var mod = await f.Services.Library.ImportAsync(f.Source("Dep" + id, (ulong)id));
+            await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", id.ToString(), (id * 10).ToString())]);
+            installed.Add(mod);
+        }
+        await f.Services.Library.SetSourcesAsync(root.Id, [new("nexusmods", "9", "90")]);
+        await f.Services.Library.SetDependenciesAsync(root.Id, Enumerable.Range(1, 4).Select(id =>
+            new ModDependency("Dep" + id, $"https://www.nexusmods.com/helldivers2/mods/{id}")).ToArray());
+        var profile = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Add(f.Services.Session.ActiveProfile!, root), installed[0]), installed[1]);
+        profile = ProfileEditor.SetEnabled(profile, installed[1].Id, false);
+        await f.Services.Session.SaveProfileAsync(profile, true, CancellationToken.None);
+        var library = new ModDetailsViewModel(root, f.Services);
+        Assert.Equal(new[] { "Installed", "Installed", "Installed", "Missing" }, library.Dependencies.Select(item => item.Status));
+        Assert.Equal("Install missing dependencies (1)", library.DependencyActionLabel);
+        var details = new ModDetailsViewModel(root, f.Services, profile.Id);
+        Assert.Equal(new[] { "Installed", "Disabled", "Not in this profile", "Missing" }, details.Dependencies.Select(item => item.Status));
+        Assert.Equal("Add dependencies to profile (3)", details.DependencyActionLabel);
+        Assert.True(details.HasDependencyAction);
+        await f.Services.Library.SetDependenciesAsync(root.Id, [new("Dep1", "https://www.nexusmods.com/helldivers2/mods/1")]);
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var satisfied = new ModDetailsViewModel(root, f.Services, profile.Id);
+        Assert.False(satisfied.HasDependencyAction);
+        Assert.Equal("All dependencies available.", satisfied.DependencySummary);
+        Assert.False(satisfied.GetDependenciesCommand.CanExecute(null));
+    }
+
+    [AvaloniaFact]
     public async Task CollisionsBelongToTheSelectedModAndRespectTheProfileContext()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
@@ -123,14 +156,14 @@ public sealed class ModDetailsTests
         dependent = f.Services.Session.State.Mods.Single(mod => mod.Id == dependent.Id);
         var details = new ModDetailsViewModel(dependent, f.Services);
         Assert.True(details.HasDependencies); Assert.False(details.HasDependents);
-        Assert.Equal(["In library", "Not in library", "External requirement"], details.Dependencies.Select(item => item.Status));
+        Assert.Equal(["Installed", "Missing", "Manual installation"], details.Dependencies.Select(item => item.Status));
         Assert.Equal("Install this first.", details.Dependencies[0].Notes);
         Assert.All(details.Dependencies, item => Assert.True(item.HasPage));
         details.Dependencies[0].OpenPageCommand.Execute(null);
         Assert.Equal(new Uri("https://nexusmods.com/helldivers2/mods/100"), Assert.Single(f.BrowserRequests));
         var reverse = new ModDetailsViewModel(requirement, f.Services);
         Assert.Equal("Dependent", Assert.Single(reverse.Dependents).Name);
-        Assert.False(reverse.HasDependencies); Assert.Equal("Dependency information unavailable.", reverse.DependencySummary);
+        Assert.False(reverse.HasDependencies); Assert.Equal("Dependency information unavailable. Refresh to check.", reverse.DependencySummary);
         var dialog = new ModDetailsDialog { DataContext = details };
         dialog.FindControl<TabControl>("DetailsTabs")!.SelectedIndex = 1;
         var window = new Window { Content = dialog }; window.Show();
@@ -146,6 +179,6 @@ public sealed class ModDetailsTests
         await f.Services.Library.SetDependenciesAsync(requirement.Id, []);
         await f.Services.Session.ReloadAsync(CancellationToken.None);
         var knownEmpty = new ModDetailsViewModel(requirement, f.Services);
-        Assert.Equal("No dependencies.", knownEmpty.DependencySummary);
+        Assert.Equal("All dependencies available.", knownEmpty.DependencySummary);
     }
 }

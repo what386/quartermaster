@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Quartermaster.Library.Mods;
 
 namespace Quartermaster.Providers.Clients.NexusMods;
 
@@ -27,20 +28,24 @@ public sealed partial class NexusClient
         foreach (var dependency in data.RootElement.GetProperty("dependencies").EnumerateArray())
         {
             var alternatives = new List<ModRequirement>();
+            var excluded = false;
             foreach (var candidate in dependency.GetProperty("candidate_mod_files").EnumerateArray())
             {
                 var mod = candidate.GetProperty("mod");
                 var domain = mod.GetProperty("game").GetProperty("domain_name").GetString()
                     ?? throw new InvalidDataException("Nexus returned no dependency game.");
                 var target = Positive(Id(mod.GetProperty("game_scoped_id")));
+                var page = new Uri($"https://www.nexusmods.com/{Uri.EscapeDataString(domain)}/mods/{target}");
+                if (ModDependencyExclusions.IsExcluded(page)) { excluded = true; break; }
                 var allowed = candidate.GetProperty("candidate_versions").EnumerateArray()
                     .Select(item => Positive(Id(item.GetProperty("game_scoped_id"))).ToString()).Distinct().ToArray();
                 if (allowed.Length == 0) continue;
                 alternatives.Add(new(mod.GetProperty("name").GetString()!,
-                    new Uri($"https://www.nexusmods.com/{Uri.EscapeDataString(domain)}/mods/{target}"),
+                    page,
                     "Requires a compatible file version.", domain.Equals(NexusLink.Game, StringComparison.OrdinalIgnoreCase))
                     { AllowedFileIds = allowed });
             }
+            if (excluded) continue;
             if (alternatives.Count == 0)
                 throw new InvalidDataException("Nexus could not resolve a mod file requirement to an available version.");
             var first = alternatives.OrderByDescending(item => item.CanInstall).First();

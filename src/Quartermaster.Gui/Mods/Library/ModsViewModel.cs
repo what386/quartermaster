@@ -135,9 +135,16 @@ public sealed class ModsViewModel : SessionViewModel
     public AsyncCommand ImportFolderCommand { get; }
     public AsyncCommand RemoveCommand { get; }
     public AsyncCommand ExportRepatchedCommand { get; }
+    public AsyncCommand GetDependenciesCommand { get; }
+    public bool HasDependencyAction => HasSingleSelection && Downloads.CanResolveDependencies(SelectedMod!.Mod) &&
+        ModDependencyState.MissingCount(SelectedMod.Mod, Session.State, null) > 0;
+    public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, null) : "Install missing dependencies";
     public ModsViewModel(AppServices services) : base(services)
     {
         AddModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct));
+        GetDependenciesCommand = Operations.CreateCommand("Getting dependencies",
+            ct => Downloads.GetDependenciesAsync(SelectedMod!.Mod.Id, ct),
+            () => HasDependencyAction);
         CheckUpdatesCommand = Operations.CreateCommand("Checking mod updates", ct => Services.Downloads.CheckUpdatesAsync(ct));
         UpdateAllCommand = Operations.CreateCommand("Updating mods", ct => Downloads.ApplyUpdatesAsync(ct),
             () => Downloads.AvailableUpdates().Any(Downloads.CanQueueUpdate));
@@ -183,8 +190,8 @@ public sealed class ModsViewModel : SessionViewModel
     private void SelectionChanged()
     {
         Set(ref selected, SelectedMods.FirstOrDefault(), nameof(SelectedMod));
-        Notify(nameof(Details)); Notify(nameof(HasSelection)); Notify(nameof(HasSingleSelection));
-        RemoveCommand.Refresh(); ExportRepatchedCommand.Refresh();
+        Notify(nameof(Details)); Notify(nameof(HasSelection)); Notify(nameof(HasSingleSelection)); Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel));
+        RemoveCommand.Refresh(); ExportRepatchedCommand.Refresh(); GetDependenciesCommand.Refresh();
     }
     protected override void Refresh()
     {
@@ -204,6 +211,7 @@ public sealed class ModsViewModel : SessionViewModel
         }).ToArray();
         CollectionUpdates.Synchronize(Mods, desired);
         Notify(nameof(CountLabel)); Notify(nameof(LibraryHeader)); Notify(nameof(HasUpdates));
+        Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel));
         if (!Operations.IsBusy || Operations.IsProgressVisible) UpdateAllCommand.Refresh();
         Notify(nameof(HasMods)); Notify(nameof(HasVisibleMods)); Notify(nameof(EmptyMessage));
         CollectionUpdates.Synchronize(SelectedMods, Mods.Where(item => ids.Contains(item.Mod.Id)).ToArray());

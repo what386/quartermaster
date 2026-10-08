@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using Quartermaster.Library.Mods;
 
 namespace Quartermaster.Providers.Clients.NexusMods;
 
@@ -46,7 +47,8 @@ public sealed partial class NexusClient
                 var url = installable ? new Uri($"https://www.nexusmods.com/{NexusLink.Game}/mods/{Positive(Id(node.GetProperty("modId")))}")
                     : Uri.TryCreate(node.GetProperty("url").GetString(), UriKind.Absolute, out var external) && external is { Scheme: "https" or "http", UserInfo: "" }
                         ? external : throw new InvalidDataException($"Nexus returned an invalid requirement link for {name}.");
-                requirements.Add(new(name, url, node.TryGetProperty("notes", out var notes) ? notes.GetString() : null, installable));
+                if (!ModDependencyExclusions.IsExcluded(url))
+                    requirements.Add(new(name, url, node.TryGetProperty("notes", out var notes) ? notes.GetString() : null, installable));
             }
             if (offset + nodes.GetArrayLength() >= page.GetProperty("totalCount").GetInt32()) break;
             if (nodes.GetArrayLength() == 0) throw new InvalidDataException("Nexus returned an incomplete requirement list.");

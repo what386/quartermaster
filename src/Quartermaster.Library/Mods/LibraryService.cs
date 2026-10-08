@@ -119,7 +119,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
                 throw new ArgumentException("A dependency needs a public HTTP or HTTPS page.");
             return dependency with { Page = page.AbsoluteUri, Alternatives = dependency.Alternatives.Select(Validate).ToArray() };
         }
-        var validated = dependencies.Select(Validate).ToArray();
+        var validated = ModDependencyExclusions.Filter(dependencies).Select(Validate).ToArray();
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
         if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
