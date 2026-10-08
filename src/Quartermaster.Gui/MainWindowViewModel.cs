@@ -40,9 +40,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
     public ViewModelBase CurrentPage => pages[SelectedNavigation.Page];
     private Profile? DisplayProfile => services.Session.ActiveProfile;
-    public string ProfileLabel => DisplayProfile?.Name ?? "No active profile";
+    public string ProfileLabel => DisplayProfile?.Name ?? Localizer.Text("No active profile");
     public string LibraryCount => services.Session.State.Mods.Count.ToString();
-    public string SelectionSummary => $"{DisplayProfile?.Entries.Count(e => e.Enabled) ?? 0} selected for deployment";
+    public string SelectionSummary => Localizer.Interpolate($"{DisplayProfile?.Entries.Count(e => e.Enabled) ?? 0} selected for deployment");
     public string CollisionCount => DisplayProfile is { } profile
         ? ConflictAnalyzer.Analyze(ProfilePatches.Resolve(services.Session.State, profile)).Resources.Count.ToString() : "0";
     public ObservableCollection<SidebarProfile> SidebarProfiles { get; } = [];
@@ -168,7 +168,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             // A double-click can arrive while its first click is still saving the selection.
             if (Operations.IsBusy)
             {
-                if (Operations.Message != "Selecting profile") return;
+                if (Operations.SourceMessage != "Selecting profile") return;
                 await Operations.WhenIdle;
                 if (Operations.IsError) return;
             }
@@ -194,14 +194,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     private Task RenameProfileAsync(Guid id) => Operations.RunAsync("Renaming profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);
-        var name = await services.Dialogs.RequestTextAsync("Rename profile", "Profile name", "Rename", profile.Name);
+        var name = await services.Dialogs.RequestTextAsync(Localizer.Text("Rename profile"), Localizer.Text("Profile name"), Localizer.Text("Rename"), profile.Name);
         if (string.IsNullOrWhiteSpace(name) || name.Trim() == profile.Name) return;
         await services.Session.SaveProfileAsync(profile with { Name = name.Trim() }, false, ct);
     });
     private Task DeleteProfileAsync(Guid id) => Operations.RunAsync("Deleting profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);
-        if (await services.Dialogs.ConfirmAsync("Delete profile", $"Delete {profile.Name}? Your imported mods and deployed game files will remain.", "Delete"))
+        if (await services.Dialogs.ConfirmAsync(Localizer.Text("Delete profile"), Localizer.Interpolate($"Delete {profile.Name}? Your imported mods and deployed game files will remain."), Localizer.Text("Delete")))
             await services.Session.DeleteProfileAsync(id, ct);
     });
     private Task ExportProfileAsync(Guid id) => Operations.RunAsync("Exporting profile", async ct =>

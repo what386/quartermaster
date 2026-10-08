@@ -59,10 +59,10 @@ public sealed class OnboardingCoordinator : ViewModelBase
     }
     public bool IsProfileStep => IsTourVisible && Stops[stop].Page == PageKind.Profiles;
     public PageKind TourPage => Stops[stop].Page;
-    public string Progress => $"TOUR · {stop + 1} / {Stops.Length}";
-    public string Title => Stops[stop].Title;
-    public string Description => Stops[stop].Description;
-    public string NextLabel => stop == Stops.Length - 1 ? "Finish" : "Next";
+    public string Progress => Localizer.Interpolate($"TOUR · {stop + 1} / {Stops.Length}");
+    public string Title => Localizer.Text(Stops[stop].Title);
+    public string Description => Localizer.Text(Stops[stop].Description);
+    public string NextLabel => stop == Stops.Length - 1 ? Localizer.Text("Finish") : Localizer.Text("Next");
     public bool CanGoBack => stop > 0;
     public Command NextCommand { get; }
     public Command BackCommand { get; }
@@ -109,7 +109,7 @@ public sealed class OnboardingCoordinator : ViewModelBase
             var outcome = SetupOutcome.SkipTour;
             var setupCompleted = false;
             await services.Operations.RunAsync(
-                "Setting up Quartermaster",
+                Localizer.Text("Setting up Quartermaster"),
                 async ct =>
                 {
                     using var linked = CancellationTokenSource.CreateLinkedTokenSource(

@@ -62,8 +62,8 @@ public sealed class ModDetailsViewModel : ViewModelBase
         return saved;
     }
     public string Name => mod.Name;
-    public string Description => string.IsNullOrWhiteSpace(mod.Description) ? "No description provided." : mod.Description;
-    public string Version => ModPresentation.Version(mod) ?? "Not specified";
+    public string Description => string.IsNullOrWhiteSpace(mod.Description) ? Localizer.Text("No description provided.") : mod.Description;
+    public string Version => ModPresentation.Version(mod) ?? Localizer.Text("Not specified");
     public string ImportedAt => mod.ImportedAt.ToLocalTime().ToString("g");
     public string ResourceSummary => $"{ModPresentation.Count(mod.PatchSets.Count, "patch set")} · {ModPresentation.Count(mod.PatchSets.Sum(p => p.Resources.Count), "indexed resource")}";
     public IReadOnlyList<string> Archives => mod.PatchSets.Select(p => p.Archive).Distinct().ToArray();
@@ -76,9 +76,9 @@ public sealed class ModDetailsViewModel : ViewModelBase
     public bool HasCollisions => Collisions.Count > 0;
     public bool HasDependencies => Dependencies.Count > 0;
     public bool HasDependents => Dependents.Count > 0;
-    public string DependencySummary => !mod.DependenciesKnown ? "Dependency information unavailable. Refresh to check." :
-        mod.Dependencies.Any(dependency => !dependency.CanInstall) ? "Additional requirements need manual installation." :
-        MissingDependencyCount == 0 ? "All dependencies available." : $"{MissingDependencyCount} dependencies need attention.";
+    public string DependencySummary => !mod.DependenciesKnown ? Localizer.Text("Dependency information unavailable. Refresh to check.") :
+        mod.Dependencies.Any(dependency => !dependency.CanInstall) ? Localizer.Text("Additional requirements need manual installation.") :
+        MissingDependencyCount == 0 ? Localizer.Text("All dependencies available.") : Localizer.Interpolate($"{MissingDependencyCount} dependencies need attention.");
 
     internal void StartWatching() { services.Session.Changed += SessionChanged; RefreshRelationships(); }
     internal void StopWatching() => services.Session.Changed -= SessionChanged;
@@ -114,16 +114,16 @@ public sealed class ModDetailsViewModel : ViewModelBase
                 .Where(conflict => conflict.SourceIds.Contains(mod.Id))
                 .Select(conflict => (Profile: profile, Conflict: conflict)))
             .ToArray();
-        Collisions = collisions.Select(item => $"{item.Profile.Name} · Clashes with {string.Join(", ", item.Conflict.SourceIds.Where(id => id != mod.Id).Select(id => mods[id].Name))}" +
-            $" · {item.Conflict.Archive} · {item.Conflict.Resource.Id:x16}/{item.Conflict.Resource.Type:x16} · {mods[item.Conflict.WinningSourceId].Name} wins").ToArray();
+        Collisions = collisions.Select(item => Localizer.Interpolate($"{item.Profile.Name} · Clashes with {string.Join(", ", item.Conflict.SourceIds.Where(id => id != mod.Id).Select(id => mods[id].Name))}") +
+            Localizer.Interpolate($" · {item.Conflict.Archive} · {item.Conflict.Resource.Id:x16}/{item.Conflict.Resource.Type:x16} · {mods[item.Conflict.WinningSourceId].Name} wins")).ToArray();
         var names = collisions.SelectMany(item => item.Conflict.SourceIds).Where(id => id != mod.Id)
             .Distinct().Select(id => mods[id].Name).Order(StringComparer.OrdinalIgnoreCase).ToArray();
         var resources = collisions.Select(item => (item.Conflict.Archive, item.Conflict.Resource)).Distinct().Count();
         var profileCount = collisions.Select(item => item.Profile.Id).Distinct().Count();
         CollisionSummary = collisions.Length == 0 ? "" :
-            $"{ModPresentation.Count(resources, "overlapping resource")} with {string.Join(", ", names.Take(3))}" +
-            (names.Length > 3 ? $" and {names.Length - 3} more" : "") +
-            (profileCount > 1 ? $" across {profileCount} profiles." : ".");
+            Localizer.Interpolate($"{ModPresentation.Count(resources, "overlapping resource")} with {string.Join(", ", names.Take(3))}") +
+            (names.Length > 3 ? Localizer.Interpolate($" and {names.Length - 3} more") : "") +
+            (profileCount > 1 ? Localizer.Interpolate($" across {profileCount} profiles.") : ".");
         Notify(nameof(Collisions)); Notify(nameof(HasCollisions)); Notify(nameof(CollisionSummary));
     }
 

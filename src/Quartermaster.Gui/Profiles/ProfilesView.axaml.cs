@@ -21,7 +21,7 @@ public partial class ProfilesView : UserControl
                 Command = new Shared.AsyncCommand(() => model.MoveModToGroupAsync(selected.Mod.Id, groupId),
                     () => model.Operations.CanInteract && model.Entries.Any(mod => mod.Mod.Id == selected.Mod.Id && mod.Entry.GroupId != groupId), model.Operations.ReportError)
             });
-            AddTarget("Ungrouped", null);
+            AddTarget(Localizer.Text("Ungrouped"), null);
             foreach (var group in model.Groups) AddTarget(group.Name, group.Id);
         };
         InitializeDrag();

@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.ModDetailsDialog" x:DataType="vm:ModDetailsViewModel" Width="520" Height="540">
   <Grid RowDefinitions="*,Auto,Auto">
     <Grid.Resources>
@@ -67,45 +67,45 @@
           <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
       </TabControl.Styles>
-      <TabItem Header="Overview">
+      <TabItem Header="{loc:Loc 'Overview'}">
         <ScrollViewer><StackPanel Spacing="12">
           <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
           <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto" RowSpacing="8">
-            <TextBlock Text="Version" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding Version}" />
-            <TextBlock Grid.Row="1" Text="Imported" Classes="muted" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ImportedAt}" />
+            <TextBlock Text="{loc:Loc 'Version'}" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding Version}" />
+            <TextBlock Grid.Row="1" Text="{loc:Loc 'Imported'}" Classes="muted" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ImportedAt}" />
           </Grid>
           <TextBlock Text="{Binding ResourceSummary}" TextWrapping="Wrap" />
           <StackPanel Spacing="4">
-            <TextBlock Text="Collisions" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc 'Collisions'}" FontWeight="SemiBold" />
             <TextBlock Text="{Binding CollisionSummary}" IsVisible="{Binding HasCollisions}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" />
-            <TextBlock Text="No collisions." IsVisible="{Binding !HasCollisions}" Classes="muted" />
+            <TextBlock Text="{loc:Loc 'No collisions.'}" IsVisible="{Binding !HasCollisions}" Classes="muted" />
           </StackPanel>
           <vm:ModPageLinkView />
-          <TextBlock Text="This mod has options. Configure them in Profiles." IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />
+          <TextBlock Text="{loc:Loc 'This mod has options. Configure them in Profiles.'}" IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />
         </StackPanel></ScrollViewer>
       </TabItem>
-      <TabItem Header="Dependencies">
+      <TabItem Header="{loc:Loc 'Dependencies'}">
         <ScrollViewer><StackPanel Spacing="12">
           <Grid ColumnDefinitions="*,Auto">
-            <TextBlock Text="Depends on" FontWeight="SemiBold" VerticalAlignment="Center" />
-            <Button x:Name="ResolveDependenciesButton" Grid.Column="1" Content="Refresh" Command="{Binding ResolveDependenciesCommand}" IsVisible="{Binding CanResolveDependencies}" />
+            <TextBlock Text="{loc:Loc 'Depends on'}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            <Button x:Name="ResolveDependenciesButton" Grid.Column="1" Content="{loc:Loc 'Refresh'}" Command="{Binding ResolveDependenciesCommand}" IsVisible="{Binding CanResolveDependencies}" />
           </Grid>
           <TextBlock Text="{Binding DependencySummary}" Classes="muted" TextWrapping="Wrap" />
           <Button x:Name="GetDependenciesButton" Content="{Binding DependencyActionLabel}" Classes="primary" Command="{Binding GetDependenciesCommand}" IsVisible="{Binding HasDependencyAction}" HorizontalAlignment="Left" />
           <ItemsControl x:Name="DependenciesList" ItemsSource="{Binding Dependencies}" ItemTemplate="{StaticResource RelationshipTemplate}" />
-          <TextBlock Text="Required by" FontWeight="SemiBold" />
-          <TextBlock Text="No dependents in your library." IsVisible="{Binding !HasDependents}" Classes="muted" />
+          <TextBlock Text="{loc:Loc 'Required by'}" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'No dependents in your library.'}" IsVisible="{Binding !HasDependents}" Classes="muted" />
           <ItemsControl x:Name="DependentsList" ItemsSource="{Binding Dependents}" ItemTemplate="{StaticResource RelationshipTemplate}" />
         </StackPanel></ScrollViewer>
       </TabItem>
-      <TabItem Header="Files">
+      <TabItem Header="{loc:Loc 'Files'}">
         <ScrollViewer><StackPanel Spacing="12">
-          <TextBlock Text="Archives" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Archives'}" FontWeight="SemiBold" />
           <ItemsControl ItemsSource="{Binding Archives}" />
-          <TextBlock Text="Patch files" FontWeight="SemiBold" />
+          <TextBlock Text="{loc:Loc 'Patch files'}" FontWeight="SemiBold" />
           <ItemsControl ItemsSource="{Binding Files}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
           <StackPanel IsVisible="{Binding HasCollisions}" Spacing="8">
-            <TextBlock Text="Collisions" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc 'Collisions'}" FontWeight="SemiBold" />
             <ItemsControl x:Name="CollisionsList" ItemsSource="{Binding Collisions}">
               <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String">
                 <TextBlock Text="{Binding}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8" />
@@ -119,7 +119,7 @@
     <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="24,16,24,16">
       <TextBlock Text="{Binding Name}" Classes="sectionTitle" TextTrimming="CharacterEllipsis"
                  ToolTip.Tip="{Binding Name}" VerticalAlignment="Center" />
-      <Button Grid.Column="1" Content="Close" Click="CloseDialog" />
+      <Button Grid.Column="1" Content="{loc:Loc 'Close'}" Click="CloseDialog" />
     </Grid>
   </Grid>
 </UserControl>

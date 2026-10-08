@@ -88,15 +88,15 @@ public interface IModRow
 
 public static class ModPresentation
 {
-    public static string Count(int count, string singular) => $"{count} {singular}{(count == 1 ? "" : "s")}";
+    public static string Count(int count, string singular) => Localizer.Current.Format(count == 1 ? "{0} " + singular : "{0} " + singular + "s", count);
     public static string? Version(Mod mod) => !string.IsNullOrWhiteSpace(mod.Version) ? mod.Version :
         mod.Sources.Select(source => source.InstalledVersion).FirstOrDefault(version => !string.IsNullOrWhiteSpace(version));
     public static string Title(Mod mod)
     {
         var title = Version(mod) is { } version ? $"{mod.Name} · {version}" : mod.Name;
-        return mod.Superseded ? $"{title} (previous version)" : title;
+        return mod.Superseded ? Localizer.Interpolate($"{title} (previous version)") : title;
     }
-    public static string Description(Mod mod) => string.IsNullOrWhiteSpace(mod.Description) ? "No description" :
+    public static string Description(Mod mod) => string.IsNullOrWhiteSpace(mod.Description) ? Localizer.Text("No description") :
         string.Join(" ", mod.Description.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     public static string Monogram(Mod mod) => string.Concat(mod.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
 }
@@ -121,11 +121,11 @@ public sealed class ModsViewModel : SessionViewModel
     public ModDetailsViewModel? Details => SelectedMods.Count == 1 ? new(SelectedMods[0].Mod, Services) : null;
     public bool HasMods => Session.State.Mods.Count > 0;
     public bool HasVisibleMods => Mods.Count > 0;
-    public string EmptyMessage => HasMods ? "No mods match your search." : "Add a mod link, ZIP or folder to your library.";
+    public string EmptyMessage => HasMods ? Localizer.Text("No mods match your search.") : Localizer.Text("Add a mod link, ZIP or folder to your library.");
     public bool HasSelection => SelectedMods.Count > 0;
     public bool HasSingleSelection => SelectedMods.Count == 1;
-    public string CountLabel => $"{Mods.Count} mods";
-    public string LibraryHeader => $"LOCAL LIBRARY ({CountLabel})";
+    public string CountLabel => Localizer.Interpolate($"{Mods.Count} mods");
+    public string LibraryHeader => Localizer.Interpolate($"LOCAL LIBRARY ({CountLabel})");
     public bool HasUpdates => Downloads.AvailableUpdates().Count > 0;
     public ModDownloads Downloads => Services.Downloads;
     public AsyncCommand UpdateAllCommand { get; }
@@ -138,7 +138,7 @@ public sealed class ModsViewModel : SessionViewModel
     public AsyncCommand GetDependenciesCommand { get; }
     public bool HasDependencyAction => HasSingleSelection && Downloads.CanResolveDependencies(SelectedMod!.Mod) &&
         ModDependencyState.MissingCount(SelectedMod.Mod, Session.State, null) > 0;
-    public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, null) : "Install missing dependencies";
+    public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, null) : Localizer.Text("Install missing dependencies");
     public ModsViewModel(AppServices services) : base(services)
     {
         AddModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct));
@@ -158,7 +158,7 @@ public sealed class ModsViewModel : SessionViewModel
         });
         ImportFolderCommand = Operations.CreateCommand("Importing mod", async ct =>
         {
-            var path = await Services.Dialogs.PickFolderAsync("Import mod folder");
+            var path = await Services.Dialogs.PickFolderAsync(Localizer.Text("Import mod folder"));
             if (path is not null) await Session.ImportAsync(path, ct);
         });
         ExportRepatchedCommand = Operations.CreateCommand("Exporting repatched mod", async ct =>
@@ -172,8 +172,8 @@ public sealed class ModsViewModel : SessionViewModel
         {
             var mods = SelectedMods.Select(item => item.Mod).ToArray();
             var names = string.Join("\n", mods.Select(mod => mod.Name));
-            if (await Services.Dialogs.ConfirmAsync(mods.Length == 1 ? "Remove mod" : $"Remove {mods.Length} mods",
-                $"Remove these mods from your library and profiles?\n\n{names}\n\nDeployed files remain until you redeploy or purge.", "Remove"))
+            if (await Services.Dialogs.ConfirmAsync(mods.Length == 1 ? Localizer.Text("Remove mod") : Localizer.Interpolate($"Remove {mods.Length} mods"),
+                Localizer.Interpolate($"Remove these mods from your library and profiles?\n\n{names}\n\nDeployed files remain until you redeploy or purge."), Localizer.Text("Remove")))
                 await Session.RemoveModsAsync(mods.Select(mod => mod.Id).ToArray(), ct);
         }, () => HasSelection);
         SelectedMods.CollectionChanged += (_, _) => SelectionChanged();

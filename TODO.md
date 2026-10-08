@@ -9,5 +9,9 @@
 - [ ] profile icon selection
       @created 2026-10-03 23:30
 
+- [ ] multi language support
+      @created 2026-10-08 15:13
 
-## Completed
+- [ ] import from arsenal
+      @created 2026-10-08 15:13
+

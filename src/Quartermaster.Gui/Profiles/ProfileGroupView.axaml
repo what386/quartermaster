@@ -1,9 +1,9 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" x:Class="Quartermaster.Gui.Profiles.ProfileGroupView" x:DataType="vm:ProfileGroupItem" HorizontalContentAlignment="Stretch">
-  <Button Classes="loadoutGroup" Command="{Binding ToggleCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip.Tip="Click to collapse or expand; right-click for group actions">
+  <Button Classes="loadoutGroup" Command="{Binding ToggleCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip.Tip="{loc:Loc 'Click to collapse or expand; right-click for group actions'}">
     <Button.ContextMenu><ContextMenu>
-      <MenuItem Header="Rename group" Command="{Binding RenameCommand}" />
-      <MenuItem Header="Remove group" Command="{Binding RemoveCommand}" />
+      <MenuItem Header="{loc:Loc 'Rename group'}" Command="{Binding RenameCommand}" />
+      <MenuItem Header="{loc:Loc 'Remove group'}" Command="{Binding RemoveCommand}" />
     </ContextMenu></Button.ContextMenu>
     <Grid ColumnDefinitions="24,*,Auto">
       <TextBlock Text="{Binding Arrow}" VerticalAlignment="Center" />

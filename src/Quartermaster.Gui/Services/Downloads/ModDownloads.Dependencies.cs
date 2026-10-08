@@ -75,7 +75,7 @@ public sealed partial class ModDownloads
                     !mod.Superseded && ModDependencyMatching.Matches(mod, item.ToDependency() with { Alternatives = [] }))) ?? alternatives[0];
                 var modId = NexusLink.Parse(selectedRequirement.Page.AbsoluteUri).ModId;
                 if (!visited.Add(modId)) continue;
-                if (visited.Count > 256) throw new InvalidDataException("This mod's dependency list is too large to install together.");
+                if (visited.Count > 256) throw new InvalidDataException(Localizer.Text("This mod's dependency list is too large to install together."));
                 var installed = services.Session.State.Mods.FirstOrDefault(mod => !mod.Superseded && ModDependencyMatching.Matches(mod, selectedRequirement.ToDependency() with { Alternatives = [] }));
                 var pending = services.Providers.State.Jobs.Any(job => job.File.Provider == "nexusmods" && job.File.ModId == modId.ToString() &&
                     (selectedRequirement.AllowedFileIds is null || selectedRequirement.AllowedFileIds.Contains(job.File.FileId)) &&
@@ -106,7 +106,7 @@ public sealed partial class ModDownloads
                         var manual = selectedRequirement with
                         {
                             CanInstall = false,
-                            Notes = "No compatible ZIP is available. Install this requirement manually."
+                            Notes = Localizer.Text("No compatible ZIP is available. Install this requirement manually.")
                         };
                         external.TryAdd(manual.Page.AbsoluteUri, manual);
                         snapshot[requirementIndex] = manual.ToDependency();
@@ -137,17 +137,17 @@ public sealed partial class ModDownloads
             await Visit(root.Page.AbsoluteUri);
             await services.Session.ReloadAsync(ct);
             var items = missing.Select(item => new DependencyReviewItem(item.Requirement.Name,
-                item.Installed is null ? (profileIds.Count == 0 ? "Download to library" : "Download and add to profile") :
+                item.Installed is null ? (profileIds.Count == 0 ? Localizer.Text("Download to library") : Localizer.Text("Download and add to profile")) :
                     profiles.Any(profile => profile.Entries.Any(entry => entry.ModId == item.Installed.Id && !entry.Enabled))
-                        ? "Enable in profile (already in your library)" : "Add to profile (already in your library)",
+                        ? Localizer.Text("Enable in profile (already in your library)") : Localizer.Text("Add to profile (already in your library)"),
                 item.File is { } file ? filesByMod[file.ModId] : [], item.File,
                 file => review!.ChangeFileAsync(file))).ToArray();
             return new(items, external.Values.ToArray());
         }
         var plan = await BuildPlan();
         if (missing.Count == 0 && external.Count == 0) return [];
-        review = new(root.Name, missing.Count == 0 ? "Continue" : profileIds.Count == 0 ? "Install dependencies" : "Add dependencies",
-            declineLabel, plan, async file =>
+        review = new(root.Name, missing.Count == 0 ? Localizer.Text("Continue") : profileIds.Count == 0 ? Localizer.Text("Install dependencies") : Localizer.Text("Add dependencies"),
+            Localizer.Text(declineLabel), plan, async file =>
             {
                 choices[file.ModId] = file.FileId;
                 return await BuildPlan();
@@ -170,7 +170,7 @@ public sealed partial class ModDownloads
     public async Task GetDependenciesAsync(Guid modId, CancellationToken ct, Guid? profileId = null)
     {
         var mod = services.Session.State.Mods.Single(item => item.Id == modId);
-        await PrepareModDependenciesAsync(mod, ct, "Not now", targetProfileIds: profileId is { } id ? [id] : []);
+        await PrepareModDependenciesAsync(mod, ct, Localizer.Text("Not now"), targetProfileIds: profileId is { } id ? [id] : []);
     }
 
     private static string? NexusPage(Mod mod)
@@ -215,7 +215,7 @@ public sealed partial class ModDownloads
 
     private async Task QueueModUpdateAsync(Mod mod, CancellationToken ct)
     {
-        var metadata = await PrepareModDependenciesAsync(mod, ct, "Update mod only", AvailableUpdate(mod)?.AvailableFileId);
+        var metadata = await PrepareModDependenciesAsync(mod, ct, Localizer.Text("Update mod only"), AvailableUpdate(mod)?.AvailableFileId);
         if (metadata is null) return;
         var source = mod.Sources.FirstOrDefault(source => source.Provider == "nexusmods");
         var dependencies = source is not null ? metadata.GetValueOrDefault(source.ModId) : null;

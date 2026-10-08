@@ -1,13 +1,13 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:services="clr-namespace:Quartermaster.Gui.Services" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              x:Class="Quartermaster.Gui.Downloads.DownloadsView" x:DataType="services:ModDownloads">
   <Grid RowDefinitions="Auto,Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,8">
-      <TextBlock Text="Downloads" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
-      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="Search downloads…" />
+      <TextBlock Text="{loc:Loc 'Downloads'}" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Search downloads…'}" />
     </Grid>
-    <TextBlock Grid.Row="1" Text="Recognized ZIPs in your download folder are imported automatically. Unfinished requests are cleared when you exit." Classes="muted" TextWrapping="Wrap" Margin="0,0,0,12" />
-    <Border Grid.Row="2" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="DOWNLOAD QUEUE" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding CountLabel}" /></Grid></Border>
+    <TextBlock Grid.Row="1" Text="{loc:Loc 'Recognized ZIPs in your download folder are imported automatically. Unfinished requests are cleared when you exit.'}" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,12" />
+    <Border Grid.Row="2" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="*,Auto"><TextBlock Text="{loc:Loc 'DOWNLOAD QUEUE'}" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding CountLabel}" /></Grid></Border>
     <Grid Grid.Row="3">
       <ScrollViewer>
         <ItemsControl ItemsSource="{Binding VisibleJobs}">
@@ -18,11 +18,11 @@
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Status}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
                 <WrapPanel Grid.Column="2" MaxWidth="470" Orientation="Horizontal" VerticalAlignment="Center">
                   <Button Content="{Binding OpenLabel}" Classes.primary="{Binding IsWaiting}" Command="{Binding OpenCommand}" Margin="4" />
-                  <Button Content="Attach ZIP" Command="{Binding AttachCommand}" IsVisible="{Binding CanAttach}" Margin="4" />
-                  <Button Content="Import anyway" Command="{Binding ConfirmCommand}" IsVisible="{Binding CanConfirm}" Margin="4" />
-                  <Button Content="Retry" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" Margin="4" />
-                  <Button Content="Cancel" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" Margin="4" />
-                  <Button Content="Remove" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" Margin="4" />
+                  <Button Content="{loc:Loc 'Attach ZIP'}" Command="{Binding AttachCommand}" IsVisible="{Binding CanAttach}" Margin="4" />
+                  <Button Content="{loc:Loc 'Import anyway'}" Command="{Binding ConfirmCommand}" IsVisible="{Binding CanConfirm}" Margin="4" />
+                  <Button Content="{loc:Loc 'Retry'}" Command="{Binding RetryCommand}" IsVisible="{Binding CanRetry}" Margin="4" />
+                  <Button Content="{loc:Loc 'Cancel'}" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" Margin="4" />
+                  <Button Content="{loc:Loc 'Remove'}" Command="{Binding RemoveCommand}" IsVisible="{Binding CanRemove}" Margin="4" />
                 </WrapPanel>
               </Grid>
             </Border>

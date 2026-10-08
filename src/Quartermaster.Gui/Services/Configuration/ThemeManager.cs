@@ -24,9 +24,9 @@ public sealed class ThemeManager
 
     public static void Validate(ThemePreset theme, string? accent)
     {
-        if (!Enum.IsDefined(theme)) throw new InvalidDataException("Invalid theme setting.");
+        if (!Enum.IsDefined(theme)) throw new InvalidDataException(Localizer.Text("Invalid theme setting."));
         if (!Color.TryParse(accent, out var color) || color.A != 255)
-            throw new InvalidDataException("Accent color must be an opaque color, such as #397ADA.");
+            throw new InvalidDataException(Localizer.Text("Accent color must be an opaque color, such as #397ADA."));
     }
 
     public static string Format(Color color) => $"#{color.R:X2}{color.G:X2}{color.B:X2}";

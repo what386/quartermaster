@@ -30,7 +30,7 @@ public partial class ModOptionsView : UserControl
         {
             OptionEdit option => option.HasChoices ? $"{option.Name} · {option.Choices[option.ChoiceIndex].Name}" : option.Name,
             OptionChoiceItem choice => choice.Name,
-            _ => "Image preview"
+            _ => Localizer.Text("Image preview")
         };
         // Popup visuals route separately; relay the captured preview from the options view.
         foreach (var combo in this.GetVisualDescendants().OfType<ComboBox>()) combo.IsDropDownOpen = false;

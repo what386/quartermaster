@@ -54,7 +54,7 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
     }
     public async Task<ProfileCreationRequest?> RequestProfileCreationAsync()
     {
-        var result = await owner().ShowDialogAsync<object?>(new TextInputDialog("Create profile", "Name your profile or import a profile ZIP", "Create", allowFileChoice: true));
+        var result = await owner().ShowDialogAsync<object?>(new TextInputDialog(Localizer.Text("Create profile"), Localizer.Text("Name your profile or import a profile ZIP"), Localizer.Text("Create"), allowFileChoice: true));
         return result switch
         {
             string name => new(Name: name),
@@ -65,10 +65,10 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
     public Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null) =>
         owner().ShowDialogAsync<string?>(new TextInputDialog(title, prompt, acceptLabel, initialValue));
 
-    public Task<string?> SaveModZipAsync(string suggestedName) => SaveZipAsync("Export repatched mod", suggestedName);
-    public Task<string?> SaveProfileZipAsync(string suggestedName) => SaveZipAsync("Export profile", suggestedName);
-    public Task<string?> PickModZipAsync() => PickZipAsync("Import mod ZIP");
-    public Task<string?> PickProfileZipAsync() => PickZipAsync("Import profile ZIP");
+    public Task<string?> SaveModZipAsync(string suggestedName) => SaveZipAsync(Localizer.Text("Export repatched mod"), suggestedName);
+    public Task<string?> SaveProfileZipAsync(string suggestedName) => SaveZipAsync(Localizer.Text("Export profile"), suggestedName);
+    public Task<string?> PickModZipAsync() => PickZipAsync(Localizer.Text("Import mod ZIP"));
+    public Task<string?> PickProfileZipAsync() => PickZipAsync(Localizer.Text("Import profile ZIP"));
     private async Task<string?> SaveZipAsync(string title, string suggestedName)
     {
         var file = await owner().StorageProvider.SaveFilePickerAsync(new()
@@ -77,7 +77,7 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
             SuggestedFileName = suggestedName,
             DefaultExtension = "zip",
             ShowOverwritePrompt = true,
-            FileTypeChoices = [new FilePickerFileType("ZIP archive") { Patterns = ["*.zip"] }]
+            FileTypeChoices = [new FilePickerFileType(Localizer.Text("ZIP archive")) { Patterns = ["*.zip"] }]
         });
         return file?.TryGetLocalPath();
     }
@@ -87,7 +87,7 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
         {
             Title = title,
             AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("ZIP archives") { Patterns = ["*.zip"] }]
+            FileTypeFilter = [new FilePickerFileType(Localizer.Text("ZIP archives")) { Patterns = ["*.zip"] }]
         });
         return files.FirstOrDefault()?.TryGetLocalPath();
     }

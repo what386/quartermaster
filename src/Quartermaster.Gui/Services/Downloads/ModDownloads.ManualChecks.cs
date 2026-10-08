@@ -13,7 +13,7 @@ public sealed partial class ModDownloads
     public IReadOnlyList<ManualCheckRow> ManualChecks { get; private set; } = [];
     public IReadOnlyList<ManualCheckRow> VisibleManualChecks => ManualChecks.Where(row => row.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
     public bool HasManualChecks => VisibleManualChecks.Count > 0;
-    public string ManualCount => $"{ManualChecks.Count} mods to check";
+    public string ManualCount => Localizer.Interpolate($"{ManualChecks.Count} mods to check");
     public event EventHandler? ManualChecksRequested;
     public void ShowManualChecks(IReadOnlyCollection<Guid>? ids = null)
     {
@@ -42,7 +42,7 @@ public sealed class ManualCheckRow
     private readonly Mod mod;
     private readonly AppServices services;
     public string Name => mod.Name;
-    public string PageLink => ModLinks.PageFor(mod) ?? "No page link set";
+    public string PageLink => ModLinks.PageFor(mod) ?? Localizer.Text("No page link set");
     public string Filename => mod.ImportedFileName ?? mod.Name + ".zip";
     private DownloadJob? ConfirmationJob => services.Providers.State.Jobs.FirstOrDefault(job =>
         job.ReplacesModId == mod.Id && job.Status == DownloadStatus.NeedsConfirmation);
@@ -64,7 +64,7 @@ public sealed class ManualCheckRow
         }, () => CanConfirm);
         SetPageCommand = services.Operations.CreateCommand("Setting mod page", async ct =>
         {
-            var link = await services.Dialogs.RequestTextAsync("Mod page", "Page link (HTTPS)", "Save", ModLinks.PageFor(mod));
+            var link = await services.Dialogs.RequestTextAsync(Localizer.Text("Mod page"), Localizer.Text("Page link (HTTPS)"), Localizer.Text("Save"), ModLinks.PageFor(mod));
             if (link is null) return;
             await services.Library.SetPageLinkAsync(mod.Id, link, ct);
             await services.Session.ReloadAsync(ct);
@@ -96,7 +96,7 @@ public sealed class ManualCheckRow
         var current = services.Session.State.Mods.Single(item => item.Id == mod.Id);
         if (ModLinks.PageFor(current) is null)
         {
-            var link = await services.Dialogs.RequestTextAsync("Mod page", "Page link (HTTPS)", "Save");
+            var link = await services.Dialogs.RequestTextAsync(Localizer.Text("Mod page"), Localizer.Text("Page link (HTTPS)"), Localizer.Text("Save"));
             if (link is null) return null;
             await services.Library.SetPageLinkAsync(mod.Id, link, ct);
             await services.Session.ReloadAsync(ct);

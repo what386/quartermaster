@@ -1,17 +1,17 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.NexusSettingsView" x:DataType="vm:SettingsViewModel">
   <Grid ColumnDefinitions="180,*">
-    <StackPanel Spacing="4"><TextBlock Text="Nexus Mods" FontWeight="SemiBold" /><TextBlock Text="{Binding NexusAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
+    <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Nexus Mods'}" FontWeight="SemiBold" /><TextBlock Text="{Binding NexusAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
     <StackPanel Grid.Column="1" Spacing="8">
       <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="12" HorizontalAlignment="Left">
-        <shared:ContentSizedTextBox x:Name="NexusApiKeyInput" Text="{Binding NexusApiKey}" PasswordChar="*" IsEnabled="{Binding !RemoveNexusKey}" PlaceholderText="Personal API key" VerticalAlignment="Center" />
-        <Button Grid.Column="1" x:Name="RemoveNexusKeyInput" Content="{Binding RemoveNexusKeyLabel}" Command="{Binding RemoveNexusKeyCommand}" ToolTip.Tip="Save settings to apply removal." VerticalAlignment="Center" />
-        <Button Grid.Column="2" Content="Register nxm links" Command="{Binding RegisterNxmCommand}" VerticalAlignment="Center" />
+        <shared:ContentSizedTextBox x:Name="NexusApiKeyInput" Text="{Binding NexusApiKey}" PasswordChar="*" IsEnabled="{Binding !RemoveNexusKey}" PlaceholderText="{loc:Loc 'Personal API key'}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" x:Name="RemoveNexusKeyInput" Content="{Binding RemoveNexusKeyLabel}" Command="{Binding RemoveNexusKeyCommand}" ToolTip.Tip="{loc:Loc 'Save settings to apply removal.'}" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Content="{loc:Loc 'Register nxm links'}" Command="{Binding RegisterNxmCommand}" VerticalAlignment="Center" />
       </Grid>
       <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
-        <Run Text="Get your personal key from " />
-        <InlineUIContainer><HyperlinkButton x:Name="NexusKeySettingsLink" Content="Nexus account settings → API" Command="{Binding OpenNexusKeySettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
-        <Run Text=", and scroll until you see &quot;Request personal API key&quot;." />
+        <Run Text="{loc:Loc 'Get your personal key from '}" />
+        <InlineUIContainer><HyperlinkButton x:Name="NexusKeySettingsLink" Content="{loc:Loc 'Nexus account settings → API'}" Command="{Binding OpenNexusKeySettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
+        <Run Text="{loc:Loc ', and scroll until you see &quot;Request personal API key&quot;.'}" />
       </TextBlock>
     </StackPanel>
   </Grid>

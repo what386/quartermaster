@@ -1,14 +1,14 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Search" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              xmlns:converters="clr-namespace:Avalonia.Data.Converters;assembly=Avalonia.Base" x:Class="Quartermaster.Gui.Search.SearchView" x:DataType="vm:SearchViewModel">
   <Grid RowDefinitions="Auto,Auto,*" IsEnabled="{Binding Operations.CanInteract}">
     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,0,0,8">
-      <TextBlock Text="Search" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
-      <TextBox x:Name="SearchInput" Text="{Binding Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" PlaceholderText="Search Helldivers 2 mods…" KeyDown="SearchKeyDown" />
-      <ComboBox x:Name="ProviderSelector" Grid.Column="2" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" MinWidth="150" Margin="8,0,0,0" AutomationProperties.Name="Search provider">
+      <TextBlock Text="{loc:Loc 'Search'}" Classes="pageTitle" VerticalAlignment="Center" Margin="0,0,16,0" />
+      <TextBox x:Name="SearchInput" Text="{Binding Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Grid.Column="1" PlaceholderText="{loc:Loc 'Search Helldivers 2 mods…'}" KeyDown="SearchKeyDown" />
+      <ComboBox x:Name="ProviderSelector" Grid.Column="2" ItemsSource="{Binding Providers}" SelectedItem="{Binding SelectedProvider, Mode=TwoWay}" MinWidth="150" Margin="8,0,0,0" AutomationProperties.Name="{loc:Loc 'Search provider'}">
         <ComboBox.ItemTemplate><DataTemplate x:DataType="vm:SearchProvider"><TextBlock Text="{Binding Name}" /></DataTemplate></ComboBox.ItemTemplate>
       </ComboBox>
-      <Button x:Name="SearchButton" Grid.Column="3" Content="Search" Classes="primary" Command="{Binding SearchCommand}" Margin="8,0,0,0" />
+      <Button x:Name="SearchButton" Grid.Column="3" Content="{loc:Loc 'Search'}" Classes="primary" Command="{Binding SearchCommand}" Margin="8,0,0,0" />
     </Grid>
     <Border Grid.Row="1" Classes="groupHeader" Margin="0,0,0,4"><Grid ColumnDefinitions="Auto,*" ColumnSpacing="16"><TextBlock Text="{Binding SelectedProvider.Name}" FontWeight="SemiBold" /><TextBlock x:Name="SearchFeedback" Grid.Column="1" Text="{Binding ResultSummary}" TextWrapping="Wrap" /></Grid></Border>
     <ScrollViewer Grid.Row="2">
@@ -27,10 +27,10 @@
                 <TextBlock Text="{Binding Description}" Classes="muted" TextWrapping="Wrap" />
                 <TextBlock x:Name="VirusScanResult" Text="{Binding VirusResult}" IsVisible="{Binding HasVirusResult}" Classes="muted"
                            Classes.success="{Binding VirusPassed}" Classes.error="{Binding VirusQuarantined}" FontSize="11"
-                           ToolTip.Tip="Nexus scan status across available ZIP files." />
+                           ToolTip.Tip="{loc:Loc 'Nexus scan status across available ZIP files.'}" />
               </StackPanel>
-              <Button Grid.Column="2" Content="Open page" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
-              <Button Grid.Column="3" Content="Add mod" Command="{Binding AddCommand}" Classes="primary" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Content="{loc:Loc 'Open page'}" Command="{Binding OpenCommand}" VerticalAlignment="Center" />
+              <Button Grid.Column="3" Content="{loc:Loc 'Add mod'}" Command="{Binding AddCommand}" Classes="primary" VerticalAlignment="Center" />
             </Grid>
           </Border>
         </DataTemplate></ItemsControl.ItemTemplate>

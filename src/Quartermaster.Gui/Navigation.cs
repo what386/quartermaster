@@ -12,7 +12,7 @@ public sealed class NavigationItem(PageKind page, string label, string iconFile)
     private bool tourTarget;
     public bool IsTourTarget { get => tourTarget; internal set => Set(ref tourTarget, value); }
     public PageKind Page { get; } = page;
-    public string Label { get; } = label;
+    public string Label => Localizer.Text(label);
     public string IconSource { get; } = $"avares://Quartermaster.Gui/Assets/{iconFile}";
     public bool IsActive { get => active; internal set => Set(ref active, value); }
     public Command OpenCommand { get; internal set; } = new(() => { });
@@ -38,7 +38,7 @@ public sealed class SidebarProfile(Profile profile, bool isActive, AsyncCommand 
     public AsyncCommand DuplicateCommand { get; } = duplicateCommand;
     public string Name => Profile.Name;
     public string Monogram => string.Concat(Profile.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
-    public string Summary => $"{Name} · {ModPresentation.Count(Profile.Entries.Count(e => e.Enabled), "enabled mod")}{(IsDeployed ? " · Deployed" : "")}";
+    public string Summary => $"{Name} · {ModPresentation.Count(Profile.Entries.Count(e => e.Enabled), "enabled mod")}{(IsDeployed ? Localizer.Text(" · Deployed") : "")}";
     internal void Update(Profile value, bool isActive, bool isDeployed)
     {
         if (Set(ref profile, value, nameof(Profile)))

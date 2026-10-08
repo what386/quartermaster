@@ -11,13 +11,13 @@ public sealed partial class SettingsViewModel
     private string nexusApiKey = "";
     private bool removeNexusKey;
     private bool hasSavedNexusKey;
-    private string nexusAccount = "Not connected";
+    private string nexusAccount = Localizer.Text("Not connected");
     private string downloadFolder = "";
     private string savedDownloadFolder = "";
     private string githubToken = "";
     private bool removeGitHubToken;
     private bool hasSavedGitHubToken;
-    private string githubAccount = "Optional · Public API access";
+    private string githubAccount = Localizer.Text("Optional · Public API access");
     public string GitHubToken { get => githubToken; set { if (Set(ref githubToken, value)) SaveCommand.Refresh(); } }
     public bool RemoveGitHubToken { get => removeGitHubToken; set { if (Set(ref removeGitHubToken, value)) SaveCommand.Refresh(); } }
     public bool HasSavedGitHubToken { get => hasSavedGitHubToken; private set => Set(ref hasSavedGitHubToken, value); }
@@ -33,8 +33,8 @@ public sealed partial class SettingsViewModel
         StoredSecret.HasReplacement(GitHubToken) || RemoveGitHubToken && HasSavedGitHubToken || DownloadFolder != savedDownloadFolder;
     public Command RemoveNexusKeyCommand { get; private set; } = null!;
     public Command RemoveGitHubTokenCommand { get; private set; } = null!;
-    public string RemoveNexusKeyLabel => RemoveNexusKey ? "Undo removal" : "Remove stored secret";
-    public string RemoveGitHubTokenLabel => RemoveGitHubToken ? "Undo removal" : "Remove stored secret";
+    public string RemoveNexusKeyLabel => RemoveNexusKey ? Localizer.Text("Undo removal") : Localizer.Text("Remove stored secret");
+    public string RemoveGitHubTokenLabel => RemoveGitHubToken ? Localizer.Text("Undo removal") : Localizer.Text("Remove stored secret");
     public AsyncCommand BrowseDownloadsCommand { get; private set; } = null!;
     public AsyncCommand RegisterNxmCommand { get; private set; } = null!;
     public AsyncCommand OpenNexusKeySettingsCommand { get; private set; } = null!;
@@ -61,7 +61,7 @@ public sealed partial class SettingsViewModel
         Operations.PropertyChanged += (_, _) => { RemoveNexusKeyCommand.Refresh(); RemoveGitHubTokenCommand.Refresh(); };
         BrowseDownloadsCommand = Operations.CreateCommand("Selecting download folder", async _ =>
         {
-            var path = await Services.Dialogs.PickFolderAsync("Choose your browser's download folder");
+            var path = await Services.Dialogs.PickFolderAsync(Localizer.Text("Choose your browser's download folder"));
             if (path is not null) DownloadFolder = path;
         });
         RegisterNxmCommand = Operations.CreateCommand("Registering nxm links", NxmProtocol.RegisterAsync);
@@ -79,10 +79,10 @@ public sealed partial class SettingsViewModel
     public async Task InitializeProviderSettingsAsync(CancellationToken ct)
     {
         HasSavedNexusKey = await Services.Keys.GetAsync(NexusAdapter.ProviderId, ct) is not null;
-        NexusAccount = HasSavedNexusKey ? "" : "Not connected";
+        NexusAccount = HasSavedNexusKey ? "" : Localizer.Text("Not connected");
         NexusApiKey = HasSavedNexusKey ? StoredSecret.Mask : "";
         HasSavedGitHubToken = !string.IsNullOrWhiteSpace(await Services.Keys.GetAsync(GitHubProvider.ProviderId, ct));
-        GitHubAccount = HasSavedGitHubToken ? "" : "Optional · Public API access";
+        GitHubAccount = HasSavedGitHubToken ? "" : Localizer.Text("Optional · Public API access");
         GitHubToken = HasSavedGitHubToken ? StoredSecret.Mask : "";
         savedDownloadFolder = Services.Providers.State.Directories.FirstOrDefault() ?? DownloadStore.DefaultDownloadsDirectory;
         DownloadFolder = savedDownloadFolder;
@@ -90,7 +90,7 @@ public sealed partial class SettingsViewModel
     private async Task<(NexusUser? Nexus, string? GitHub)> ValidateProviderDraftAsync(CancellationToken ct)
     {
         if (DownloadFolder != savedDownloadFolder && (string.IsNullOrWhiteSpace(DownloadFolder) || !Path.IsPathFullyQualified(DownloadFolder.Trim())))
-            throw new ArgumentException("Choose an absolute download folder path.");
+            throw new ArgumentException(Localizer.Text("Choose an absolute download folder path."));
         var nexus = !RemoveNexusKey && StoredSecret.HasReplacement(NexusApiKey)
             ? await Services.ValidateNexusKeyAsync(NexusApiKey.Trim(), ct) : null;
         var github = !RemoveGitHubToken && StoredSecret.HasReplacement(GitHubToken)
@@ -103,18 +103,18 @@ public sealed partial class SettingsViewModel
         if (RemoveNexusKey)
         {
             await Services.Keys.SetAsync(NexusAdapter.ProviderId, null, ct);
-            HasSavedNexusKey = false; NexusAccount = "Not connected";
+            HasSavedNexusKey = false; NexusAccount = Localizer.Text("Not connected");
         }
         else if (user is not null)
         {
             await Services.Keys.SetAsync(NexusAdapter.ProviderId, NexusApiKey.Trim(), ct);
-            HasSavedNexusKey = true; NexusAccount = $"{user.Name} · {(user.IsPremium ? "Premium" : "Free account")}";
+            HasSavedNexusKey = true; NexusAccount = $"{user.Name} · {(user.IsPremium ? Localizer.Text("Premium") : Localizer.Text("Free account"))}";
         }
         NexusApiKey = HasSavedNexusKey ? StoredSecret.Mask : ""; RemoveNexusKey = false;
         if (RemoveGitHubToken)
         {
             await Services.Keys.SetAsync(GitHubProvider.ProviderId, null, ct);
-            HasSavedGitHubToken = false; GitHubAccount = "Optional · Public API access";
+            HasSavedGitHubToken = false; GitHubAccount = Localizer.Text("Optional · Public API access");
         }
         else if (accounts.GitHub is { } login)
         {

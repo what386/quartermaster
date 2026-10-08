@@ -149,6 +149,8 @@ just package linux-x64
 See the [repatcher documentation](src/Quartermaster.Repatcher/README.md) for
 patching details and the [changelog](CHANGELOG.md) for release changes.
 
+See [localization](docs/localization.md) for adding language packs and translating UI text.
+
 ## License
 
 [MIT](LICENSE)

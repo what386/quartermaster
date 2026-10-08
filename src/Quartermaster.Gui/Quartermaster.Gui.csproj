@@ -10,6 +10,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Localization/Catalogs/en.json" />
     <AvaloniaResource Include="Assets/**" />
     <ProjectReference Include="../Quartermaster.Providers/Quartermaster.Providers.csproj" />
     <ProjectReference Include="../Quartermaster.Library/Quartermaster.Library.csproj" />

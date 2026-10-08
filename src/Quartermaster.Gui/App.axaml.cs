@@ -42,7 +42,7 @@ public partial class App : Application
                         if (pending is not null && promptedLinks.Add(pending))
                         {
                             viewModel.Navigate(PageKind.Settings);
-                            services.Operations.ReportError(new InvalidOperationException("Add your personal Nexus API key to receive this download."));
+                            services.Operations.ReportError(new InvalidOperationException(Localizer.Text("Add your personal Nexus API key to receive this download.")));
                         }
                         return;
                     }

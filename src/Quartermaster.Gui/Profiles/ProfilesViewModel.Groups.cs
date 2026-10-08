@@ -47,7 +47,7 @@ public sealed partial class ProfilesViewModel
     private async Task AddGroupAsync(CancellationToken ct, IReadOnlyCollection<Guid> modIds)
     {
         var current = SelectedProfile!;
-        var name = await Services.Dialogs.RequestTextAsync("Create group", "Group name", "Create");
+        var name = await Services.Dialogs.RequestTextAsync(Localizer.Text("Create group"), Localizer.Text("Group name"), Localizer.Text("Create"));
         if (name is not null) await Save(ProfileEditor.AddGroup(current, name, modIds), ct);
     }
     private Task ToggleGroupAsync(Guid id) => Operations.RunAsync("Changing group visibility", ct =>
@@ -55,13 +55,13 @@ public sealed partial class ProfilesViewModel
     private Task RenameGroupAsync(Guid id) => Operations.RunAsync("Renaming group", async ct =>
     {
         var current = SelectedProfile!; var group = current.Groups.Single(group => group.Id == id);
-        var name = await Services.Dialogs.RequestTextAsync("Rename group", "Group name", "Rename", group.Name);
+        var name = await Services.Dialogs.RequestTextAsync(Localizer.Text("Rename group"), Localizer.Text("Group name"), Localizer.Text("Rename"), group.Name);
         if (name is not null) await Save(ProfileEditor.RenameGroup(current, id, name), ct);
     });
     private Task RemoveGroupAsync(Guid id) => Operations.RunAsync("Removing group", async ct =>
     {
         var current = SelectedProfile!; var group = current.Groups.Single(group => group.Id == id);
-        if (await Services.Dialogs.ConfirmAsync("Remove group", $"Remove {group.Name}? Its mods will remain in this profile and move to the ungrouped section.", "Remove"))
+        if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Remove group"), Localizer.Interpolate($"Remove {group.Name}? Its mods will remain in this profile and move to the ungrouped section."), Localizer.Text("Remove")))
             await Save(ProfileEditor.RemoveGroup(current, id), ct);
     });
     public Task MoveModToGroupAsync(Guid modId, Guid? groupId) => MoveModsToGroupAsync([modId], groupId);
@@ -97,7 +97,7 @@ public sealed partial class ProfilesViewModel
                 group.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
             if (Search != "" && matching.Length == 0 && !group.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)) continue;
             var expanded = group.IsExpanded || Search != "";
-            var row = new ProfileGroupItem(group, $"{members.Length} mods · {members.Count(entry => entry.IsEnabled)} on", expanded,
+            var row = new ProfileGroupItem(group, Localizer.Interpolate($"{members.Length} mods · {members.Count(entry => entry.IsEnabled)} on"), expanded,
                 new AsyncCommand(() => ToggleGroupAsync(group.Id), () => !Operations.IsProgressVisible && Search == "", Operations.ReportError),
                 new AsyncCommand(() => RenameGroupAsync(group.Id), () => !Operations.IsProgressVisible, Operations.ReportError),
                 new AsyncCommand(() => RemoveGroupAsync(group.Id), () => !Operations.IsProgressVisible, Operations.ReportError));

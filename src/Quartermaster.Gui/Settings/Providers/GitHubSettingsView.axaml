@@ -1,16 +1,16 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.GitHubSettingsView" x:DataType="vm:SettingsViewModel">
   <Grid ColumnDefinitions="180,*">
-    <StackPanel Spacing="4"><TextBlock Text="GitHub" FontWeight="SemiBold" /><TextBlock Text="{Binding GitHubAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
+    <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'GitHub'}" FontWeight="SemiBold" /><TextBlock Text="{Binding GitHubAccount}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
     <StackPanel Grid.Column="1" Spacing="8">
       <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12" HorizontalAlignment="Left">
-        <shared:ContentSizedTextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken}" PasswordChar="*" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="Optional personal access token" VerticalAlignment="Center" />
-        <Button Grid.Column="1" x:Name="RemoveGitHubTokenInput" Content="{Binding RemoveGitHubTokenLabel}" Command="{Binding RemoveGitHubTokenCommand}" ToolTip.Tip="Save settings to apply removal." VerticalAlignment="Center" />
+        <shared:ContentSizedTextBox x:Name="GitHubTokenInput" Text="{Binding GitHubToken}" PasswordChar="*" IsEnabled="{Binding !RemoveGitHubToken}" PlaceholderText="{loc:Loc 'Optional personal access token'}" VerticalAlignment="Center" />
+        <Button Grid.Column="1" x:Name="RemoveGitHubTokenInput" Content="{Binding RemoveGitHubTokenLabel}" Command="{Binding RemoveGitHubTokenCommand}" ToolTip.Tip="{loc:Loc 'Save settings to apply removal.'}" VerticalAlignment="Center" />
       </Grid>
       <TextBlock Classes="muted" FontSize="11" TextWrapping="Wrap">
-        <Run Text="A token increases your GitHub API rate limit. Create one in " />
-        <InlineUIContainer><HyperlinkButton x:Name="GitHubTokenSettingsLink" Content="GitHub Settings → Developer settings → Personal access tokens" Command="{Binding OpenGitHubTokenSettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
-        <Run Text=", you do not need any extra permissions beyond read-only." />
+        <Run Text="{loc:Loc 'A token increases your GitHub API rate limit. Create one in '}" />
+        <InlineUIContainer><HyperlinkButton x:Name="GitHubTokenSettingsLink" Content="{loc:Loc 'GitHub Settings → Developer settings → Personal access tokens'}" Command="{Binding OpenGitHubTokenSettingsCommand}" FontSize="11" Padding="0" MinHeight="0" Foreground="{DynamicResource AccentBrush}" /></InlineUIContainer>
+        <Run Text="{loc:Loc ', you do not need any extra permissions beyond read-only.'}" />
       </TextBlock>
     </StackPanel>
   </Grid>

@@ -3,8 +3,10 @@ using System.Runtime.CompilerServices;
 
 namespace Quartermaster.Gui.Shared;
 
-public abstract class ViewModelBase : INotifyPropertyChanged
+public abstract class ViewModelBase : INotifyPropertyChanged, ILocalizationListener
 {
+    protected ViewModelBase() => Localizer.Current.Watch(this);
+    void ILocalizationListener.RefreshLocalization() => Notify(null);
     public event PropertyChangedEventHandler? PropertyChanged;
     protected bool Set<T>(ref T field, T value, [CallerMemberName] string? name = null)
     {

@@ -1,9 +1,9 @@
-<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.AppearanceSettingsView" x:DataType="vm:SettingsViewModel">
   <Grid ColumnDefinitions="180,*">
-    <StackPanel Spacing="4"><TextBlock Text="Appearance" FontWeight="SemiBold" /><TextBlock Text="Preview changes before saving" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
+    <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Appearance'}" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc 'Preview changes before saving'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" /></StackPanel>
     <Grid Grid.Column="1" ColumnDefinitions="Auto,Auto,320" ColumnSpacing="12" HorizontalAlignment="Left">
-      <TextBlock Text="Accent color" VerticalAlignment="Center" />
+      <TextBlock Text="{loc:Loc 'Accent color'}" VerticalAlignment="Center" />
       <ColorPicker Grid.Column="1" x:Name="AccentPicker" Color="{Binding AccentColor, Mode=TwoWay}" IsAlphaEnabled="False" VerticalAlignment="Center" />
       <ComboBox Grid.Column="2" x:Name="ThemeSelector" ItemsSource="{Binding ThemeChoices}" SelectedIndex="{Binding ThemeChoice, Mode=TwoWay}" HorizontalAlignment="Stretch" VerticalAlignment="Center" />
     </Grid>
