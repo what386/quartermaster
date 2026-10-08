@@ -13,6 +13,9 @@ public sealed class ModDetailsViewModel : ViewModelBase
     private readonly Guid? profileId;
     private string pageLink;
     private string savedPage;
+    private string tagsInput;
+    private string savedTags;
+    public string TagsInput { get => tagsInput; set => Set(ref tagsInput, value); }
     public string PageLink { get => pageLink; set => Set(ref pageLink, value); }
     public OperationState Operations => services.Operations;
     public AsyncCommand ResolveDependenciesCommand { get; }
@@ -27,6 +30,7 @@ public sealed class ModDetailsViewModel : ViewModelBase
         this.services = services;
         this.profileId = profileId;
         pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
+        tagsInput = savedTags = string.Join(", ", mod.Tags);
         RefreshRelationships();
         ResolveDependenciesCommand = services.Operations.CreateCommand("Refreshing dependencies", async ct =>
         {
@@ -43,18 +47,23 @@ public sealed class ModDetailsViewModel : ViewModelBase
     }
     private async Task SavePageAsync(CancellationToken ct)
     {
-        if (PageLink.Trim() == savedPage) return;
-        await services.Library.SetPageLinkAsync(mod.Id, PageLink, ct);
-        savedPage = PageLink = ModLinks.ValidatePage(PageLink) ?? "";
+        var page = ModLinks.ValidatePage(PageLink) ?? "";
+        var tags = ModTags.Normalize(TagsInput.Split(','));
+        var tagsText = string.Join(", ", tags);
+        if (page == savedPage && tagsText == savedTags) return;
+        if (page != savedPage) await services.Library.SetPageLinkAsync(mod.Id, page, ct);
+        if (tagsText != savedTags) await services.Library.SetTagsAsync(mod.Id, tags, ct);
+        savedPage = PageLink = page;
+        savedTags = TagsInput = tagsText;
         await services.Session.ReloadAsync(ct);
         RefreshRelationships();
     }
     public async Task<bool> SaveOnCloseAsync()
     {
         if (!Operations.CanInteract) return false;
-        if (PageLink.Trim() == savedPage) return true;
+        if (PageLink.Trim() == savedPage && TagsInput == savedTags) return true;
         var saved = false;
-        await Operations.RunAsync("Saving mod page", async ct =>
+        await Operations.RunAsync("Saving mod details", async ct =>
         {
             await SavePageAsync(ct);
             saved = true;

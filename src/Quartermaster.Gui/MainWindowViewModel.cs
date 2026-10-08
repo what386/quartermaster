@@ -102,7 +102,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (e.PropertyName != nameof(OperationState.IsBusy) || Operations.IsBusy && !Operations.IsProgressVisible) return;
             foreach (var entry in SidebarProfiles)
-            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); entry.DuplicateCommand.Refresh(); }
+            { entry.SelectCommand.Refresh(); entry.RenameCommand.Refresh(); entry.DeleteCommand.Refresh(); entry.ExportCommand.Refresh(); entry.DuplicateCommand.Refresh(); entry.ChangeThumbnailCommand.Refresh(); entry.RemoveThumbnailCommand.Refresh(); }
         };
         RefreshProfiles();
         ((ProfilesViewModel)pages[PageKind.Profiles]).PropertyChanged += (_, e) =>
@@ -143,7 +143,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 new AsyncCommand(() => RenameProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => DeleteProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
                 new AsyncCommand(() => ExportProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
-                new AsyncCommand(() => DuplicateProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError))
+                new AsyncCommand(() => DuplicateProfileAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => ChangeProfileThumbnailAsync(profile.Id), () => Operations.CanInteract, Operations.ReportError),
+                new AsyncCommand(() => ChangeProfileThumbnailAsync(profile.Id, remove: true), () => Operations.CanInteract && services.Session.State.Profiles.Any(p => p.Id == profile.Id && p.Thumbnail is not null), Operations.ReportError))
             { IsDeployed = deployed });
         }
     }
@@ -185,6 +187,24 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         foreach (var name in new[] { nameof(ProfileLabel), nameof(LibraryCount), nameof(SelectionSummary), nameof(CollisionCount) }) Notify(name);
     }
+    private Task ChangeProfileThumbnailAsync(Guid id, bool remove = false) => Operations.RunAsync("Changing profile thumbnail", async ct =>
+    {
+        string? thumbnail = null;
+        if (!remove)
+        {
+            var path = await services.Dialogs.PickProfileImageAsync();
+            if (path is null) return;
+            thumbnail = await ProfileAppearance.ReadThumbnailAsync(path, ct);
+            using var stream = new MemoryStream(Convert.FromBase64String(thumbnail));
+            using var image = Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 256);
+            using var output = new MemoryStream();
+            image.Save(output, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+            thumbnail = Convert.ToBase64String(output.ToArray());
+            ProfileAppearance.ValidateThumbnail(thumbnail);
+        }
+        var profile = services.Session.State.Profiles.Single(p => p.Id == id);
+        await services.Session.SaveProfileAsync(profile with { Thumbnail = thumbnail }, false, ct);
+    });
     private Task DuplicateProfileAsync(Guid id) => Operations.RunAsync("Duplicating profile", async ct =>
     {
         var profile = services.Session.State.Profiles.Single(p => p.Id == id);

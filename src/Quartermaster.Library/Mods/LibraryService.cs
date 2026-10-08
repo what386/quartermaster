@@ -25,6 +25,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
             var updatedExisting = existing with
             {
                 PageLink = pageLink ?? existing.PageLink,
+                Tags = ModTags.Normalize(existing.Tags.Concat(mod.Tags)),
                 InstalledAsDependency = existing.InstalledAsDependency && installedAsDependency
             };
             var duplicateState = state;
@@ -133,6 +134,15 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         }, ct).ConfigureAwait(false);
     }
 
+    public async Task SetTagsAsync(Guid modId, IEnumerable<string> tags, CancellationToken ct = default)
+    {
+        var normalized = ModTags.Normalize(tags);
+        await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
+        var state = await store.LoadAsync(ct).ConfigureAwait(false);
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        await store.SaveAsync(state with { Mods = state.Mods.Select(mod => mod.Id == modId ? mod with { Tags = normalized } : mod).ToArray() }, ct).ConfigureAwait(false);
+    }
+
     public async Task SetPageLinkAsync(Guid modId, string? link, CancellationToken ct = default)
     {
         link = ModLinks.ValidatePage(link);
@@ -185,6 +195,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
                 {
                     Superseded = false,
                     PageLink = oldMod.PageLink ?? mod.PageLink,
+                    Tags = ModTags.Normalize(oldMod.Tags.Concat(mod.Tags)),
                     Dependencies = mod.DependenciesKnown ? mod.Dependencies : oldMod.Dependencies,
                     DependenciesKnown = mod.DependenciesKnown || oldMod.DependenciesKnown,
                     InstalledAsDependency = mod.InstalledAsDependency && oldMod.InstalledAsDependency

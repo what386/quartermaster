@@ -1,0 +1,29 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
+             x:Class="Quartermaster.Gui.Shared.GroupColorsDialog" Width="360">
+  <StackPanel Spacing="16" Margin="24">
+    <TextBlock Text="{loc:Loc 'Group colors'}" Classes="pageTitle" />
+    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+      <StackPanel Spacing="6">
+        <TextBlock Text="{loc:Loc 'Background color'}" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+          <ColorPicker x:Name="BackgroundPicker" IsAlphaEnabled="False" />
+          <TextBox Grid.Column="1" x:Name="BackgroundInput" PlaceholderText="#RRGGBB" TextChanged="ColorChanged" />
+        </Grid>
+      </StackPanel>
+      <StackPanel Grid.Column="1" Spacing="6">
+        <TextBlock Text="{loc:Loc 'Text color'}" />
+        <Grid ColumnDefinitions="Auto,*" ColumnSpacing="6">
+          <ColorPicker x:Name="ForegroundPicker" IsAlphaEnabled="False" />
+          <TextBox Grid.Column="1" x:Name="ForegroundInput" PlaceholderText="#RRGGBB" TextChanged="ColorChanged" />
+        </Grid>
+      </StackPanel>
+    </Grid>
+    <Border x:Name="Preview" Padding="12,8"><TextBlock x:Name="PreviewText" Text="{loc:Loc 'Group preview'}" FontWeight="SemiBold" /></Border>
+    <TextBlock x:Name="ErrorText" Text="{loc:Loc 'Enter a color as #RRGGBB.'}" Classes="muted" IsVisible="False" />
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+      <Button Content="{loc:Loc 'Reset'}" Click="ResetColors" HorizontalAlignment="Left" />
+      <Button Grid.Column="1" Content="{loc:Loc 'Cancel'}" Click="CancelColors" />
+      <Button x:Name="SaveButton" Grid.Column="2" Content="{loc:Loc 'Save'}" Classes="primary" Click="SaveColors" />
+    </Grid>
+  </StackPanel>
+</UserControl>

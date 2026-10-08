@@ -1,8 +1,19 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
              xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" x:Class="Quartermaster.Gui.Profiles.ProfileGroupView" x:DataType="vm:ProfileGroupItem" HorizontalContentAlignment="Stretch">
-  <Button Classes="loadoutGroup" Command="{Binding ToggleCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip.Tip="{loc:Loc 'Click to collapse or expand; right-click for group actions'}">
+  <Button x:Name="GroupButton" Classes="loadoutGroup" Command="{Binding ToggleCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" ToolTip.Tip="{loc:Loc 'Click to collapse or expand; right-click for group actions'}">
+    <Button.Styles>
+      <Style Selector="Button.loadoutGroup:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+        <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
+      </Style>
+      <Style Selector="Button.loadoutGroup:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+        <Setter Property="Foreground" Value="{Binding $parent[Button].Foreground}" />
+      </Style>
+    </Button.Styles>
     <Button.ContextMenu><ContextMenu>
       <MenuItem Header="{loc:Loc 'Rename group'}" Command="{Binding RenameCommand}" />
+      <MenuItem Header="{loc:Loc 'Group colors'}" Command="{Binding ColorsCommand}" />
       <MenuItem Header="{loc:Loc 'Remove group'}" Command="{Binding RemoveCommand}" />
     </ContextMenu></Button.ContextMenu>
     <Grid ColumnDefinitions="24,*,Auto">

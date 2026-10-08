@@ -81,6 +81,10 @@
             <TextBlock Text="{loc:Loc 'No collisions.'}" IsVisible="{Binding !HasCollisions}" Classes="muted" />
           </StackPanel>
           <vm:ModPageLinkView />
+          <StackPanel Spacing="4">
+            <TextBlock Text="{loc:Loc 'Tags'}" FontWeight="SemiBold" />
+            <TextBox x:Name="TagsInput" Text="{Binding TagsInput, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Comma-separated tags'}" />
+          </StackPanel>
           <TextBlock Text="{loc:Loc 'This mod has options. Configure them in Profiles.'}" IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />
         </StackPanel></ScrollViewer>
       </TabItem>

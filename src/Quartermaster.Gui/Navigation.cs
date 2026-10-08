@@ -19,7 +19,8 @@ public sealed class NavigationItem(PageKind page, string label, string iconFile)
 }
 
 public sealed class SidebarProfile(Profile profile, bool isActive, AsyncCommand selectCommand,
-    AsyncCommand renameCommand, AsyncCommand deleteCommand, AsyncCommand exportCommand, AsyncCommand duplicateCommand) : ViewModelBase
+    AsyncCommand renameCommand, AsyncCommand deleteCommand, AsyncCommand exportCommand, AsyncCommand duplicateCommand,
+    AsyncCommand changeThumbnailCommand, AsyncCommand removeThumbnailCommand) : ViewModelBase
 {
     private Profile profile = profile;
     private bool active = isActive;
@@ -36,13 +37,17 @@ public sealed class SidebarProfile(Profile profile, bool isActive, AsyncCommand 
     public AsyncCommand DeleteCommand { get; } = deleteCommand;
     public AsyncCommand ExportCommand { get; } = exportCommand;
     public AsyncCommand DuplicateCommand { get; } = duplicateCommand;
+    public AsyncCommand ChangeThumbnailCommand { get; } = changeThumbnailCommand;
+    public AsyncCommand RemoveThumbnailCommand { get; } = removeThumbnailCommand;
+    public string? Thumbnail => Profile.Thumbnail;
+    public bool HasThumbnail => Thumbnail is not null;
     public string Name => Profile.Name;
     public string Monogram => string.Concat(Profile.Name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(s => char.ToUpperInvariant(s[0])));
     public string Summary => $"{Name} · {ModPresentation.Count(Profile.Entries.Count(e => e.Enabled), "enabled mod")}{(IsDeployed ? Localizer.Text(" · Deployed") : "")}";
     internal void Update(Profile value, bool isActive, bool isDeployed)
     {
         if (Set(ref profile, value, nameof(Profile)))
-        { Notify(nameof(Name)); Notify(nameof(Monogram)); Notify(nameof(Summary)); }
+        { Notify(nameof(Name)); Notify(nameof(Monogram)); Notify(nameof(Summary)); Notify(nameof(Thumbnail)); Notify(nameof(HasThumbnail)); RemoveThumbnailCommand.Refresh(); }
         IsActive = isActive; IsDeployed = isDeployed;
     }
 }

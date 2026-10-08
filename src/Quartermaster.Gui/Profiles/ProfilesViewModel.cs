@@ -31,6 +31,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(Title), Title, value.Title),
             (nameof(Number), Number, value.Number),
             (nameof(Description), Description, value.Description),
+            (nameof(TagSummary), TagSummary, value.TagSummary),
+            (nameof(HasTags), HasTags, value.HasTags),
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
@@ -67,6 +69,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
     public string Description => ModPresentation.Description(Mod);
+    public string TagSummary => string.Join(" · ", Mod.Tags);
+    public bool HasTags => Mod.Tags.Count > 0;
     public string Monogram => ModPresentation.Monogram(Mod);
     public bool IsLoaded => DeploymentState == ModDeploymentState.Loaded;
     public bool IsUnloaded => DeploymentState == ModDeploymentState.Unloaded;
@@ -99,7 +103,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
     public IReadOnlyList<string> Conflicts { get; private set; } = [];
     public string ArchiveSummary { get; private set; } = "";
-    public IReadOnlyList<ProfileModItem> VisibleEntries => Entries.Where(e => e.Name.Contains(Search, StringComparison.OrdinalIgnoreCase)).ToArray();
+    public IReadOnlyList<ProfileModItem> VisibleEntries => Entries.Where(e => ModTags.Matches(e.Mod, Search)).ToArray();
     public string Search { get => search; set { if (Set(ref search, value)) Notify(nameof(VisibleEntries)); RebuildVisibleItems(); } }
     public string EntrySummary => Localizer.Interpolate($"{Entries.Count} mods · {Entries.Count(e => e.Entry.Enabled)} on");
     public string SelectedModName => SelectedMod?.Name ?? Localizer.Text("Select a mod");
@@ -192,7 +196,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
             if (e.PropertyName != nameof(OperationState.IsBusy) || Operations.IsBusy && !Operations.IsProgressVisible) return;
             foreach (var row in Entries) { row.EnableCommand.Refresh(); row.UpdateCommand?.Refresh(); }
             foreach (var group in VisibleItems.OfType<ProfileGroupItem>())
-            { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); }
+            { group.ToggleCommand.Refresh(); group.RenameCommand.Refresh(); group.RemoveCommand.Refresh(); group.ColorsCommand.Refresh(); }
         };
         WatchSession();
     }

@@ -22,12 +22,25 @@ public interface IDialogService
     Task<string?> SaveProfileZipAsync(string suggestedName);
     Task<ProfileCreationRequest?> RequestProfileCreationAsync();
     Task<string?> PickFolderAsync(string title);
+    Task<string?> PickProfileImageAsync();
+    Task<GroupColors?> RequestGroupColorsAsync(string? background, string? text);
     Task<bool> ConfirmAsync(string title, string message, string acceptLabel, string cancelLabel = "Cancel");
     Task<string?> RequestTextAsync(string title, string prompt, string acceptLabel, string? initialValue = null);
 }
 
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
+    public Task<GroupColors?> RequestGroupColorsAsync(string? background, string? text) =>
+        owner().ShowDialogAsync<GroupColors?>(new GroupColorsDialog(background, text));
+    public async Task<string?> PickProfileImageAsync()
+    {
+        var files = await owner().StorageProvider.OpenFilePickerAsync(new()
+        {
+            Title = Localizer.Text("Choose profile thumbnail"), AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(Localizer.Text("Images")) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.webp"] }]
+        });
+        return files.FirstOrDefault()?.TryGetLocalPath();
+    }
     public async Task<Onboarding.SetupOutcome> ShowOnboardingAsync(Onboarding.SetupViewModel model, CancellationToken ct = default)
     {
         await owner().WaitForDialogAsync(ct);

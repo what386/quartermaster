@@ -31,10 +31,18 @@
               <ItemsControl x:Name="ProfileList" ItemsSource="{Binding SidebarProfiles}" IsEnabled="{Binding !Operations.IsProgressVisible}" IsHitTestVisible="{Binding Operations.CanInteract}">
                 <ItemsControl.ItemsPanel><ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate><DataTemplate x:DataType="local:SidebarProfile">
-                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Content="{Binding Monogram}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
+                  <Button Classes="profileButton" Classes.active="{Binding IsActive}" Classes.deployed="{Binding IsDeployed}" Command="{Binding SelectCommand}" DoubleTapped="DeployProfile" ToolTip.Tip="{Binding Summary}" AutomationProperties.Name="{Binding Name}" HorizontalAlignment="Center">
+                    <Border CornerRadius="11" ClipToBounds="True" Width="42" Height="42">
+                      <Grid>
+                        <TextBlock x:Name="ProfileMonogram" Text="{Binding Monogram}" IsVisible="{Binding !IsVisible, ElementName=ProfileThumbnail}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <shared:ProfileThumbnailImage x:Name="ProfileThumbnail" Thumbnail="{Binding Thumbnail}" Stretch="UniformToFill" />
+                      </Grid>
+                    </Border>
                     <Button.ContextMenu><ContextMenu>
                       <MenuItem Header="{loc:Loc 'Rename'}" Command="{Binding RenameCommand}" />
                       <MenuItem Header="{loc:Loc 'Duplicate profile'}" Command="{Binding DuplicateCommand}" />
+                      <MenuItem Header="{loc:Loc 'Change thumbnail'}" Command="{Binding ChangeThumbnailCommand}" />
+                      <MenuItem Header="{loc:Loc 'Remove thumbnail'}" Command="{Binding RemoveThumbnailCommand}" IsVisible="{Binding HasThumbnail}" />
                       <MenuItem Header="{loc:Loc 'Delete'}" Command="{Binding DeleteCommand}" />
                       <Separator />
                       <MenuItem Header="{loc:Loc 'Export profile ZIP'}" Command="{Binding ExportCommand}" />

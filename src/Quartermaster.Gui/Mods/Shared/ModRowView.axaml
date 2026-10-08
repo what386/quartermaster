@@ -14,6 +14,7 @@
     <StackPanel Grid.Column="3" Spacing="0" VerticalAlignment="Center" Margin="4,0,12,0">
       <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
       <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+      <TextBlock Text="{Binding TagSummary}" IsVisible="{Binding HasTags}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TagSummary}" />
     </StackPanel>
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
       <Border x:Name="DependencyIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding InstalledAsDependency}"

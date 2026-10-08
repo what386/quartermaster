@@ -496,6 +496,20 @@
     "{0} {1} of {2}: {3}": "{0} {1} of {2}: {3}",
     "{0} · Clashes with {1}": "{0} · Clashes with {1}",
     "{0} · {1:x16}/{2:x16} · {3} wins": "{0} · {1:x16}/{2:x16} · {3} wins",
-    "▶  Run": "▶  Run"
+    "▶  Run": "▶  Run",
+    "Group colors": "Group colors",
+    "Background color": "Background color",
+    "Text color": "Text color",
+    "Group preview": "Group preview",
+    "Enter a color as #RRGGBB.": "Enter a color as #RRGGBB.",
+    "Changing group colors": "Changing group colors",
+    "Choose profile thumbnail": "Choose profile thumbnail",
+    "Images": "Images",
+    "Change thumbnail": "Change thumbnail",
+    "Remove thumbnail": "Remove thumbnail",
+    "Changing profile thumbnail": "Changing profile thumbnail",
+    "Tags": "Tags",
+    "Comma-separated tags": "Comma-separated tags",
+    "Saving mod details": "Saving mod details"
   }
 }

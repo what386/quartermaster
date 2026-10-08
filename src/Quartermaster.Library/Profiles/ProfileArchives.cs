@@ -137,6 +137,7 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                     existing = existing with
                     {
                         PageLink = existing.PageLink ?? ModLinks.PageFor(original),
+                        Tags = ModTags.Normalize(existing.Tags.Concat(original.Tags)),
                         ImportedFileName = existing.ImportedFileName ?? original.ImportedFileName,
                         Dependencies = existing.DependenciesKnown ? existing.Dependencies : original.Dependencies,
                         DependenciesKnown = existing.DependenciesKnown || original.DependenciesKnown,
@@ -150,6 +151,7 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                     imported = imported with
                     {
                         Description = original.Description,
+                        Tags = original.Tags,
                         Version = original.Version,
                         Sources = original.Sources,
                         PageLink = original.PageLink,

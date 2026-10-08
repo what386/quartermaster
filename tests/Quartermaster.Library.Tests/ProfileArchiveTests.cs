@@ -24,11 +24,15 @@ public class ProfileArchiveTests
         var disabled = await sender.Library.ImportAsync(sender.Source("Disabled", 4), installedAsDependency: true);
         await sender.Library.SetDependenciesAsync(variants.Id, [new("Requirement", "https://www.nexusmods.com/helldivers2/mods/100")]);
         await sender.Library.SetDependenciesAsync(disabled.Id, []);
+        await sender.Library.SetTagsAsync(variants.Id, ["Weapons", "HUD"]);
+        await sender.Library.SetTagsAsync(disabled.Id, ["Cosmetic"]);
         var profile = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Create("My loadout"), disabled), variants);
         profile = ProfileEditor.SetEnabled(profile, disabled.Id, false);
         profile = ProfileEditor.SetOptions(profile, variants, [new(variants.Options[0].Id, true, 1), new(variants.Options[1].Id, false)]);
         profile = ProfileEditor.AddGroup(profile, "Equipment", [variants.Id]);
         profile = ProfileEditor.SetGroupExpanded(profile, profile.Groups[0].Id, false);
+        profile = ProfileEditor.SetGroupColors(profile, profile.Groups[0].Id, "#fee800", "#000000");
+        profile = profile with { Thumbnail = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==" };
         profile = ProfileEditor.AddGroup(profile, "Empty group") with { Priority = PriorityDirection.FirstWins };
         await sender.Library.SaveProfileAsync(profile, true);
         var destination = Path.Combine(sender.Root, "loadout.zip");
@@ -45,6 +49,8 @@ public class ProfileArchiveTests
         var imported = await new ProfileArchives(receiver.Store, receiver.Contents).ImportAsync(destination);
         var state = await receiver.Library.LoadAsync();
         Assert.NotEqual(profile.Id, imported.Id); Assert.Equal(profile.Name, imported.Name); Assert.Equal(profile.Priority, imported.Priority);
+        Assert.Equal(profile.Thumbnail, imported.Thumbnail);
+        Assert.Equal("#FEE800", imported.Groups[0].BackgroundColor); Assert.Equal("#000000", imported.Groups[0].TextColor);
         Assert.Equal(active.Id, state.ActiveProfileId); Assert.Equal(2, state.Mods.Count); Assert.Equal(2, state.Profiles.Count);
         Assert.False(imported.Entries[0].Enabled); Assert.Equal(existing.Id, imported.Entries[1].ModId);
         Assert.Equal(new[] { "Equipment", "Empty group" }, imported.Groups.Select(group => group.Name));
@@ -60,6 +66,8 @@ public class ProfileArchiveTests
         Assert.True(importedDisabled.InstalledAsDependency);
         Assert.False(state.Mods.Single(mod => mod.Id == existing.Id).InstalledAsDependency);
         Assert.Equal("Disabled", importedDisabled.Name);
+        Assert.Equal(new[] { "Cosmetic" }, importedDisabled.Tags);
+        Assert.Equal(new[] { "Weapons", "HUD" }, state.Mods.Single(mod => mod.Id == existing.Id).Tags);
         foreach (var file in Directory.GetFiles(sender.Contents.GetModDirectory(disabled.Id), "*", SearchOption.AllDirectories))
         {
             var relative = Path.GetRelativePath(sender.Contents.GetModDirectory(disabled.Id), file);

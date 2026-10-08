@@ -19,6 +19,8 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
             (nameof(Title), Title, value.Title),
             (nameof(Number), Number, value.Number),
             (nameof(Description), Description, value.Description),
+            (nameof(TagSummary), TagSummary, value.TagSummary),
+            (nameof(HasTags), HasTags, value.HasTags),
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
@@ -43,6 +45,8 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
     public string Title => ModPresentation.Title(Mod);
     public string Number => (Index + 1).ToString();
     public string Description => ModPresentation.Description(Mod);
+    public string TagSummary => string.Join(" · ", Mod.Tags);
+    public bool HasTags => Mod.Tags.Count > 0;
     public string Monogram => ModPresentation.Monogram(Mod);
     public bool IsLoaded => false;
     public bool IsUnloaded => false;
@@ -67,6 +71,8 @@ public interface IModRow
     string Name { get; }
     string Number { get; }
     string Description { get; }
+    string TagSummary { get; }
+    bool HasTags { get; }
     string Monogram { get; }
     string Title { get; }
     string? IconPath { get; }
@@ -201,7 +207,7 @@ public sealed class ModsViewModel : SessionViewModel
         var collisions = report?.Resources.SelectMany(c => c.SourceIds).ToHashSet() ?? [];
         var warnings = ModWarnings.ForProfile(Session.State, Session.ActiveProfile, report);
         var existing = Mods.ToDictionary(row => row.Mod.Id);
-        var rows = Session.State.Mods.Where(m => m.Name.Contains(Search, StringComparison.OrdinalIgnoreCase))
+        var rows = Session.State.Mods.Where(m => ModTags.Matches(m, Search))
             .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m), ModWarnings.ForLibraryMod(Session.State, m, warnings))
             { UpdateCommand = Services.Downloads.CreateUpdateCommand(m), UpdateDescription = Services.Downloads.UpdateDescription(m) }).ToArray();
         var desired = rows.Select(row =>
