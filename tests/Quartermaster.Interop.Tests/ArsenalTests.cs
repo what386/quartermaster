@@ -16,6 +16,8 @@ public sealed class ArsenalTests
     {
         var root = Path.Combine(f.Root, "arsenal");
         var mods = Path.Combine(root, "mods"); Directory.CreateDirectory(mods);
+        var images = Path.Combine(root, "profile-images"); Directory.CreateDirectory(images);
+        await File.WriteAllBytesAsync(Path.Combine(images, "first.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg=="));
         var a = f.Source("a", 1); var b = f.Source("b", 2);
         var common = Path.Combine(a, "common"); Directory.CreateDirectory(common);
         File.Move(Path.Combine(a, Fixture.Archive + ".patch_7"), Path.Combine(common, Fixture.Archive + ".patch_7"));
@@ -37,14 +39,14 @@ public sealed class ArsenalTests
             {
                 new { uuid=A, label="Renamed A", path=@"C:\Users\Old\hd2arsenal\mods\a", description="Original description",
                     addedAt="2026-07-03T22:40:18.129Z", nexusData=new { mod_id=123, file_id=456, version="1.2.3", game_domain_name="helldivers2" } },
-                new { uuid=B, label="B", path=@"C:\Users\Old\hd2arsenal\mods\b" },
+                new { uuid=B, label="B", path=@"C:\Users\Old\hd2arsenal\mods\b", tags=new[]{"Weapons","UI"} },
                 new { uuid=Unused, label="Unused missing mod", path=@"C:\Users\Old\hd2arsenal\mods\unused" }
             },
             modsList = new Dictionary<string,object>
             {
-                ["first"] = new { label="First", mods=new object[] {
+                ["first"] = new { label="First", imagePath=@"C:\Users\Old\hd2arsenal\profile-images\first.png", mods=new object[] {
                     new { uuid=B, enabled=true },
-                    new { uuid="sep1", type="separator", label="Weapons" },
+                    new { uuid="sep1", type="separator", label="Weapons", backgroundColor="#fee800",textColor="#000000" },
                     new { uuid=A, enabled=false, optionsConfig=new[]{new {name="Color",enabled=true,suboptions=new[]{new {name="Blue",enabled=true}}}} },
                     new { uuid="sep2",type="separator",label="Empty group" }
                 } },
@@ -81,6 +83,9 @@ public sealed class ArsenalTests
         Assert.Equal("123", Assert.Single(a.Sources).ModId); Assert.Equal("456", a.Sources[0].FileId);
         Assert.Equal("2026-07-03T22:40:18.1290000+00:00", a.ImportedAt.ToString("O"));
         var first = result.Profiles.Single(profile => profile.Name == "First");
+        Assert.Equal("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==", first.Thumbnail);
+        Assert.Equal("#FEE800", first.Groups[0].BackgroundColor); Assert.Equal("#000000", first.Groups[0].TextColor);
+        Assert.Equal(new[] { "Weapons", "UI" }, state.Mods.Single(mod => mod.Name == "B").Tags);
         Assert.Equal(priority, first.Priority);
         Assert.Equal(new[] { "Weapons", "Empty group" }, first.Groups.Select(group => group.Name));
         Assert.Null(first.Entries[0].GroupId); Assert.Equal(first.Groups[0].Id, first.Entries[1].GroupId);

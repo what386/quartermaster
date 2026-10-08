@@ -48,7 +48,14 @@ public static class ArsenalReader
             {
                 var id = Required(mod, "uuid");
                 if (Text(mod, "type") == "separator")
-                { rows.Add(new(id, Required(mod, "label"), false, null)); continue; }
+                {
+                    rows.Add(new(id, Required(mod, "label"), false, null)
+                    {
+                        BackgroundColor = ProfileAppearance.NormalizeColor(Text(mod, "backgroundColor")),
+                        TextColor = ProfileAppearance.NormalizeColor(Text(mod, "textColor"))
+                    });
+                    continue;
+                }
                 if (!seen.Add(id)) throw new InvalidDataException($"Duplicate mod in Arsenal profile: {key}");
                 // Older Arsenal profiles contain complete mod records; newer ones can be UUID-only.
                 if (!records.ContainsKey(id) && Text(mod, "path") is not null) records.Add(id, mod);
@@ -59,7 +66,10 @@ public static class ArsenalReader
                 rows.Add(new(id, null, Bool(mod, "enabled", true), options));
                 required.Add(id);
             }
-            profiles.Add(new(key, Text(profile, "label") ?? key, priority, rows));
+            var image = Text(profile, "imagePath");
+            var thumbnail = image is null ? null : ResolveProfileImage(directory, image);
+            profiles.Add(new(key, Text(profile, "label") ?? key, priority, rows)
+            { Thumbnail = thumbnail is null ? null : await ProfileAppearance.ReadThumbnailAsync(thumbnail, ct).ConfigureAwait(false) });
         }
         if (profiles.Count == 0) throw new InvalidDataException("No Arsenal profiles were selected.");
         var imports = new List<ArsenalMod>();
@@ -70,7 +80,9 @@ public static class ArsenalReader
             var path = ResolveModDirectory(directory, Required(mod, "path"));
             if (!Directory.Exists(path)) throw new DirectoryNotFoundException($"Arsenal mod files were not found: {Text(mod, "label") ?? id} ({path})");
             var addedAt = DateTimeOffset.TryParse(Text(mod, "addedAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var added) ? added : (DateTimeOffset?)null;
-            imports.Add(new(id, Text(mod, "label") ?? Path.GetFileName(path), path, Text(mod, "description") ?? "", addedAt, ReadSource(mod)));
+            imports.Add(new(id, Text(mod, "label") ?? Path.GetFileName(path), path, Text(mod, "description") ?? "", addedAt, ReadSource(mod))
+            { Tags = mod.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
+                ? ModTags.Normalize(tags.EnumerateArray().Select(tag => tag.GetString() ?? "")) : [] });
         }
         return new(directory, Text(root, "selectedProfile"), imports, profiles);
     }
@@ -85,6 +97,21 @@ public static class ArsenalReader
         if (Path.IsPathFullyQualified(original)) return Path.GetFullPath(original);
         if (original.Replace('\\', '/').Split('/').Any(part => part == "..")) throw new InvalidDataException("Unsafe relative Arsenal mod directory.");
         return Path.GetFullPath(Path.Combine(directory, original.Replace('\\', Path.DirectorySeparatorChar)));
+    }
+    private static string? ResolveProfileImage(string directory, string original)
+    {
+        var parts = original.Replace('\\', '/').Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Any(part => part == "..")) throw new InvalidDataException("Unsafe Arsenal profile image path.");
+        var marker = Array.FindLastIndex(parts, part => part.Equals("hd2arsenal", StringComparison.OrdinalIgnoreCase));
+        if (marker >= 0 && marker < parts.Length - 1)
+        {
+            var local = Path.Combine(directory, Path.Combine(parts.Skip(marker + 1).ToArray()));
+            if (File.Exists(local)) return local;
+        }
+        var relative = Path.Combine(directory, original.Replace('\\', Path.DirectorySeparatorChar));
+        if (!Path.IsPathFullyQualified(original) && File.Exists(relative)) return relative;
+        if (Path.IsPathFullyQualified(original) && File.Exists(original)) return original;
+        return null;
     }
     private static IReadOnlyList<ArsenalOptionSelection>? ReadOptions(JsonElement options)
     {

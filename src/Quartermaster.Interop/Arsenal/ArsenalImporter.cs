@@ -27,6 +27,7 @@ public sealed class ArsenalImporter(ILibraryStore store, IModContentStore conten
                 {
                     Name = record.Name,
                     Description = record.Description,
+                    Tags = ModTags.Normalize(record.Tags.Concat(imported.Tags)),
                     ImportedAt = record.AddedAt ?? imported.ImportedAt,
                     Version = imported.Version ?? record.Source?.InstalledVersion,
                     Sources = record.Source is { } source ? [source with { InstalledVersion = source.InstalledVersion ?? imported.Version }] : imported.Sources
@@ -35,6 +36,8 @@ public sealed class ArsenalImporter(ILibraryStore store, IModContentStore conten
                 var existing = mods.FirstOrDefault(mod => ModIdentity.GetKey(mod) == identity);
                 if (existing is not null)
                 {
+                    existing = existing with { Tags = ModTags.Normalize(existing.Tags.Concat(imported.Tags)) };
+                    mods[mods.FindIndex(mod => mod.Id == existing.Id)] = existing;
                     await contents.DeleteAsync(imported.Id, CancellationToken.None).ConfigureAwait(false);
                     created.Remove(imported.Id);
                     mapping.Add(record.Id, existing);
@@ -60,14 +63,15 @@ public sealed class ArsenalImporter(ILibraryStore store, IModContentStore conten
                 {
                     if (row.GroupName is { } label)
                     {
-                        var group = new ProfileGroup(Guid.NewGuid(), label);
+                        var group = new ProfileGroup(Guid.NewGuid(), label)
+                        { BackgroundColor = row.BackgroundColor, TextColor = row.TextColor };
                         groups.Add(group); groupId = group.Id;
                         continue;
                     }
                     if (!mapping.TryGetValue(row.Id, out var mod)) throw new InvalidDataException($"Arsenal profile references a missing imported mod: {row.Id}");
                     entries.Add(new(mod.Id, row.Enabled, SelectOptions(mod, row.Options)) { GroupId = groupId });
                 }
-                var profile = new Profile(Guid.NewGuid(), source.Name, source.Priority, entries) { Groups = groups };
+                var profile = new Profile(Guid.NewGuid(), source.Name, source.Priority, entries) { Groups = groups, Thumbnail = source.Thumbnail };
                 var existing = profiles.FirstOrDefault(candidate => Equivalent(candidate, profile));
                 if (existing is not null) profile = existing;
                 else
@@ -126,7 +130,8 @@ public sealed class ArsenalImporter(ILibraryStore store, IModContentStore conten
     private static bool Equivalent(Profile left, Profile right)
     {
         if (left.Name != right.Name && !left.Name.StartsWith(right.Name + " (Arsenal", StringComparison.Ordinal)) return false;
-        if (left.Priority != right.Priority || !left.Groups.Select(group => group.Name).SequenceEqual(right.Groups.Select(group => group.Name)) || left.Entries.Count != right.Entries.Count) return false;
+        if (left.Thumbnail != right.Thumbnail || left.Priority != right.Priority ||
+            !left.Groups.Select(group => (group.Name, group.BackgroundColor, group.TextColor)).SequenceEqual(right.Groups.Select(group => (group.Name, group.BackgroundColor, group.TextColor))) || left.Entries.Count != right.Entries.Count) return false;
         for (var index = 0; index < left.Entries.Count; index++)
         {
             var a = left.Entries[index]; var b = right.Entries[index];

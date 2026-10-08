@@ -19,7 +19,8 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
   Skip to ignore that release at startup, or Cancel to decide later.
 
 - **Profiles:** enable mods, select their options, organize them into collapsible
-  groups, and drag them to change load order.
+  groups with custom colors, and drag them to change load order. Set profile
+  thumbnails from the sidebar and organize mods with searchable tags in mod details.
 
 - **Repatching:** repair outdated unit formats during deployment while keeping
   the original mod files. Choose automatic repatching, confirmation, or disable it.
@@ -61,8 +62,9 @@ Right-click a profile to rename, duplicate, delete, or export it. Import a profi
 ZIP through the create-profile dialog or by dropping it into the sidebar.
 
 To migrate from HD2 Arsenal, use **Settings → Imports → Import Arsenal profiles**.
-This copies the profiles and their mods, preserving groups, load order, enabled
-states, and option choices. See [Arsenal importing](docs/interop.md) for details.
+This copies the profiles and their mods, preserving colored groups, thumbnails,
+tags, load order, enabled states, and option choices.
+See [Arsenal importing](docs/interop.md) for details.
 
 ## Search and updates
 
