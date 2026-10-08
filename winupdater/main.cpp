@@ -5,6 +5,10 @@
 #include <stdexcept>
 #include <string>
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+
 namespace {
 template <typename Char> std::uint32_t positive_number(const Char *text) {
   std::uint64_t value = 0;
@@ -61,4 +65,9 @@ template <typename Char> int run(int argc, Char **argv) {
 }
 } // namespace
 
-int wmain(int argc, wchar_t **argv) { return run(argc, argv); }
+int wmain(int argc, wchar_t **argv) {
+  // Invalid update executables must return an error, not block rollback behind
+  // a Windows critical-error dialog (including when no desktop is available).
+  SetErrorMode(GetErrorMode() | SEM_FAILCRITICALERRORS);
+  return run(argc, argv);
+}
