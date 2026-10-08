@@ -28,3 +28,7 @@
       @created 2026-10-08 23:07
       @completed 2026-10-08 23:07
 
+- [x] fix: padding on popups is normal now
+      @created 2026-10-08 23:07
+      @completed 2026-10-08 23:08
+
