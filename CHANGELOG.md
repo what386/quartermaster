@@ -2,6 +2,17 @@
 
 *Generated on 2026-10-08*
 
+## 0.6.0 — 2026-10-08
+
+### Changes
+
+- feat: arsenal profile importing
+- feat: localization framework
+- feat: profile icon selection
+- feat: mod tags
+- fix: padding on popups is normal now
+
+
 ## 0.5.0 — 2026-10-08
 
 ### Changes
