@@ -13,6 +13,54 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDetailsTests
 {
     [AvaloniaFact]
+    public async Task CollisionsBelongToTheSelectedModAndRespectTheProfileContext()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var selected = await f.Services.Library.ImportAsync(f.Source("Selected", 1));
+        var winner = await f.Services.Library.ImportAsync(f.Source("Winner", 1));
+        var unrelated = await f.Services.Library.ImportAsync(f.Source("Unrelated", 2));
+        var unrelatedWinner = await f.Services.Library.ImportAsync(f.Source("Unrelated winner", 2));
+        var clear = await f.Services.Library.ImportAsync(f.Source("Clear", 3));
+        var primary = f.Services.Session.ActiveProfile! with { Name = "Primary" };
+        foreach (var mod in new[] { selected, winner, unrelated, unrelatedWinner, clear })
+            primary = ProfileEditor.Add(primary, mod);
+        await f.Services.Session.SaveProfileAsync(primary, true, CancellationToken.None);
+        var secondary = ProfileEditor.Add(ProfileEditor.Add(ProfileEditor.Create("Secondary"), selected), winner);
+        await f.Services.Session.SaveProfileAsync(secondary, false, CancellationToken.None);
+        var profiles = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
+        profiles.SelectedMod = profiles.Entries.Single(row => row.Mod.Id == selected.Id);
+        var details = profiles.Details!;
+        Assert.True(details.HasCollisions);
+        var collision = Assert.Single(details.Collisions);
+        Assert.Contains("Primary", collision); Assert.Contains("Clashes with Winner", collision);
+        Assert.Contains("Winner wins", collision); Assert.DoesNotContain("Unrelated", collision);
+        Assert.Equal("1 overlapping resource with Winner.", details.CollisionSummary);
+        Assert.True(profiles.SelectedMod.HasWarnings);
+        Assert.False(new ModDetailsViewModel(clear, f.Services).HasCollisions);
+        var libraryDetails = new ModDetailsViewModel(selected, f.Services);
+        Assert.Equal(2, libraryDetails.Collisions.Count);
+        Assert.Equal("1 overlapping resource with Winner across 2 profiles.", libraryDetails.CollisionSummary);
+        Assert.Contains(libraryDetails.Collisions, item => item.StartsWith("Secondary"));
+        var dialog = new ModDetailsDialog { DataContext = details };
+        dialog.FindControl<TabControl>("DetailsTabs")!.SelectedIndex = 2;
+        var window = new Window { Content = dialog }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            Assert.Equal(1, dialog.FindControl<ItemsControl>("CollisionsList")!.ItemCount);
+            primary = ProfileEditor.Move(primary, selected.Id, 1);
+            await f.Services.Session.SaveProfileAsync(primary, true, CancellationToken.None);
+            Assert.Contains("Selected wins", Assert.Single(details.Collisions));
+            await f.Services.Session.SaveProfileAsync(ProfileEditor.SetEnabled(primary, winner.Id, false), true, CancellationToken.None);
+            Assert.False(details.HasCollisions);
+            Assert.Empty(details.CollisionSummary);
+            Assert.False(profiles.Entries.Single(row => row.Mod.Id == selected.Id).HasWarnings);
+            Assert.Single(new ModDetailsViewModel(selected, f.Services).Collisions);
+        }
+        finally { window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ClosingDetailsSavesLinkAndInvalidLinkKeepsTheDialogOpen()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

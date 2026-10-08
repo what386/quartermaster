@@ -129,7 +129,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         Notify(nameof(Options)); Notify(nameof(Details)); Notify(nameof(ToggleLabel)); Notify(nameof(SelectedModName)); Notify(nameof(HasSelectedMod)); RefreshCommands();
     }
     public ModOptionsViewModel? Options { get; private set; }
-    public ModDetailsViewModel? Details => SelectedMod is null ? null : new(SelectedMod.Mod, Services);
+    public ModDetailsViewModel? Details => SelectedMod is null ? null : new(SelectedMod.Mod, Services, SelectedProfile?.Id);
     public Mod? ModToAdd { get => modToAdd; set { if (Set(ref modToAdd, value) && (!Operations.IsBusy || Operations.IsProgressVisible)) AddCommand.Refresh(); } }
     public string ToggleLabel => SelectedMod?.Entry.Enabled == true ? "Disable" : "Enable";
     public AsyncCommand MakeActiveCommand { get; }

@@ -1,4 +1,5 @@
 using Quartermaster.Library.Mods;
+using Quartermaster.Core.Deployment;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Shared;
 using Quartermaster.Gui.Services;
@@ -9,16 +10,18 @@ public sealed class ModDetailsViewModel : ViewModelBase
 {
     private Mod mod;
     private readonly AppServices services;
+    private readonly Guid? profileId;
     private string pageLink;
     private string savedPage;
     public string PageLink { get => pageLink; set => Set(ref pageLink, value); }
     public OperationState Operations => services.Operations;
     public AsyncCommand ResolveDependenciesCommand { get; }
     public bool CanResolveDependencies => services.Downloads.CanResolveDependencies(mod);
-    public ModDetailsViewModel(Mod mod, AppServices services)
+    public ModDetailsViewModel(Mod mod, AppServices services, Guid? profileId = null)
     {
         this.mod = mod;
         this.services = services;
+        this.profileId = profileId;
         pageLink = savedPage = ModLinks.PageFor(mod) ?? "";
         RefreshRelationships();
         ResolveDependenciesCommand = services.Operations.CreateCommand("Resolving dependencies", async ct =>
@@ -58,6 +61,9 @@ public sealed class ModDetailsViewModel : ViewModelBase
     public bool HasOptions => mod.Options.Count > 0;
     public IReadOnlyList<ModRelationshipItem> Dependencies { get; private set; } = [];
     public IReadOnlyList<ModRelationshipItem> Dependents { get; private set; } = [];
+    public IReadOnlyList<string> Collisions { get; private set; } = [];
+    public string CollisionSummary { get; private set; } = "";
+    public bool HasCollisions => Collisions.Count > 0;
     public bool HasDependencies => Dependencies.Count > 0;
     public bool HasDependents => Dependents.Count > 0;
     public string DependencySummary => mod.DependenciesKnown ? "No dependencies." : "Dependency information unavailable.";
@@ -81,6 +87,30 @@ public sealed class ModDetailsViewModel : ViewModelBase
         Notify(nameof(Dependencies)); Notify(nameof(Dependents));
         Notify(nameof(HasDependencies)); Notify(nameof(HasDependents)); Notify(nameof(DependencySummary));
         Notify(nameof(CanResolveDependencies)); ResolveDependenciesCommand?.Refresh();
+        RefreshCollisions();
+    }
+
+    private void RefreshCollisions()
+    {
+        var state = services.Session.State;
+        var mods = state.Mods.ToDictionary(item => item.Id);
+        var collisions = state.Profiles.Where(profile => (profileId is null || profile.Id == profileId) &&
+                profile.Entries.Any(entry => entry.ModId == mod.Id && entry.Enabled))
+            .SelectMany(profile => ConflictAnalyzer.Analyze(ProfilePatches.Resolve(state, profile)).Resources
+                .Where(conflict => conflict.SourceIds.Contains(mod.Id))
+                .Select(conflict => (Profile: profile, Conflict: conflict)))
+            .ToArray();
+        Collisions = collisions.Select(item => $"{item.Profile.Name} · Clashes with {string.Join(", ", item.Conflict.SourceIds.Where(id => id != mod.Id).Select(id => mods[id].Name))}" +
+            $" · {item.Conflict.Archive} · {item.Conflict.Resource.Id:x16}/{item.Conflict.Resource.Type:x16} · {mods[item.Conflict.WinningSourceId].Name} wins").ToArray();
+        var names = collisions.SelectMany(item => item.Conflict.SourceIds).Where(id => id != mod.Id)
+            .Distinct().Select(id => mods[id].Name).Order(StringComparer.OrdinalIgnoreCase).ToArray();
+        var resources = collisions.Select(item => (item.Conflict.Archive, item.Conflict.Resource)).Distinct().Count();
+        var profileCount = collisions.Select(item => item.Profile.Id).Distinct().Count();
+        CollisionSummary = collisions.Length == 0 ? "" :
+            $"{ModPresentation.Count(resources, "overlapping resource")} with {string.Join(", ", names.Take(3))}" +
+            (names.Length > 3 ? $" and {names.Length - 3} more" : "") +
+            (profileCount > 1 ? $" across {profileCount} profiles." : ".");
+        Notify(nameof(Collisions)); Notify(nameof(HasCollisions)); Notify(nameof(CollisionSummary));
     }
 
 }

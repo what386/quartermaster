@@ -71,6 +71,11 @@
             <TextBlock Grid.Row="1" Text="Imported" Classes="muted" /><TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ImportedAt}" />
           </Grid>
           <TextBlock Text="{Binding ResourceSummary}" TextWrapping="Wrap" />
+          <StackPanel Spacing="4">
+            <TextBlock Text="Collisions" FontWeight="SemiBold" />
+            <TextBlock Text="{Binding CollisionSummary}" IsVisible="{Binding HasCollisions}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" />
+            <TextBlock Text="No collisions." IsVisible="{Binding !HasCollisions}" Classes="muted" />
+          </StackPanel>
           <vm:ModPageLinkView />
           <TextBlock Text="This mod has options. Configure them in Profiles." IsVisible="{Binding HasOptions}" Classes="accent" TextWrapping="Wrap" />
         </StackPanel></ScrollViewer>
@@ -92,6 +97,14 @@
           <ItemsControl ItemsSource="{Binding Archives}" />
           <TextBlock Text="Patch files" FontWeight="SemiBold" />
           <ItemsControl ItemsSource="{Binding Files}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+          <StackPanel IsVisible="{Binding HasCollisions}" Spacing="8">
+            <TextBlock Text="Collisions" FontWeight="SemiBold" />
+            <ItemsControl x:Name="CollisionsList" ItemsSource="{Binding Collisions}">
+              <ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8" />
+              </DataTemplate></ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
         </StackPanel></ScrollViewer>
       </TabItem>
     </TabControl>

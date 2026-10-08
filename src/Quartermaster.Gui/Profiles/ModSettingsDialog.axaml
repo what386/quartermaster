@@ -9,12 +9,6 @@
           <mods:ModOptionsView DataContext="{Binding Options}" PreviewRequested="OpenPreview" />
           <Button Content="Apply options" Classes="primary" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
           <TextBlock Text="Choose variants above, then apply them to this profile." Classes="muted" FontSize="11" TextWrapping="Wrap" />
-          <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,1,0,0" Margin="0,6,0,0" Padding="0,12,0,0"><StackPanel Spacing="10">
-            <TextBlock Text="COLLISIONS" Classes="eyebrow" />
-            <TextBlock Text="{Binding ArchiveSummary}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
-            <TextBlock Text="No overlapping resources." IsVisible="{Binding !HasConflicts}" Classes="success" FontSize="11" />
-            <ItemsControl ItemsSource="{Binding Conflicts}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="x:String"><TextBlock Text="{Binding}" Foreground="{DynamicResource ClashBrush}" TextWrapping="Wrap" FontSize="11" Margin="0,0,0,8" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
-          </StackPanel></Border>
         </StackPanel></ScrollViewer></Border>
       </Border>
       <TextBlock Grid.Row="1" Text="{Binding Operations.Message}" IsVisible="{Binding Operations.IsError}"
