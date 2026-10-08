@@ -9,7 +9,7 @@ namespace Quartermaster.Interop.Arsenal;
 public static class ArsenalReader
 {
     public static string DefaultDirectory => Path.Combine(OperatingSystem.IsWindows()
-        ? Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData)
+        ? Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData)
         : Environment.GetEnvironmentVariable("XDG_CONFIG_HOME") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".config"), "hd2arsenal");
 
     public static async Task<ArsenalImportPlan> ReadAsync(string directory, IReadOnlyCollection<string>? profileKeys = null, CancellationToken ct = default)
