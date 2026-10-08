@@ -68,6 +68,7 @@ public sealed class SettingsTests
     [InlineData("game and deployment", "GameSettingsSection")]
     [InlineData("providers", "ProviderSettingsSection")]
     [InlineData("app information", "AppInformationSection")]
+    [InlineData("imports", "ImportsSettingsSection")]
     [InlineData("no matching settings here", null)]
     public async Task SearchShowsOnlyMatchingFunctionalSections(string search, string? expected)
     {
@@ -78,7 +79,7 @@ public sealed class SettingsTests
         {
             settings.Search = search; Dispatcher.UIThread.RunJobs();
             var view = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
-            foreach (var name in new[] { "AppSettingsSection", "GameSettingsSection", "DownloadsSettingsSection", "ProviderSettingsSection", "AppInformationSection" })
+            foreach (var name in new[] { "AppSettingsSection", "GameSettingsSection", "DownloadsSettingsSection", "ProviderSettingsSection", "AppInformationSection", "ImportsSettingsSection" })
                 Assert.Equal(name == expected, view.FindControl<Border>(name)!.IsEffectivelyVisible);
             Assert.Equal(expected is not null, settings.HasMatches);
         }

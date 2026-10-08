@@ -60,6 +60,10 @@ Use **Purge** to remove any deployed patches and have a vanilla game.
 Right-click a profile to rename, duplicate, delete, or export it. Import a profile
 ZIP through the create-profile dialog or by dropping it into the sidebar.
 
+To migrate from HD2 Arsenal, use **Settings → Imports → Import Arsenal profiles**.
+This copies the profiles and their mods, preserving groups, load order, enabled
+states, and option choices. See [Arsenal importing](docs/interop.md) for details.
+
 ## Search and updates
 
 Use **Search** to find Helldivers 2 mods on Nexus Mods. Choose **Open download

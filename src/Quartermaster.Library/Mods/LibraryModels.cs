@@ -58,7 +58,7 @@ public sealed record UpdateCheck(Guid ModId, string Provider, DateTimeOffset Che
     string? AvailableVersion, string? AvailableFileId, string? Error = null);
 
 /// <summary>Import identity uses patch contents and options, independent of generated IDs and ZIP wrapper folders.</summary>
-internal static class ModIdentity
+public static class ModIdentity
 {
     public static string GetKey(Mod mod)
     {

@@ -56,7 +56,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             if (!Set(ref search, value)) return;
             foreach (var name in new[] { nameof(ShowInstallation), nameof(ShowPriority), nameof(ShowRepatch), nameof(ShowStorage),
                 nameof(ShowVersion), nameof(ShowPlatform), nameof(ShowRuntime), nameof(ShowLogs), nameof(ShowConfiguration), nameof(ShowNexus), nameof(ShowGitHub), nameof(ShowAppearance),
-                nameof(ShowDownloads), nameof(ShowAppUpdates), nameof(ShowOnboarding), nameof(ShowLanguage), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
+                nameof(ShowImports), nameof(ShowDownloads), nameof(ShowAppUpdates), nameof(ShowOnboarding), nameof(ShowLanguage), nameof(ShowAppSettings), nameof(ShowGameSettings), nameof(ShowProviderSettings), nameof(ShowAppInformation), nameof(HasMatches) }) Notify(name);
         }
     }
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || Localizer.Current.SearchTerms(keywords).Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
@@ -77,7 +77,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowGameSettings => ShowInstallation || ShowPriority || ShowRepatch;
     public bool ShowProviderSettings => ShowNexus || ShowGitHub;
     public bool ShowAppInformation => ShowStorage || ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
-    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowProviderSettings || ShowAppInformation;
+    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowProviderSettings || ShowAppInformation || ShowImports;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;
@@ -137,6 +137,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             SelectedInstallation = Installations.FirstOrDefault();
         });
         InitializeProviderCommands();
+        InitializeInteropCommands();
         WatchSession();
     }
     private void LoadDrafts()

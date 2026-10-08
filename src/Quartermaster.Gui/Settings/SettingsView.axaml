@@ -67,6 +67,22 @@
         <vm:NexusSettingsView IsVisible="{Binding ShowNexus}" />
         <vm:GitHubSettingsView IsVisible="{Binding ShowGitHub}" />
       </StackPanel></Border>
+      <Border x:Name="ImportsSettingsSection" Classes="card" IsVisible="{Binding ShowImports}"><StackPanel Spacing="16">
+        <TextBlock Text="{loc:Loc 'Imports'}" Classes="sectionTitle" />
+        <Grid ColumnDefinitions="180,*">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{loc:Loc 'Arsenal profiles'}" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc 'Includes mods, groups, load order and option choices'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="8" HorizontalAlignment="Left">
+            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+              <shared:ContentSizedTextBox x:Name="ArsenalDirectoryInput" Text="{Binding ArsenalDirectory, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Arsenal data folder'}" />
+              <Button Content="{loc:Loc 'Browse'}" Command="{Binding BrowseArsenalCommand}" Grid.Column="1" />
+            </Grid>
+            <Button x:Name="ImportArsenalButton" Content="{loc:Loc 'Import Arsenal profiles'}" Classes="primary" Command="{Binding ImportArsenalCommand}" HorizontalAlignment="Left" />
+          </StackPanel>
+        </Grid>
+      </StackPanel></Border>
       <Border x:Name="AppInformationSection" Classes="card" IsVisible="{Binding ShowAppInformation}"><StackPanel Spacing="16">
         <TextBlock Text="{loc:Loc 'App information'}" Classes="sectionTitle" />
         <Grid x:Name="StorageSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowStorage}">
