@@ -10,6 +10,15 @@ public partial class MainWindow : Window
     {
         while (DialogOverlay.IsOpen) await DialogOverlay.WhenClosed.WaitAsync(ct);
     }
+    protected override void OnKeyDown(KeyEventArgs e)
+    {
+        if (!e.Handled && e.Key == Key.Escape && DialogOverlay.IsOpen)
+        {
+            DialogOverlay.CancelActiveDialog();
+            e.Handled = true;
+        }
+        else base.OnKeyDown(e);
+    }
     private async void DeployProfile(object? sender, TappedEventArgs e)
     {
         if (sender is not Button { DataContext: SidebarProfile profile } || DataContext is not MainWindowViewModel model) return;

@@ -1505,6 +1505,35 @@ public class GuiTests
     }
 
     [AvaloniaFact]
+    public async Task EscapeClosesTheActiveDialogWhenFocusIsOutsideIt()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var owner = new MainWindow { DataContext = f.Shell }; owner.Show();
+        try
+        {
+            var parent = new ModDetailsDialog();
+            var parentResult = owner.ShowDialogAsync<object?>(parent);
+            var dialogs = new DialogService(() => owner);
+            var answer = dialogs.ConfirmAsync("Confirm", "Continue?", "Continue");
+            owner.CaptureRenderedFrame()?.Dispose(); Dispatcher.UIThread.RunJobs();
+            owner.Focus();
+            owner.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            owner.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            Assert.False(await answer);
+            Assert.False(parentResult.IsCompleted);
+            Assert.True(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+
+            owner.Focus();
+            owner.KeyPress(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            owner.KeyRelease(Key.Escape, RawInputModifiers.None, PhysicalKey.Escape, null);
+            await parentResult;
+            Assert.False(owner.FindControl<DialogHost>("DialogOverlay")!.IsOpen);
+            Assert.True(owner.IsVisible);
+        }
+        finally { owner.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task ClosingWindowDismissesDialogAndReleasesWaitingOperation()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
