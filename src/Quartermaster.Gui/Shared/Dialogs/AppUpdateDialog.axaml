@@ -1,6 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="Quartermaster.Gui.Shared.AppUpdateDialog" Width="480">
-  <StackPanel Spacing="16">
+  <StackPanel Spacing="16" Margin="20">
     <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
     <TextBlock Text="Update Quartermaster and restart?" TextWrapping="Wrap" />
     <ScrollViewer MaxHeight="280" HorizontalScrollBarVisibility="Disabled">
