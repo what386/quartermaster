@@ -118,7 +118,9 @@ public sealed class LocalizationTests
         Directory.CreateDirectory(store.LocalizationDirectory);
         await File.WriteAllTextAsync(System.IO.Path.Combine(store.LocalizationDirectory, "de.json"), JsonSerializer.Serialize(new
         {
-            language = "de", name = "Deutsch", strings = new Dictionary<string,string>
+            language = "de",
+            name = "Deutsch",
+            strings = new Dictionary<string, string>
             { ["Settings"] = "Einstellungen", ["Save"] = "Speichern", ["Language"] = "Sprache", ["Library"] = "Bibliothek" }
         }));
         await store.SaveAsync(new(Language: "de", OnboardingCompleted: true), default);
@@ -166,7 +168,7 @@ public sealed class LocalizationTests
     {
         public string Path { get; } = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "qm-localization-" + Guid.NewGuid().ToString("N"));
         public CatalogDirectory() => Directory.CreateDirectory(Path);
-        public void Write(string language, Dictionary<string,string> strings) => File.WriteAllText(System.IO.Path.Combine(Path, language + ".json"),
+        public void Write(string language, Dictionary<string, string> strings) => File.WriteAllText(System.IO.Path.Combine(Path, language + ".json"),
             JsonSerializer.Serialize(new { language, name = language, strings }));
         public void Dispose() => Directory.Delete(Path, recursive: true);
     }

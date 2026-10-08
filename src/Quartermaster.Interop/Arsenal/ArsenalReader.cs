@@ -81,8 +81,10 @@ public static class ArsenalReader
             if (!Directory.Exists(path)) throw new DirectoryNotFoundException($"Arsenal mod files were not found: {Text(mod, "label") ?? id} ({path})");
             var addedAt = DateTimeOffset.TryParse(Text(mod, "addedAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var added) ? added : (DateTimeOffset?)null;
             imports.Add(new(id, Text(mod, "label") ?? Path.GetFileName(path), path, Text(mod, "description") ?? "", addedAt, ReadSource(mod))
-            { Tags = mod.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
-                ? ModTags.Normalize(tags.EnumerateArray().Select(tag => tag.GetString() ?? "")) : [] });
+            {
+                Tags = mod.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
+                ? ModTags.Normalize(tags.EnumerateArray().Select(tag => tag.GetString() ?? "")) : []
+            });
         }
         return new(directory, Text(root, "selectedProfile"), imports, profiles);
     }

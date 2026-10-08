@@ -34,7 +34,9 @@ public sealed class ArsenalTests
         // Old absolute Windows paths exercise portability on all test platforms.
         var data = new
         {
-            setTopPriority = topPriority, selectedProfile = "second", profileOrder = new[] { "second", "first" },
+            setTopPriority = topPriority,
+            selectedProfile = "second",
+            profileOrder = new[] { "second", "first" },
             modsLibrary = new object[]
             {
                 new { uuid=A, label="Renamed A", path=@"C:\Users\Old\hd2arsenal\mods\a", description="Original description",
@@ -42,19 +44,28 @@ public sealed class ArsenalTests
                 new { uuid=B, label="B", path=@"C:\Users\Old\hd2arsenal\mods\b", tags=new[]{"Weapons","UI"} },
                 new { uuid=Unused, label="Unused missing mod", path=@"C:\Users\Old\hd2arsenal\mods\unused" }
             },
-            modsList = new Dictionary<string,object>
+            modsList = new Dictionary<string, object>
             {
-                ["first"] = new { label="First", imagePath=@"C:\Users\Old\hd2arsenal\profile-images\first.png", mods=new object[] {
+                ["first"] = new
+                {
+                    label = "First",
+                    imagePath = @"C:\Users\Old\hd2arsenal\profile-images\first.png",
+                    mods = new object[] {
                     new { uuid=B, enabled=true },
                     new { uuid="sep1", type="separator", label="Weapons", backgroundColor="#fee800",textColor="#000000" },
                     new { uuid=A, enabled=false, optionsConfig=new[]{new {name="Color",enabled=true,suboptions=new[]{new {name="Blue",enabled=true}}}} },
                     new { uuid="sep2",type="separator",label="Empty group" }
-                } },
-                ["second"] = new { label="Second", mods=new object[] {
+                }
+                },
+                ["second"] = new
+                {
+                    label = "Second",
+                    mods = new object[] {
                     new { uuid="sep3",type="separator",label="Different group" },
                     new { uuid=A, enabled=true, optionsConfig=new[]{new {name="Color",enabled=false,suboptions=new[]{new {name="Blue",enabled=true}}}} },
                     new { uuid=B, enabled=false }
-                } }
+                }
+                }
             }
         };
         await File.WriteAllTextAsync(Path.Combine(root, "hd2a_data.json"), JsonSerializer.Serialize(data));
@@ -92,9 +103,9 @@ public sealed class ArsenalTests
         Assert.True(first.Entries[0].Enabled); Assert.False(first.Entries[1].Enabled);
         var option = Assert.Single(first.Entries[1].Options); Assert.True(option.Enabled); Assert.Equal(1, option.ChoiceIndex);
         var second = result.Profiles[0]; Assert.False(Assert.Single(second.Entries[0].Options).Enabled);
-        Assert.Equal(1,Assert.Single(second.Entries[0].Options).ChoiceIndex);
-        Assert.Equal(bytes, await File.ReadAllBytesAsync(Path.Combine(root,"hd2a_data.json")));
-        Assert.True(Directory.Exists(Path.Combine(root,"mods","a")));
+        Assert.Equal(1, Assert.Single(second.Entries[0].Options).ChoiceIndex);
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(Path.Combine(root, "hd2a_data.json")));
+        Assert.True(Directory.Exists(Path.Combine(root, "mods", "a")));
         var repeated = await importer.ImportAsync(plan);
         Assert.Equal(0, repeated.AddedMods); Assert.Equal(2, repeated.ReusedMods); Assert.Equal(0, repeated.AddedProfiles);
         Assert.Equal(3, (await f.Library.LoadAsync()).Profiles.Count);
@@ -106,8 +117,8 @@ public sealed class ArsenalTests
         using var f = new Fixture(); var root = await ArsenalData(f);
         var plan = await ArsenalReader.ReadAsync(root, ["second"]);
         Assert.Single(plan.Profiles); Assert.Equal(2, plan.Mods.Count);
-        await Assert.ThrowsAsync<InvalidDataException>(() => ArsenalReader.ReadAsync(root,["missing"]));
-        Directory.Delete(Path.Combine(root,"mods","a"),true);
+        await Assert.ThrowsAsync<InvalidDataException>(() => ArsenalReader.ReadAsync(root, ["missing"]));
+        Directory.Delete(Path.Combine(root, "mods", "a"), true);
         await Assert.ThrowsAsync<DirectoryNotFoundException>(() => ArsenalReader.ReadAsync(root));
         Assert.Empty((await f.Library.LoadAsync()).Mods);
     }
@@ -120,13 +131,13 @@ public sealed class ArsenalTests
         var optionFolder = Path.Combine(folder, "Legacy option"); Directory.CreateDirectory(optionFolder);
         foreach (var file in Directory.EnumerateFiles(folder)) File.Move(file, Path.Combine(optionFolder, Path.GetFileName(file)));
         var manifest = """{"Name":"Legacy mod","Version":"1.03","Options":["Legacy option"]}""";
-        await File.WriteAllTextAsync(Path.Combine(folder,"manifest.json"),manifest);
+        await File.WriteAllTextAsync(Path.Combine(folder, "manifest.json"), manifest);
         var plan = await ArsenalReader.ReadAsync(root);
-        await new ArsenalImporter(f.Store,f.Contents).ImportAsync(plan);
+        await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
         var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
-        Assert.Equal("Legacy option",Assert.Single(mod.Options).Name);
-        Assert.Equal("1.03",mod.Version);
-        Assert.Equal(manifest,await File.ReadAllTextAsync(Path.Combine(folder,"manifest.json")));
+        Assert.Equal("Legacy option", Assert.Single(mod.Options).Name);
+        Assert.Equal("1.03", mod.Version);
+        Assert.Equal(manifest, await File.ReadAllTextAsync(Path.Combine(folder, "manifest.json")));
     }
 
     [Fact]
@@ -135,11 +146,11 @@ public sealed class ArsenalTests
         using var f = new Fixture(); var root = await ArsenalData(f);
         var plan = await ArsenalReader.ReadAsync(root);
         var rows = plan.Profiles[0].Rows.Select(row => row.Id == A ? row with
-        { Options = [new("Removed option",true,[])] } : row).ToArray();
-        plan = plan with { Profiles = [plan.Profiles[0] with { Rows=rows }] };
-        await Assert.ThrowsAsync<InvalidDataException>(() => new ArsenalImporter(f.Store,f.Contents).ImportAsync(plan));
+        { Options = [new("Removed option", true, [])] } : row).ToArray();
+        plan = plan with { Profiles = [plan.Profiles[0] with { Rows = rows }] };
+        await Assert.ThrowsAsync<InvalidDataException>(() => new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan));
         Assert.Empty((await f.Library.LoadAsync()).Mods); Assert.Empty((await f.Library.LoadAsync()).Profiles);
-        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App,"library")));
+        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App, "library")));
     }
 
     [Fact]
@@ -150,10 +161,10 @@ public sealed class ArsenalTests
         var plan = await ArsenalReader.ReadAsync(root);
         var progress = new CancelOnSecondMod(cancellation);
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            new ArsenalImporter(f.Store,f.Contents).ImportAsync(plan,progress,cancellation.Token));
+            new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan, progress, cancellation.Token));
         Assert.Empty((await f.Library.LoadAsync()).Mods);
         Assert.Empty((await f.Library.LoadAsync()).Profiles);
-        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App,"library")));
+        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App, "library")));
     }
 
     private sealed class CancelOnSecondMod(CancellationTokenSource cancellation) : IProgress<ArsenalImportProgress>
@@ -165,22 +176,22 @@ public sealed class ArsenalTests
     public async Task FailedCommitRestoresMetadataBeforeDeletingNewContent()
     {
         using var f = new Fixture(); var root = await ArsenalData(f);
-        var profile = ProfileEditor.Create("Existing"); await f.Library.SaveProfileAsync(profile,true);
+        var profile = ProfileEditor.Create("Existing"); await f.Library.SaveProfileAsync(profile, true);
         var plan = await ArsenalReader.ReadAsync(root);
-        await Assert.ThrowsAsync<IOException>(() => new ArsenalImporter(new FailingStore(f.Store),f.Contents).ImportAsync(plan));
+        await Assert.ThrowsAsync<IOException>(() => new ArsenalImporter(new FailingStore(f.Store), f.Contents).ImportAsync(plan));
         var state = await f.Library.LoadAsync(); Assert.Equal(profile.Id, Assert.Single(state.Profiles).Id);
-        Assert.Empty(state.Mods); Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App,"library")));
+        Assert.Empty(state.Mods); Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App, "library")));
     }
 
     private sealed class FailingStore(ILibraryStore inner) : ILibraryStore
     {
         private bool fail = true;
-        public ValueTask<IAsyncDisposable> AcquireLockAsync(CancellationToken ct=default) => inner.AcquireLockAsync(ct);
-        public Task<LibraryState> LoadAsync(CancellationToken ct=default) => inner.LoadAsync(ct);
-        public async Task SaveAsync(LibraryState state,CancellationToken ct=default)
+        public ValueTask<IAsyncDisposable> AcquireLockAsync(CancellationToken ct = default) => inner.AcquireLockAsync(ct);
+        public Task<LibraryState> LoadAsync(CancellationToken ct = default) => inner.LoadAsync(ct);
+        public async Task SaveAsync(LibraryState state, CancellationToken ct = default)
         {
-            await inner.SaveAsync(state,ct);
-            if(fail) { fail=false; throw new IOException("Simulated commit failure"); }
+            await inner.SaveAsync(state, ct);
+            if (fail) { fail = false; throw new IOException("Simulated commit failure"); }
         }
     }
 }

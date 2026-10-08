@@ -36,7 +36,8 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
     {
         var files = await owner().StorageProvider.OpenFilePickerAsync(new()
         {
-            Title = Localizer.Text("Choose profile thumbnail"), AllowMultiple = false,
+            Title = Localizer.Text("Choose profile thumbnail"),
+            AllowMultiple = false,
             FileTypeFilter = [new FilePickerFileType(Localizer.Text("Images")) { Patterns = ["*.png", "*.jpg", "*.jpeg", "*.webp"] }]
         });
         return files.FirstOrDefault()?.TryGetLocalPath();
