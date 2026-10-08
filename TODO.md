@@ -16,7 +16,7 @@
       @created 2026-10-08 20:22
       @completed 2026-10-08 23:06
 
-- [x] feat: localization support
+- [x] feat: localization framework
       @created 2026-10-08 15:13
       @completed 2026-10-08 23:06
 
