@@ -98,6 +98,13 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     private ProfileModItem? selectedMod;
     private Mod? modToAdd;
     private string search = "";
+    private string descriptionDraft = "";
+    private string savedDescription = "";
+    private Guid? descriptionProfileId;
+    public string DescriptionDraft { get => descriptionDraft; set { if (Set(ref descriptionDraft, value)) SaveDescriptionCommand.Refresh(); } }
+    public bool HasDescription => !string.IsNullOrWhiteSpace(SelectedProfile?.Description);
+    public AsyncCommand SaveDescriptionCommand { get; }
+    public Command ResetDescriptionCommand { get; }
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
     public ObservableCollection<ProfileModItem> Entries { get; } = [];
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
@@ -112,6 +119,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public bool HasProfile => SelectedProfile is not null;
     public bool HasConflicts => Conflicts.Count > 0;
     public string ActiveLabel => SelectedProfile?.Id == Session.State.ActiveProfileId ? Localizer.Text("Active profile") : "";
+    public ConflictInspectorViewModel CreateConflictInspector(string? search = null) => new(Services, SelectedProfile!.Id, search);
     public Profile? SelectedProfile
     {
         get => profile;
@@ -154,6 +162,9 @@ public sealed partial class ProfilesViewModel : SessionViewModel
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
+        SaveDescriptionCommand = Operations.CreateCommand("Saving profile description", ct => Save(ProfileEditor.SetDescription(SelectedProfile!, DescriptionDraft), ct),
+            () => HasProfile && DescriptionDraft.Length <= ProfileEditor.MaxDescriptionLength && DescriptionDraft.Trim() != SelectedProfile!.Description);
+        ResetDescriptionCommand = new(() => DescriptionDraft = SelectedProfile?.Description ?? "", () => Operations.CanInteract);
         CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, Entries.Select(row => row.Mod.Id).ToArray()), () => HasProfile);
         ImportModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct, SelectedProfile!.Id), () => HasProfile);
         GetDependenciesCommand = Operations.CreateCommand("Getting dependencies",
@@ -221,6 +232,12 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     }
     private void RebuildEntries()
     {
+        if (descriptionProfileId != SelectedProfile?.Id || DescriptionDraft == savedDescription)
+            DescriptionDraft = SelectedProfile?.Description ?? "";
+        savedDescription = SelectedProfile?.Description ?? "";
+        descriptionProfileId = SelectedProfile?.Id;
+        Notify(nameof(HasDescription));
+        SaveDescriptionCommand.Refresh();
         var selection = SelectedListItem;
         var id = selectedMod?.Mod.Id;
         var existing = Entries.ToDictionary(row => row.Mod.Id);
@@ -278,6 +295,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     {
         if (Operations.IsBusy && !Operations.IsProgressVisible) return;
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand, GetDependenciesCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand, GetDependenciesCommand, SaveDescriptionCommand }) command.Refresh();
     }
 }

@@ -102,7 +102,8 @@ public sealed class LocalizationTests
         Directory.CreateDirectory(store.LocalizationDirectory);
         await File.WriteAllTextAsync(System.IO.Path.Combine(store.LocalizationDirectory, "de.json"), JsonSerializer.Serialize(new
         {
-            language = "de", name = "Deutsch",
+            language = "de",
+            name = "Deutsch",
             strings = new Dictionary<string, string> { ["Save"] = "Speichern", ["Library"] = "Bibliothek" }
         }));
         await store.SaveAsync(new(Language: "en", OnboardingCompleted: true), default);

@@ -34,6 +34,7 @@ public class ProfileArchiveTests
         profile = ProfileEditor.SetGroupColors(profile, profile.Groups[0].Id, "#fee800", "#000000");
         profile = profile with { Thumbnail = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==" };
         profile = ProfileEditor.AddGroup(profile, "Empty group") with { Priority = PriorityDirection.FirstWins };
+        profile = ProfileEditor.SetDescription(profile, "My armor loadout\nUse the red variant.");
         await sender.Library.SaveProfileAsync(profile, true);
         var destination = Path.Combine(sender.Root, "loadout.zip");
         await new ProfileArchives(sender.Store, sender.Contents).ExportAsync(profile.Id, destination);
@@ -50,6 +51,7 @@ public class ProfileArchiveTests
         var state = await receiver.Library.LoadAsync();
         Assert.NotEqual(profile.Id, imported.Id); Assert.Equal(profile.Name, imported.Name); Assert.Equal(profile.Priority, imported.Priority);
         Assert.Equal(profile.Thumbnail, imported.Thumbnail);
+        Assert.Equal(profile.Description, imported.Description);
         Assert.Equal("#FEE800", imported.Groups[0].BackgroundColor); Assert.Equal("#000000", imported.Groups[0].TextColor);
         Assert.Equal(active.Id, state.ActiveProfileId); Assert.Equal(2, state.Mods.Count); Assert.Equal(2, state.Profiles.Count);
         Assert.False(imported.Entries[0].Enabled); Assert.Equal(existing.Id, imported.Entries[1].ModId);

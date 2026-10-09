@@ -63,7 +63,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowInstallation => Matches("Game and deployment Helldivers 2 installation folder Steam path");
     public bool ShowPriority => Matches("Game and deployment Profile load priority earlier later entries order " + ActiveProfileName);
     public bool ShowRepatch => Matches("Game and deployment Repatching repair automatic ask never patches");
-    public bool ShowStorage => Matches("App information Library storage directory originals profiles " + LibraryDirectory);
+    public bool ShowStorage => Matches("Storage Library storage management cleanup disk space temporary files previous versions originals profiles " + LibraryDirectory);
     public bool ShowVersion => Matches("App information Quartermaster application version build " + ApplicationVersion);
     public bool ShowPlatform => Matches("App information Operating system platform architecture " + PlatformInformation);
     public bool ShowRuntime => Matches("App information Runtime .NET " + RuntimeVersion);
@@ -76,8 +76,8 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowAppSettings => ShowAppearance || ShowAppUpdates || ShowOnboarding || ShowLanguage;
     public bool ShowGameSettings => ShowInstallation || ShowPriority || ShowRepatch;
     public bool ShowProviderSettings => ShowNexus || ShowGitHub;
-    public bool ShowAppInformation => ShowStorage || ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
-    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowProviderSettings || ShowAppInformation || ShowImports;
+    public bool ShowAppInformation => ShowVersion || ShowPlatform || ShowRuntime || ShowLogs || ShowConfiguration;
+    public bool HasMatches => ShowAppSettings || ShowGameSettings || ShowDownloads || ShowStorage || ShowProviderSettings || ShowAppInformation || ShowImports;
     public IReadOnlyList<string> Installations { get; private set; } = [];
     public bool HasInstallations => Installations.Count > 0;
     public string LibraryDirectory => Services.DataDirectory;
@@ -138,6 +138,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
         });
         InitializeProviderCommands();
         InitializeInteropCommands();
+        InitializeStorageCommands();
         WatchSession();
     }
     private void LoadDrafts()
