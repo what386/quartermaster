@@ -24,3 +24,7 @@
       @created 2026-10-09 17:41
       @completed 2026-10-09 19:55
 
+- [x] feat: localization for some common languages 
+      @created 2026-10-09 19:57
+      @completed 2026-10-09 19:57
+
