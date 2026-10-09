@@ -20,7 +20,14 @@ Disclaimer: This is actively in development and has yet to hit a stable v1.0 rel
 
 - **Profiles:** enable mods, select their options, organize them into collapsible
   groups with custom colors, and drag them to change load order. Set profile
-  thumbnails from the sidebar and organize mods with searchable tags in mod details.
+  thumbnails from the sidebar, add descriptions and setup notes, and organize mods
+  with searchable tags in mod details. Descriptions travel with duplicated and shared profiles.
+
+- **Conflict inspection:** compare contributing mods and selected patch files for
+  each overlapping resource, see which mod wins, and preview either load-priority direction.
+
+- **Storage management:** inspect per-mod disk usage and selectively clean up
+  unused previous versions, orphaned library content, and abandoned staging files.
 
 - **Repatching:** repair outdated unit formats during deployment while keeping
   the original mod files. Choose automatic repatching, confirmation, or disable it.
@@ -57,6 +64,12 @@ Changes to a profile take effect when you deploy it. The deployed profile is
 marked green; yellow mod outlines indicate a difference from what is deployed.
 
 Use **Purge** to remove any deployed patches and have a vanilla game.
+
+Use **Edit description** beneath the profile title to save notes for a loadout.
+Choose **Inspect conflicts**, or right-click a mod and select it, to inspect
+overlapping resources. The priority selector previews the winner without changing
+the profile or deployed files; change the profile's load priority in Settings to
+apply a different direction, then redeploy.
 
 Right-click a profile to rename, duplicate, delete, or export it. Import a profile
 ZIP through the create-profile dialog or by dropping it into the sidebar.
@@ -126,6 +139,16 @@ deployment. **Export repatched ZIP** in a mod's Library context menu saves a
 repaired copy separately. Repatching is experimental, expect some failures.
 
 Profile exports include mod files, load order, groups, and option selections.
+
+The **Settings → Storage** card shows application usage and reclaimable space.
+Open **Manage storage…** to see
+application storage, tracked deployed patches in the game folder, and usage by mod.
+Select cleanup candidates and choose **Remove selected** to review and confirm them.
+Previous versions used by any profile (including disabled entries) or tracked
+deployment are protected. Cleanup also keeps downloads, app update files, and
+unrecognized folders. Abandoned import, profile-import, and deployment staging
+directories become eligible after one day. Changed or newly protected candidates
+are skipped; incomplete deployments protect library content until you purge or redeploy.
 
 Provider credentials are stored separately and are excluded from exports.
 
