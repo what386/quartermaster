@@ -33,6 +33,8 @@ public static class StateValidation
         }
         foreach (var profile in state.Profiles)
         {
+            if (profile.Description is null || profile.Description.Length > ProfileEditor.MaxDescriptionLength)
+                throw new ArgumentException("Invalid profile description.");
             ProfileAppearance.ValidateThumbnail(profile.Thumbnail);
             foreach (var group in profile.Groups)
             { ProfileAppearance.NormalizeColor(group.BackgroundColor); ProfileAppearance.NormalizeColor(group.TextColor); }

@@ -15,12 +15,19 @@ public sealed record ProfileGroup(Guid Id, string Name, bool IsExpanded = true)
 }
 public sealed record Profile(Guid Id, string Name, PriorityDirection Priority, IReadOnlyList<ProfileEntry> Entries)
 {
+    public string Description { get; init; } = "";
     public IReadOnlyList<ProfileGroup> Groups { get; init; } = [];
     public string? Thumbnail { get; init; }
 }
 
 public static class ProfileEditor
 {
+    public const int MaxDescriptionLength = 4000;
+    public static Profile SetDescription(Profile profile, string description)
+    {
+        if (description.Length > MaxDescriptionLength) throw new ArgumentException("Profile descriptions must be 4000 characters or fewer.");
+        return profile with { Description = description.Trim() };
+    }
     public static Profile Create(string name) => new(Guid.NewGuid(), Name(name), PriorityDirection.LastWins, []);
     public static Profile Duplicate(Profile profile)
     {
