@@ -21,6 +21,9 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
     private string nexusApiKey = "";
     private string gitHubToken = "";
     private LanguageOption selectedLanguage = new("", "System default");
+    private bool previewedLanguage;
+    // Keep the option list stable so live localization does not reset the ComboBox selection.
+    private IReadOnlyList<LanguageOption> languages = [];
     public event Action<SetupOutcome>? Completed;
     public int Step => step;
     public bool IsLanguage => step == 0;
@@ -48,18 +51,21 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
         private set => Set(ref error, value);
     }
     public string Progress => IsReady ? Localizer.Text("SETUP COMPLETE") : Localizer.Interpolate($"SETUP · {step + 1} / 6");
-    public IReadOnlyList<LanguageOption> Languages
+    public IReadOnlyList<LanguageOption> Languages => languages;
+    private void LoadLanguages()
     {
-        get
-        {
-            var options = Localizer.Current.Languages;
-            return options.Any(option => option.Code == selectedLanguage.Code) ? options : options.Append(selectedLanguage).ToArray();
-        }
+        var options = Localizer.Current.Languages;
+        languages = options.Any(option => option.Code == selectedLanguage.Code) ? options : options.Append(selectedLanguage).ToArray();
     }
     public LanguageOption SelectedLanguage
     {
         get => selectedLanguage;
-        set { if (value is not null) Set(ref selectedLanguage, value); }
+        set
+        {
+            if (value is null || !Set(ref selectedLanguage, value)) return;
+            previewedLanguage = true;
+            Localizer.Current.SetLanguage(value.Code);
+        }
     }
     public string Title =>
         step switch
@@ -147,9 +153,11 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
     public SetupViewModel(AppServices services, CancellationToken ct)
     {
         this.services = services;
+        LoadLanguages();
         var language = services.Session.Settings.Language ?? "";
-        SelectedLanguage = Languages.FirstOrDefault(option => option.Code == language)
+        selectedLanguage = Languages.FirstOrDefault(option => option.Code == language)
             ?? new LanguageOption(language, Localizer.Interpolate($"Saved language ({language})"));
+        LoadLanguages();
         cancellation = CancellationTokenSource.CreateLinkedTokenSource(ct, services.Lifetime);
         GamePath = services.Session.GameDirectory;
         DownloadFolder =
@@ -375,5 +383,7 @@ public sealed class SetupViewModel : ViewModelBase, IDisposable
     {
         cancellation.Cancel();
         cancellation.Dispose();
+        if (previewedLanguage && SelectedLanguage.Code != (services.Session.Settings.Language ?? ""))
+            Localizer.Current.SetLanguage(services.Session.Settings.Language);
     }
 }

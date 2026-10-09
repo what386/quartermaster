@@ -238,6 +238,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         finally
         {
             Settings = await Task.Run(() => settingsStore.LoadAsync(CancellationToken.None));
+            Localizer.Current.SetLanguage(Settings.Language);
             await ReloadAsync(CancellationToken.None);
         }
     }

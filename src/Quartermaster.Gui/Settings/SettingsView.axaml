@@ -14,7 +14,6 @@
         <Grid ColumnDefinitions="180,*" IsVisible="{Binding ShowLanguage}">
           <StackPanel Spacing="4">
             <TextBlock Text="{loc:Loc 'Language'}" FontWeight="SemiBold" />
-            <TextBlock Text="{loc:Loc 'Restart Quartermaster after saving'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" />
           </StackPanel>
           <ComboBox x:Name="LanguageSelector" Grid.Column="1" ItemsSource="{Binding Languages}" SelectedItem="{Binding SelectedLanguage, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
         </Grid>

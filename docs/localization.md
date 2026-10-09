@@ -1,7 +1,5 @@
 # Localization
 
-Quartermaster ships an English source catalog. Select **Settings → App settings → Language**, save, and restart to apply a language. **System default** follows the operating system's UI language; missing languages and strings fall back to English. Existing settings files keep this default.
-
 ## Adding a translation
 
 Copy `src/Quartermaster.Gui/Localization/Catalogs/en.json`, change `language` to a .NET culture code (such as `de`, `es`, or `pt-BR`), and change `name` to the language's native name. Translate the **values** in `strings`; keep the English keys unchanged. Partial catalogs work.
@@ -12,6 +10,8 @@ Put the UTF-8 JSON file in either:
 - `localization/` next to `settings.json`, for user-installed language packs.
 
 User-installed catalogs take precedence. Available catalogs appear in the language selector after restarting. Regional cultures fall back to their parent catalog, then English. Invalid catalogs are ignored; `Localizer.LoadDirectory` returns their validation errors.
+
+Any json files added to Catalogs are automatically picked up, so long as they are named after a .NET culture code.
 
 ```json
 {
