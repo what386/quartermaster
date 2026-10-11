@@ -517,7 +517,7 @@
     "Describe this loadout, its purpose, or any setup notes…": "描述此模组配置、用途或设置说明…",
     "Save description": "保存描述",
     "Inspect conflicts": "查看冲突",
-    "Conflict inspector": "冲突检查器",
+    "Conflict inspector: {0}": "冲突检查器：{0}",
     "Unknown version": "未知版本",
     "{0} wins": "{0} 优先",
     "Loadout position {0}": "模组配置中的位置 {0}",

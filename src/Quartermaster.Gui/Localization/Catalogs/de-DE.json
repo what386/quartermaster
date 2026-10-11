@@ -517,7 +517,7 @@
     "Describe this loadout, its purpose, or any setup notes…": "Beschreibe dieses Loadout, seinen Zweck oder Hinweise zur Einrichtung…",
     "Save description": "Beschreibung speichern",
     "Inspect conflicts": "Konflikte prüfen",
-    "Conflict inspector": "Konfliktanalyse",
+    "Conflict inspector: {0}": "Konfliktanalyse: {0}",
     "Unknown version": "Unbekannte Version",
     "{0} wins": "{0} gewinnt",
     "Loadout position {0}": "Loadout-Position {0}",

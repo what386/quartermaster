@@ -517,7 +517,7 @@
     "Describe this loadout, its purpose, or any setup notes…": "Décrivez cette configuration de mods, son objectif ou les étapes de mise en place…",
     "Save description": "Enregistrer la description",
     "Inspect conflicts": "Examiner les conflits",
-    "Conflict inspector": "Inspecteur de conflits",
+    "Conflict inspector: {0}": "Inspecteur de conflits: {0}",
     "Unknown version": "Version inconnue",
     "{0} wins": "{0} l’emporte",
     "Loadout position {0}": "Position dans la configuration : {0}",

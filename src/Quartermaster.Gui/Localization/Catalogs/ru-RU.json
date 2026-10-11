@@ -517,7 +517,7 @@
     "Describe this loadout, its purpose, or any setup notes…": "Опишите набор модов, его назначение или особенности настройки…",
     "Save description": "Сохранить описание",
     "Inspect conflicts": "Просмотреть конфликты",
-    "Conflict inspector": "Анализ конфликтов",
+    "Conflict inspector: {0}": "Анализ конфликтов: {0}",
     "Unknown version": "Неизвестная версия",
     "{0} wins": "Побеждает {0}",
     "Loadout position {0}": "Позиция в наборе модов: {0}",

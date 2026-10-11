@@ -104,7 +104,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public string DescriptionDraft { get => descriptionDraft; set { if (Set(ref descriptionDraft, value)) SaveDescriptionCommand.Refresh(); } }
     public bool HasDescription => !string.IsNullOrWhiteSpace(SelectedProfile?.Description);
     public AsyncCommand SaveDescriptionCommand { get; }
-    public Command ResetDescriptionCommand { get; }
     public IReadOnlyList<Profile> Profiles { get; private set; } = [];
     public ObservableCollection<ProfileModItem> Entries { get; } = [];
     public IReadOnlyList<Mod> AvailableMods { get; private set; } = [];
@@ -164,7 +163,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     {
         SaveDescriptionCommand = Operations.CreateCommand("Saving profile description", ct => Save(ProfileEditor.SetDescription(SelectedProfile!, DescriptionDraft), ct),
             () => HasProfile && DescriptionDraft.Length <= ProfileEditor.MaxDescriptionLength && DescriptionDraft.Trim() != SelectedProfile!.Description);
-        ResetDescriptionCommand = new(() => DescriptionDraft = SelectedProfile?.Description ?? "", () => Operations.CanInteract);
         CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, Entries.Select(row => row.Mod.Id).ToArray()), () => HasProfile);
         ImportModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct, SelectedProfile!.Id), () => HasProfile);
         GetDependenciesCommand = Operations.CreateCommand("Getting dependencies",

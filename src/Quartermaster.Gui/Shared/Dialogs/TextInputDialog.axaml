@@ -1,14 +1,16 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
         x:Class="Quartermaster.Gui.Shared.TextInputDialog"
         Width="360">
-  <StackPanel Spacing="16">
-    <TextBlock x:Name="TitleText" Classes="pageTitle" TextWrapping="Wrap" />
+  <StackPanel Spacing="16" Margin="20">
     <TextBlock x:Name="PromptText" Classes="muted" TextWrapping="Wrap" />
     <shared:ContentSizedTextBox x:Name="NameInput" PlaceholderText="{loc:Loc 'Profile name'}" TextChanged="NameChanged" />
     <Button x:Name="ChooseFileButton" Content="{loc:Loc 'Choose from file…'}" IsVisible="False" HorizontalAlignment="Left" Click="ChooseFile" />
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="{loc:Loc 'Cancel'}" Click="CancelInput" />
-      <Button x:Name="AcceptButton" Classes="primary" IsEnabled="False" Click="AcceptInput" />
-    </StackPanel>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock x:Name="TitleText" Classes="sectionTitle" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+        <Button Content="{loc:Loc 'Cancel'}" Click="CancelInput" />
+        <Button x:Name="AcceptButton" Classes="primary" IsEnabled="False" Click="AcceptInput" />
+      </StackPanel>
+    </Grid>
   </StackPanel>
 </UserControl>

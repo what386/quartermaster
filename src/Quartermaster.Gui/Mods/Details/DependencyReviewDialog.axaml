@@ -3,7 +3,6 @@
              xmlns:p="clr-namespace:Quartermaster.Providers.Clients;assembly=Quartermaster.Providers"
              x:Class="Quartermaster.Gui.Mods.DependencyReviewDialog" x:DataType="vm:DependencyReviewViewModel" Width="520">
   <StackPanel Spacing="16" Margin="20">
-    <TextBlock Text="{loc:Loc 'Dependencies'}" Classes="sectionTitle" />
     <TextBlock Text="{Binding Name}" Classes="muted" TextWrapping="Wrap" />
     <ScrollViewer MaxHeight="360">
       <StackPanel Spacing="12" IsEnabled="{Binding !IsUpdating}">
@@ -31,9 +30,12 @@
     </ScrollViewer>
     <TextBlock Text="{loc:Loc 'Updating file requirements…'}" IsVisible="{Binding IsUpdating}" Classes="muted" />
     <TextBlock Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" TextWrapping="Wrap" />
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button Content="{Binding CancelLabel}" Click="CancelReview" />
-      <Button Content="{Binding AcceptLabel}" IsEnabled="{Binding CanAccept}" Classes="primary" Click="AcceptReview" />
-    </StackPanel>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock Text="{loc:Loc 'Dependencies'}" Classes="sectionTitle" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+        <Button Content="{Binding CancelLabel}" Click="CancelReview" />
+        <Button Content="{Binding AcceptLabel}" IsEnabled="{Binding CanAccept}" Classes="primary" Click="AcceptReview" />
+      </StackPanel>
+    </Grid>
   </StackPanel>
 </UserControl>

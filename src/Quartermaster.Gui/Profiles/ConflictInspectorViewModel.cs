@@ -35,6 +35,7 @@ public sealed class ConflictInspectorViewModel : ViewModelBase, IDisposable
     private int priorityChoice;
     private ConflictResourceRow? selected;
     public string ProfileName => services.Session.State.Profiles.FirstOrDefault(profile => profile.Id == profileId)?.Name ?? "";
+    public string Title => Localizer.Interpolate($"Conflict inspector: {ProfileName}");
     public IReadOnlyList<string> PriorityChoices => Localizer.Current.Choices("Later entries win", "Earlier entries win");
     public int PriorityChoice { get => priorityChoice; set { if (value is >= 0 and <= 1 && Set(ref priorityChoice, value)) Refresh(); } }
     public bool IsPreview => services.Session.State.Profiles.FirstOrDefault(profile => profile.Id == profileId) is { } profile && (int)profile.Priority != PriorityChoice;
@@ -72,7 +73,7 @@ public sealed class ConflictInspectorViewModel : ViewModelBase, IDisposable
         Resources = report.Resources.OrderBy(row => row.Archive, StringComparer.Ordinal).ThenBy(row => row.Resource.Type).ThenBy(row => row.Resource.Id)
             .Select(row => new ConflictResourceRow(row, names)).ToArray();
         SharedArchives = report.Archives.Select(row => row.Archive + " · " + string.Join(" · ", row.SourceIds.Select(id => names[id]))).ToArray();
-        foreach (var name in new[] { nameof(ProfileName), nameof(Resources), nameof(VisibleResources), nameof(HasVisibleResources), nameof(SharedArchives),
+        foreach (var name in new[] { nameof(ProfileName), nameof(Title), nameof(Resources), nameof(VisibleResources), nameof(HasVisibleResources), nameof(SharedArchives),
             nameof(Summary), nameof(IsPreview), nameof(PriorityExplanation) }) Notify(name);
         SelectedResource = VisibleResources.FirstOrDefault(row => row.Conflict.Archive == previous?.Archive && row.Conflict.Resource == previous?.Resource)
             ?? VisibleResources.FirstOrDefault();

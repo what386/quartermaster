@@ -84,8 +84,11 @@ public sealed class ManagementFeatureTests
         Assert.True(model.HasDescription);
         var saved = (await f.Services.Library.LoadAsync()).Profiles.Single(p => p.Id == model.SelectedProfile!.Id);
         Assert.Equal(model.DescriptionDraft, saved.Description);
-        model.DescriptionDraft = "Discard this"; model.ResetDescriptionCommand.Execute(null);
-        Assert.Equal(saved.Description, model.DescriptionDraft);
+        model.DescriptionDraft = "";
+        await model.SaveDescriptionCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError);
+        Assert.False(model.HasDescription);
+        Assert.Equal("", (await f.Services.Library.LoadAsync()).Profiles.Single(p => p.Id == model.SelectedProfile!.Id).Description);
         var another = ProfileEditor.Create("Another");
         await f.Services.Session.SaveProfileAsync(another, true, default);
         Assert.Equal("", model.DescriptionDraft);

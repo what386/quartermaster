@@ -517,7 +517,7 @@
     "Describe this loadout, its purpose, or any setup notes…": "Describe this loadout, its purpose, or any setup notes…",
     "Save description": "Save description",
     "Inspect conflicts": "Inspect conflicts",
-    "Conflict inspector": "Conflict inspector",
+    "Conflict inspector: {0}": "Conflict inspector: {0}",
     "Unknown version": "Unknown version",
     "{0} wins": "{0} wins",
     "Loadout position {0}": "Loadout position {0}",

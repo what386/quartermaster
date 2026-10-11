@@ -3,7 +3,7 @@
              x:Class="Quartermaster.Gui.Profiles.ConflictInspectorDialog" x:DataType="vm:ConflictInspectorViewModel" Width="920" Height="580">
   <UserControl.Styles><Style Selector="Border.winner"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /></Style></UserControl.Styles>
   <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20" RowSpacing="12">
-    <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Conflict inspector'}" Classes="pageTitle" /><TextBlock Text="{Binding ProfileName}" FontWeight="SemiBold" /><TextBlock Text="{Binding Summary}" Classes="muted" /></StackPanel>
+    <TextBlock Text="{Binding Summary}" Classes="muted" />
     <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
       <TextBox x:Name="ConflictSearch" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Search mods, archives or resources…'}" />
       <ComboBox x:Name="ConflictPriority" Grid.Column="1" ItemsSource="{Binding PriorityChoices}" SelectedIndex="{Binding PriorityChoice, Mode=TwoWay}" Width="220" />
@@ -29,6 +29,9 @@
         <Expander Header="{loc:Loc 'Shared archives'}"><StackPanel Spacing="8"><TextBlock Text="{loc:Loc 'Sharing an archive does not necessarily mean mods replace the same resources.'}" Classes="muted" TextWrapping="Wrap" /><ItemsControl ItemsSource="{Binding SharedArchives}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></Expander>
       </StackPanel></ScrollViewer>
     </Grid>
-    <Button Grid.Row="3" Content="{loc:Loc 'Close'}" Click="CloseDialog" HorizontalAlignment="Right" />
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock Text="{Binding Title}" Classes="sectionTitle" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+      <Button Grid.Column="1" Content="{loc:Loc 'Close'}" Click="CloseDialog" />
+    </Grid>
   </Grid>
 </UserControl>
