@@ -1,4 +1,4 @@
-# Changelog — Untitled
+# Changelog — Quartermaster
 
 *Generated on 2026-10-12*
 
