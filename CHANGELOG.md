@@ -1,6 +1,16 @@
 # Changelog — Untitled
 
-*Generated on 2026-10-08*
+*Generated on 2026-10-12*
+
+## 0.7.0 — 2026-10-12
+
+### Changes
+
+- feat: visual conflict inspection
+- feat: storage management
+- feat: profile descriptions
+- feat: localization for some common languages
+
 
 ## 0.6.0 — 2026-10-08
 
