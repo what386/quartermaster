@@ -11,9 +11,10 @@ public sealed record LanguageOption(string Code, string Name)
 }
 
 /// <summary>English source text is the translation key; user content is never translated.</summary>
-public sealed class Localizer
+public sealed class Localizer : INotifyPropertyChanged
 {
     public static Localizer Current { get; } = new();
+    public event PropertyChangedEventHandler? PropertyChanged;
     private readonly Dictionary<string, Catalog> catalogs = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<WeakReference<ILocalizationListener>> bindings = [];
     private readonly Dictionary<string, IReadOnlyList<string>> choices = [];
@@ -84,6 +85,7 @@ public sealed class Localizer
         bindings.RemoveAll(reference => !reference.TryGetTarget(out _));
         foreach (var reference in bindings.ToArray())
             if (reference.TryGetTarget(out var binding)) binding.RefreshLocalization();
+        PropertyChanged?.Invoke(this, new(nameof(Language)));
     }
     public string Get(string source)
     {

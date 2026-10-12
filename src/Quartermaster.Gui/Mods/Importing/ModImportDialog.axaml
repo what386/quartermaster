@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization" xmlns:shared="clr-namespace:Quartermaster.Gui.Shared"
              x:Class="Quartermaster.Gui.Mods.ModImportDialog" Width="460">
   <StackPanel Spacing="16" Margin="20">
-    <TextBlock Text="{loc:Loc 'Import mod'}" Classes="pageTitle" />
     <TextBlock x:Name="SourceText" TextWrapping="Wrap" />
     <StackPanel Spacing="6">
       <TextBlock Text="{loc:Loc 'Mod page URL (optional)'}" />
@@ -9,9 +8,12 @@
       <TextBlock Text="{loc:Loc 'Save the mod\&#x27;s page now to check for updates later.'}" Classes="muted" TextWrapping="Wrap" />
       <TextBlock x:Name="ValidationText" IsVisible="False" TextWrapping="Wrap" />
     </StackPanel>
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="10">
-      <Button Content="{loc:Loc 'Cancel'}" Click="CancelImport" />
-      <Button x:Name="AcceptButton" Content="{loc:Loc 'Import'}" Classes="primary" Click="AcceptImport" />
-    </StackPanel>
+    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock Text="{loc:Loc 'Import mod'}" Classes="sectionTitle" TextWrapping="Wrap" VerticalAlignment="Center" />
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+        <Button Content="{loc:Loc 'Cancel'}" Click="CancelImport" />
+        <Button x:Name="AcceptButton" Content="{loc:Loc 'Import'}" Classes="primary" Click="AcceptImport" />
+      </StackPanel>
+    </Grid>
   </StackPanel>
 </UserControl>

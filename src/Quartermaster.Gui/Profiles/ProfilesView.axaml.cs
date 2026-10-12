@@ -63,4 +63,14 @@ public partial class ProfilesView : UserControl
         try { await owner.ShowDialogAsync<object?>(modDialog); }
         finally { modDialog = null; }
     }
+    private async void OpenConflicts(object? sender, RoutedEventArgs e)
+    {
+        if (modDialog is not null || DataContext is not ProfilesViewModel { HasProfile: true, Operations.CanInteract: true } model ||
+            TopLevel.GetTopLevel(this) is not MainWindow owner) return;
+        ProfileModsList.ContextMenu?.Close();
+        using var inspector = model.CreateConflictInspector(sender is MenuItem ? model.SelectedMod?.Name : null);
+        modDialog = new ConflictInspectorDialog { DataContext = inspector };
+        try { await owner.ShowDialogAsync<object?>(modDialog); }
+        finally { modDialog = null; }
+    }
 }

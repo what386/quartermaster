@@ -9,6 +9,9 @@ import unittest
 
 UPDATER = Path(sys.argv.pop(1)).resolve()
 APP = Path(sys.argv.pop(1)).resolve()
+# Start the helper with Windows' default error mode, so these tests cannot pass
+# just because Python or the CI runner already suppressed launch-error dialogs.
+UPDATER_CREATION_FLAGS = 0x04000000 if os.name == "nt" else 0  # CREATE_DEFAULT_ERROR_MODE
 
 
 class UpdaterTests(unittest.TestCase):
@@ -51,7 +54,8 @@ class UpdaterTests(unittest.TestCase):
                 str(source or self.source), str(self.target), self.name, str(timeout)]
 
     def run_update(self, **kwargs):
-        return subprocess.run(self.command(**kwargs), capture_output=True, text=True, timeout=10)
+        return subprocess.run(self.command(**kwargs), capture_output=True, text=True,
+                              timeout=10, creationflags=UPDATER_CREATION_FLAGS)
 
     def assert_unchanged(self):
         self.assertEqual((self.target / self.name).read_bytes(), b"previous application")
@@ -108,6 +112,7 @@ class UpdaterTests(unittest.TestCase):
         (self.target / "winupdater" / UPDATER.name).write_bytes(b"previous updater")
         result = self.run_update()
         self.assertEqual(result.returncode, 1)
+        self.assertIn("Cannot restart Quartermaster", result.stderr)
         self.assert_unchanged()
         self.assertFalse((self.target / "new-file.txt").exists())
         self.assertFalse((self.target / "new-directory").exists())
@@ -179,10 +184,12 @@ class UpdaterTests(unittest.TestCase):
         self.stop_parent()
         (self.source / self.name).write_bytes(b"not an executable")
         log = self.root / "update log ü.txt"
-        result = subprocess.run(self.command() + [str(log)], capture_output=True, text=True, timeout=10)
+        result = subprocess.run(self.command() + [str(log)], capture_output=True, text=True,
+                                timeout=10, creationflags=UPDATER_CREATION_FLAGS)
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stderr, "")
         self.assertIn("Quartermaster update failed", log.read_text())
+        self.assertIn("Cannot restart Quartermaster", log.read_text())
         self.assert_unchanged()
 
     def test_arguments_are_validated(self):

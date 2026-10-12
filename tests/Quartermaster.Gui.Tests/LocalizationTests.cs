@@ -95,19 +95,45 @@ public sealed class LocalizationTests
     }
 
     [AvaloniaFact]
-    public async Task LanguageSettingSavesWithoutChangingTheRunningLanguage()
+    public async Task LanguageSettingAppliesOnSaveToTheRunningWindowAndPersists()
     {
-        using var f = new Fixture(); await f.Shell.InitializeAsync(); f.Shell.Navigate(PageKind.Settings);
-        var settings = Assert.IsType<SettingsViewModel>(f.Shell.CurrentPage);
-        var before = Localizer.Current.Language;
-        settings.SelectedLanguage = settings.Languages.Single(language => language.Code == "en");
-        Assert.True(settings.SaveCommand.CanExecute(null));
-        await settings.SaveCommand.ExecuteAsync();
-        Assert.False(f.Services.Operations.IsError);
-        Assert.Equal("en", f.Services.Session.Settings.Language);
-        Assert.Equal(before, Localizer.Current.Language);
-        settings.ResetCommand.Execute(null);
-        Assert.Equal("", settings.SelectedLanguage.Code);
+        using var f = new Fixture();
+        var store = new SettingsStore(f.Services.DataDirectory);
+        Directory.CreateDirectory(store.LocalizationDirectory);
+        await File.WriteAllTextAsync(System.IO.Path.Combine(store.LocalizationDirectory, "de.json"), JsonSerializer.Serialize(new
+        {
+            language = "de",
+            name = "Deutsch",
+            strings = new Dictionary<string, string> { ["Save"] = "Speichern", ["Library"] = "Bibliothek" }
+        }));
+        await store.SaveAsync(new(Language: "en", OnboardingCompleted: true), default);
+        MainWindow? window = null;
+        try
+        {
+            await f.Shell.InitializeAsync(); f.Shell.Navigate(PageKind.Settings);
+            window = new MainWindow { DataContext = f.Shell }; window.Show();
+            window.CaptureRenderedFrame()?.Dispose(); Dispatcher.UIThread.RunJobs();
+            var settings = Assert.IsType<SettingsViewModel>(f.Shell.CurrentPage);
+            settings.SelectedLanguage = settings.Languages.Single(language => language.Code == "de");
+            Assert.Equal("en", Localizer.Current.Language);
+            Assert.True(settings.SaveCommand.CanExecute(null));
+            await settings.SaveCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+            Assert.False(f.Services.Operations.IsError);
+            Assert.Equal("de", f.Services.Session.Settings.Language);
+            Assert.Equal("de", (await store.LoadAsync(default)).Language);
+            Assert.Equal("de", Localizer.Current.Language);
+            Assert.Equal("Bibliothek", f.Shell.LibraryNavigation.Label);
+            var view = Assert.Single(window.GetVisualDescendants().OfType<SettingsView>());
+            Assert.Contains(view.GetVisualDescendants().OfType<Button>(), button => Equals(button.Content, "Speichern"));
+            settings.SelectedLanguage = settings.Languages.Single(language => language.Code == "en");
+            await settings.SaveCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
+            Assert.Equal("en", Localizer.Current.Language);
+            Assert.Equal("Library", f.Shell.LibraryNavigation.Label);
+            Assert.Contains(view.GetVisualDescendants().OfType<Button>(), button => Equals(button.Content, "Save"));
+            settings.ResetCommand.Execute(null);
+            Assert.Equal("", settings.SelectedLanguage.Code);
+        }
+        finally { window?.Close(); Localizer.Current.SetLanguage("en"); }
     }
 
     [AvaloniaFact]

@@ -56,8 +56,10 @@ void restart(const fs::path &executable, const fs::path &working_directory) {
   STARTUPINFOW startup{};
   startup.cb = sizeof(startup);
   PROCESS_INFORMATION process{};
+  // The application should not inherit the updater's dialog suppression.
   if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr,
-                      FALSE, 0, nullptr, working_directory.c_str(), &startup,
+                      FALSE, CREATE_DEFAULT_ERROR_MODE, nullptr,
+                      working_directory.c_str(), &startup,
                       &process))
     throw std::system_error(static_cast<int>(GetLastError()),
                             std::system_category(),

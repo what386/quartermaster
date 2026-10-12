@@ -8,6 +8,21 @@ namespace Quartermaster.Library.Tests;
 
 public class ProfileTests
 {
+    [Fact]
+    public async Task DescriptionsPersistDuplicateAndDefaultForOlderProfiles()
+    {
+        using var f = new Fixture();
+        var profile = ProfileEditor.SetDescription(ProfileEditor.Create("Notes"), "  Weapon replacements\nKeep the HUD enabled.  ");
+        await f.Library.SaveProfileAsync(profile, true);
+        Assert.Equal("Weapon replacements\nKeep the HUD enabled.", Assert.Single((await f.Library.LoadAsync()).Profiles).Description);
+        Assert.Equal(profile.Description, ProfileEditor.Duplicate(profile).Description);
+        Assert.Equal("", ProfileEditor.Create("Legacy").Description);
+        Assert.Throws<ArgumentException>(() => ProfileEditor.SetDescription(profile, new string('a', ProfileEditor.MaxDescriptionLength + 1)));
+        var legacy = global::System.Text.Json.JsonSerializer.Deserialize<Profile>("""
+            {"Id":"d1e6c3ba-2146-400b-83eb-7788f052c015","Name":"Legacy","Priority":0,"Entries":[]}
+            """);
+        Assert.Equal("", legacy!.Description);
+    }
     private const string Archive = "9ba626afa44a3aa3";
     private const string Other = "0123456789abcdef";
     private static Mod Mod(params PatchSet[] sets) => new(Guid.NewGuid(), "Test", "", null, null, DateTimeOffset.UtcNow, sets, [], []);

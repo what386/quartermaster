@@ -23,7 +23,7 @@ public class OnboardingTests
         var store = new SettingsStore(f.Data);
         Directory.CreateDirectory(store.LocalizationDirectory);
         await File.WriteAllTextAsync(Path.Combine(store.LocalizationDirectory, "de.json"), """
-            {"language":"de","name":"Deutsch","strings":{"Confirm your game folder":"Spielordner bestätigen"}}
+            {"language":"de","name":"Deutsch","strings":{"Choose your language":"Sprache auswählen","Confirm your game folder":"Spielordner bestätigen"}}
             """, TestContext.Current.CancellationToken);
         await f.Shell.InitializeAsync();
         using var model = new SetupViewModel(f.Services, CancellationToken.None);
@@ -37,6 +37,11 @@ public class OnboardingTests
             var selector = dialog.FindControl<ComboBox>("LanguageSelector")!;
             Assert.True(selector.IsEffectivelyVisible);
             selector.SelectedItem = model.Languages.Single(language => language.Code == "de");
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("de", Localizer.Current.Language);
+            Assert.Equal(model.SelectedLanguage, selector.SelectedItem);
+            Assert.Equal("Sprache auswählen", model.Title);
+            Assert.Contains(dialog.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Sprache auswählen");
             await model.NextCommand.ExecuteAsync(); Dispatcher.UIThread.RunJobs();
             Assert.True(model.IsGame); Assert.Equal("Spielordner bestätigen", model.Title);
             Assert.Equal("de", f.Services.Session.Settings.Language);
@@ -45,8 +50,36 @@ public class OnboardingTests
             Assert.Contains(dialog.GetVisualDescendants().OfType<TextBlock>(), text => text.Text == "Spielordner bestätigen");
             model.BackCommand.Execute(null); Dispatcher.UIThread.RunJobs();
             Assert.True(model.IsLanguage); Assert.Equal("de", model.SelectedLanguage.Code);
+            selector.SelectedItem = model.Languages.Single(language => language.Code == "");
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("", model.SelectedLanguage.Code);
+            Assert.Equal(model.SelectedLanguage, selector.SelectedItem);
+            selector.SelectedItem = model.Languages.Single(language => language.Code == "de");
+            Dispatcher.UIThread.RunJobs();
+            Assert.Equal("de", Localizer.Current.Language);
         }
         finally { window.Close(); Localizer.Current.SetLanguage("en"); }
+    }
+
+    [AvaloniaFact]
+    public async Task ClosingSetupWithoutConfirmingLanguageRestoresTheSavedLanguage()
+    {
+        using var f = new Fixture();
+        var store = new SettingsStore(f.Data);
+        Directory.CreateDirectory(store.LocalizationDirectory);
+        await File.WriteAllTextAsync(Path.Combine(store.LocalizationDirectory, "de.json"), """
+            {"language":"de","name":"Deutsch","strings":{"Choose your language":"Sprache auswählen"}}
+            """, TestContext.Current.CancellationToken);
+        await store.SaveAsync(new(Language: "en"), default);
+        await f.Shell.InitializeAsync();
+        using (var model = new SetupViewModel(f.Services, CancellationToken.None))
+        {
+            model.SelectedLanguage = model.Languages.Single(language => language.Code == "de");
+            Assert.Equal("de", Localizer.Current.Language);
+            Assert.Equal("en", f.Services.Session.Settings.Language);
+        }
+        Assert.Equal("en", Localizer.Current.Language);
+        Assert.Equal("en", (await store.LoadAsync(default)).Language);
     }
 
     [AvaloniaTheory]

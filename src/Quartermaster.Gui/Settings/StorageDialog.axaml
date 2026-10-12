@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Settings" x:Class="Quartermaster.Gui.Settings.StorageDialog" x:DataType="vm:SettingsViewModel" Width="820" Height="570">
+  <Grid RowDefinitions="Auto,*,Auto" Margin="20" RowSpacing="12">
+    <Grid ColumnDefinitions="*,Auto"><TextBlock Text="{loc:Loc 'Storage management'}" Classes="pageTitle" /><Button Grid.Column="1" Content="{loc:Loc 'Refresh'}" Command="{Binding ScanStorageCommand}" /></Grid>
+    <ScrollViewer Grid.Row="1"><StackPanel Spacing="16" Margin="0,0,12,0" IsEnabled="{Binding Operations.CanInteract}">
+      <SelectableTextBlock Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" />
+      <StackPanel IsVisible="{Binding HasStorageReport}"><TextBlock Text="{loc:Loc 'Application storage'}" Classes="muted" /><TextBlock Text="{Binding StorageTotal}" FontSize="24" FontWeight="SemiBold" /></StackPanel>
+      <Grid ColumnDefinitions="*,*,*" ColumnSpacing="16" IsVisible="{Binding HasStorageReport}">
+        <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Mod originals'}" /><TextBlock Text="{Binding StorageLibrary}" /><ProgressBar Value="{Binding StorageLibraryPercent}" Maximum="100" Height="5" /></StackPanel>
+        <StackPanel Grid.Column="1" Spacing="4"><TextBlock Text="{loc:Loc 'Temporary files'}" /><TextBlock Text="{Binding StorageTemporary}" /><ProgressBar Value="{Binding StorageTemporaryPercent}" Maximum="100" Height="5" /></StackPanel>
+        <StackPanel Grid.Column="2" Spacing="4"><TextBlock Text="{loc:Loc 'Settings and other files'}" /><TextBlock Text="{Binding StorageOther}" /><ProgressBar Value="{Binding StorageOtherPercent}" Maximum="100" Height="5" /></StackPanel>
+      </Grid>
+      <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasStorageReport}"><TextBlock Text="{loc:Loc 'Tracked deployed patches in the game folder'}" Classes="muted" /><TextBlock Grid.Column="1" Text="{Binding StorageDeployed}" /></Grid>
+      <TextBlock Text="{loc:Loc 'Cleanup candidates'}" Classes="sectionTitle" />
+      <TextBlock Text="{loc:Loc 'Files used by any profile or tracked deployment are protected. Active downloads and update files are kept.'}" Classes="muted" TextWrapping="Wrap" />
+      <TextBlock Text="{loc:Loc 'Deployment state is incomplete or unknown. Purge or redeploy before removing library content.'}" IsVisible="{Binding IsStorageDeploymentUncertain}" Classes="error" TextWrapping="Wrap" />
+      <TextBlock Text="{loc:Loc 'No cleanup candidates found.'}" IsVisible="{Binding !HasStorageCandidates}" Classes="muted" />
+      <ItemsControl ItemsSource="{Binding StorageCandidates}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:StorageCleanupRow">
+        <Border Classes="card" Margin="0,0,0,6" Padding="10"><Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+          <CheckBox IsChecked="{Binding IsSelected, Mode=TwoWay}" VerticalAlignment="Center" AutomationProperties.Name="{Binding Name}" />
+          <StackPanel Grid.Column="1"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding Reason}" Classes="muted" TextWrapping="Wrap" /></StackPanel>
+          <TextBlock Grid.Column="2" Text="{Binding Size}" VerticalAlignment="Center" />
+        </Grid></Border>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+      <TextBlock Text="{loc:Loc 'Storage by mod'}" Classes="sectionTitle" />
+      <ItemsControl ItemsSource="{Binding StorageMods}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:StorageModRow">
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,8"><StackPanel><TextBlock Text="{Binding Name}" FontWeight="SemiBold" /><TextBlock Text="{Binding Version}" Classes="muted" /><TextBlock Text="{Binding Usage}" Classes="muted" TextWrapping="Wrap" /></StackPanel><TextBlock Grid.Column="1" Text="{Binding Size}" /></Grid>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </StackPanel></ScrollViewer>
+    <StackPanel Grid.Row="2" Spacing="8"><TextBlock Text="{Binding StorageCleanupResult}" Classes="muted" TextWrapping="Wrap" />
+      <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8"><TextBlock Text="{Binding StorageSelectionSummary}" VerticalAlignment="Center" /><Button Grid.Column="1" Content="{loc:Loc 'Remove selected'}" Classes="danger" Command="{Binding CleanStorageCommand}" /><Button Grid.Column="2" Content="{loc:Loc 'Close'}" Click="CloseDialog" IsEnabled="{Binding Operations.CanInteract}" /></Grid>
+    </StackPanel>
+  </Grid>
+</UserControl>

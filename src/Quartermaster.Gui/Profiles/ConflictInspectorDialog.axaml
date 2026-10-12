@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Profiles" xmlns:mods="clr-namespace:Quartermaster.Gui.Mods"
+             x:Class="Quartermaster.Gui.Profiles.ConflictInspectorDialog" x:DataType="vm:ConflictInspectorViewModel" Width="920" Height="580">
+  <UserControl.Styles><Style Selector="Border.winner"><Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" /><Setter Property="BorderThickness" Value="2" /></Style></UserControl.Styles>
+  <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="20" RowSpacing="12">
+    <TextBlock Text="{Binding Summary}" Classes="muted" />
+    <Grid Grid.Row="1" ColumnDefinitions="*,Auto" ColumnSpacing="12">
+      <TextBox x:Name="ConflictSearch" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Search mods, archives or resources…'}" />
+      <ComboBox x:Name="ConflictPriority" Grid.Column="1" ItemsSource="{Binding PriorityChoices}" SelectedIndex="{Binding PriorityChoice, Mode=TwoWay}" Width="220" />
+    </Grid>
+    <Grid Grid.Row="2" ColumnDefinitions="280,*" ColumnSpacing="16">
+      <Grid RowDefinitions="Auto,*"><TextBlock Text="{loc:Loc 'Overlapping resources'}" FontWeight="SemiBold" Margin="0,0,0,8" />
+        <ListBox x:Name="ConflictResources" Grid.Row="1" ItemsSource="{Binding VisibleResources}" SelectedItem="{Binding SelectedResource, Mode=TwoWay}">
+          <ListBox.ItemTemplate><DataTemplate x:DataType="vm:ConflictResourceRow"><StackPanel Margin="0,4" Spacing="3"><TextBlock Text="{Binding Archive}" FontWeight="SemiBold" /><TextBlock Text="{Binding Resource}" FontSize="10" FontFamily="monospace" /><TextBlock Text="{Binding Winner}" Foreground="{DynamicResource AccentForegroundBrush}" TextWrapping="Wrap" /><TextBlock Text="{Binding Contributors}" Classes="muted" TextWrapping="Wrap" /></StackPanel></DataTemplate></ListBox.ItemTemplate>
+        </ListBox>
+      </Grid>
+      <ScrollViewer Grid.Column="1"><StackPanel Spacing="12" Margin="0,0,12,0">
+        <TextBlock Text="{Binding PriorityExplanation}" Classes="muted" TextWrapping="Wrap" />
+        <TextBlock Text="{loc:Loc 'No overlapping resources match this search.'}" Classes="muted" IsVisible="{Binding !HasVisibleResources}" TextWrapping="Wrap" />
+        <StackPanel IsVisible="{Binding HasSelectedResource}" Spacing="4"><TextBlock Text="{Binding SelectedResource.Archive}" FontWeight="SemiBold" /><SelectableTextBlock Text="{Binding SelectedResource.Resource}" FontFamily="monospace" /><TextBlock Text="{loc:Loc 'Contributing mods'}" Classes="sectionTitle" Margin="0,8,0,0" /></StackPanel>
+        <ItemsControl ItemsSource="{Binding Contributors}"><ItemsControl.ItemsPanel><ItemsPanelTemplate><UniformGrid Columns="2" /></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:ConflictContributorRow"><Border Classes="card" Classes.winner="{Binding IsWinner}" Padding="12" Margin="0,0,8,8"><StackPanel Spacing="6">
+            <mods:ModPreviewImage FilePath="{Binding IconPath}" CanPreview="False" Height="72" Stretch="Uniform" />
+            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Version}" Classes="muted" /><TextBlock Text="{Binding Order}" Classes="muted" />
+            <TextBlock Text="{Binding Outcome}" FontWeight="SemiBold" TextWrapping="Wrap" /><TextBlock Text="{Binding Description}" TextWrapping="Wrap" MaxHeight="80" TextTrimming="CharacterEllipsis" />
+            <TextBlock Text="{loc:Loc 'Selected patch files'}" Classes="muted" /><SelectableTextBlock Text="{Binding Files}" FontSize="10" TextWrapping="Wrap" />
+          </StackPanel></Border></DataTemplate></ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Expander Header="{loc:Loc 'Shared archives'}"><StackPanel Spacing="8"><TextBlock Text="{loc:Loc 'Sharing an archive does not necessarily mean mods replace the same resources.'}" Classes="muted" TextWrapping="Wrap" /><ItemsControl ItemsSource="{Binding SharedArchives}"><ItemsControl.ItemTemplate><DataTemplate><TextBlock Text="{Binding}" TextWrapping="Wrap" Margin="0,0,0,6" /></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></StackPanel></Expander>
+      </StackPanel></ScrollViewer>
+    </Grid>
+    <Grid Grid.Row="3" ColumnDefinitions="*,Auto" ColumnSpacing="16">
+      <TextBlock Text="{Binding Title}" Classes="sectionTitle" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Title}" />
+      <Button Grid.Column="1" Content="{loc:Loc 'Close'}" Click="CloseDialog" />
+    </Grid>
+  </Grid>
+</UserControl>
