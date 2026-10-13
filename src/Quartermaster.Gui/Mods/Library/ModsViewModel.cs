@@ -159,8 +159,8 @@ public sealed class ModsViewModel : SessionViewModel
         Operations.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OperationState.IsBusy) && (!Operations.IsBusy || Operations.IsProgressVisible)) foreach (var row in Mods) row.UpdateCommand?.Refresh(); };
         ImportZipCommand = Operations.CreateCommand("Importing mod", async ct =>
         {
-            var path = await Services.Dialogs.PickModZipAsync();
-            if (path is not null) await Session.ImportAsync(path, ct);
+            foreach (var path in await Services.Dialogs.PickModZipsAsync())
+                await Session.ImportAsync(path, ct);
         });
         ImportFolderCommand = Operations.CreateCommand("Importing mod", async ct =>
         {
