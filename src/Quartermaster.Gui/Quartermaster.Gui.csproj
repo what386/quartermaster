@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets/icon.ico</ApplicationIcon>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
   </PropertyGroup>
@@ -12,6 +13,11 @@
   <ItemGroup>
     <EmbeddedResource Include="Localization/Catalogs/en.json" />
     <AvaloniaResource Include="Assets/**" />
+    <None Update="Assets/icon.png"
+          TargetPath="icon.png"
+          CopyToOutputDirectory="PreserveNewest"
+          CopyToPublishDirectory="PreserveNewest"
+          ExcludeFromSingleFile="true" />
     <ProjectReference Include="../Quartermaster.Providers/Quartermaster.Providers.csproj" />
     <ProjectReference Include="../Quartermaster.Library/Quartermaster.Library.csproj" />
     <ProjectReference Include="../Quartermaster.Interop/Quartermaster.Interop.csproj" />

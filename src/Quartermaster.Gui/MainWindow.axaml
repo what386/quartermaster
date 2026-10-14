@@ -5,7 +5,8 @@
         xmlns:downloads="clr-namespace:Quartermaster.Gui.Downloads" xmlns:services="clr-namespace:Quartermaster.Gui.Services"
         xmlns:onboarding="clr-namespace:Quartermaster.Gui.Onboarding"
         x:Class="Quartermaster.Gui.MainWindow" x:DataType="local:MainWindowViewModel"
-        Title="Quartermaster" Width="1320" Height="850" MinWidth="1040" MinHeight="680">
+        Title="Quartermaster" Icon="avares://Quartermaster.Gui/Assets/icon.png"
+        Width="1320" Height="850" MinWidth="1040" MinHeight="680">
   <Window.DataTemplates>
     <DataTemplate DataType="{x:Type mods:ModsViewModel}"><mods:ModsView /></DataTemplate>
     <DataTemplate DataType="{x:Type profiles:ProfilesViewModel}"><profiles:ProfilesView /></DataTemplate>
