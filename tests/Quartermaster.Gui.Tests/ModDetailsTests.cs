@@ -13,6 +13,49 @@ namespace Quartermaster.Gui.Tests;
 public sealed class ModDetailsTests
 {
     [AvaloniaFact]
+    public async Task ProfileModPageActionFollowsSelectionAndUpdatedMetadata()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var linked = await f.Services.Library.ImportAsync(f.Source("Linked"), pageLink: "https://mods.example/linked");
+        var provider = await f.Services.Library.ImportAsync(f.Source("Provider"));
+        await f.Services.Library.SetSourcesAsync(provider.Id, [new("nexusmods", "123", "456")]);
+        var local = await f.Services.Library.ImportAsync(f.Source("Local"));
+        var profile = f.Services.Session.ActiveProfile!;
+        foreach (var mod in new[] { linked, provider, local }) profile = ProfileEditor.Add(profile, mod);
+        await f.Services.Session.SaveProfileAsync(profile, true, CancellationToken.None);
+        var model = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
+        var view = new ProfilesView { DataContext = model };
+        var list = view.FindControl<ListBox>("ProfileModsList")!;
+        var menu = list.ContextMenu!;
+        var window = new Window { Content = view }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            menu.Open(list);
+            var item = menu.Items.OfType<MenuItem>().Single(item => Equals(item.Header, "Open mod page"));
+            Assert.Same(model.OpenModPageCommand, item.Command);
+            foreach (var mod in new[] { linked, provider })
+            {
+                model.SelectedMod = model.Entries.Single(row => row.Mod.Id == mod.Id);
+                Assert.True(model.OpenModPageCommand.CanExecute(null));
+                await model.OpenModPageCommand.ExecuteAsync();
+            }
+            Assert.Equal(new[] { "https://mods.example/linked", "https://www.nexusmods.com/helldivers2/mods/123" },
+                f.BrowserRequests.Select(uri => uri.AbsoluteUri));
+            model.SelectedMod = model.Entries.Single(row => row.Mod.Id == local.Id);
+            Assert.False(model.OpenModPageCommand.CanExecute(null));
+            await f.Services.Library.SetPageLinkAsync(local.Id, "https://mods.example/added");
+            await f.Services.Session.ReloadAsync(CancellationToken.None);
+            Assert.True(model.OpenModPageCommand.CanExecute(null));
+            await model.OpenModPageCommand.ExecuteAsync();
+            Assert.Equal("https://mods.example/added", f.BrowserRequests.Last().AbsoluteUri);
+            model.SelectedMod = null;
+            Assert.False(model.OpenModPageCommand.CanExecute(null));
+        }
+        finally { menu.Close(); window.Close(); }
+    }
+
+    [AvaloniaFact]
     public async Task DependencyStatesAndActionsFollowTheLibraryAndSelectedProfile()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();

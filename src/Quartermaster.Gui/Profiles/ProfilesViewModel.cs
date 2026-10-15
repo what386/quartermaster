@@ -155,12 +155,20 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public AsyncCommand CheckUpdatesCommand { get; }
     public AsyncCommand ImportModCommand { get; }
     public AsyncCommand GetDependenciesCommand { get; }
+    public AsyncCommand OpenModPageCommand { get; }
+    private Uri? SelectedModPage => SelectedMod is { } row && Uri.TryCreate(ModLinks.PageFor(row.Mod), UriKind.Absolute, out var uri) &&
+        uri.Scheme is "https" or "http" ? uri : null;
     public bool HasDependencyAction => HasProfile && SelectedMod is { } row && Services.Downloads.CanResolveDependencies(row.Mod) &&
         ModDependencyState.MissingCount(row.Mod, Session.State, SelectedProfile!.Id) > 0;
     public string DependencyActionLabel => SelectedMod is { } row ? ModDependencyState.ActionLabel(row.Mod, Session.State, SelectedProfile?.Id) : Localizer.Text("Add dependencies to profile");
 
     public ProfilesViewModel(AppServices services) : base(services)
     {
+        OpenModPageCommand = Operations.CreateCommand("Opening mod page", _ =>
+        {
+            Services.OpenBrowser(SelectedModPage!);
+            return Task.CompletedTask;
+        }, () => SelectedModPage is not null);
         SaveDescriptionCommand = Operations.CreateCommand("Saving profile description", ct => Save(ProfileEditor.SetDescription(SelectedProfile!, DescriptionDraft), ct),
             () => HasProfile && DescriptionDraft.Length <= ProfileEditor.MaxDescriptionLength && DescriptionDraft.Trim() != SelectedProfile!.Description);
         CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, Entries.Select(row => row.Mod.Id).ToArray()), () => HasProfile);
@@ -293,6 +301,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     {
         if (Operations.IsBusy && !Operations.IsProgressVisible) return;
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand, GetDependenciesCommand, SaveDescriptionCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand, GetDependenciesCommand, OpenModPageCommand, SaveDescriptionCommand }) command.Refresh();
     }
 }
