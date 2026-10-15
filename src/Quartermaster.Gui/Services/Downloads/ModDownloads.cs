@@ -77,7 +77,13 @@ public sealed partial class ModDownloads : ViewModelBase
         ct.ThrowIfCancellationRequested();
         if (request.Kind == ModImportKind.Link)
         { await AddLinkAsync(request.Link ?? "", ct, profileId); return; }
-        var path = request.Kind == ModImportKind.Zip ? await services.Dialogs.PickModZipAsync() : await services.Dialogs.PickFolderAsync(Localizer.Text("Import mod folder"));
+        if (request.Kind == ModImportKind.Zip)
+        {
+            foreach (var source in await services.Dialogs.PickModZipsAsync())
+                await services.Session.ImportAsync(source, ct, profileId);
+            return;
+        }
+        var path = await services.Dialogs.PickFolderAsync(Localizer.Text("Import mod folder"));
         if (path is not null) await services.Session.ImportAsync(path, ct, profileId);
     }
     public async Task AddLinkAsync(string link, CancellationToken ct, Guid? profileId = null)

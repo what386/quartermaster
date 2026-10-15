@@ -17,6 +17,7 @@ public interface IDialogService
     Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod);
     Task<bool> ReviewDependenciesAsync(DependencyReviewViewModel model, CancellationToken ct = default);
     Task<string?> PickModZipAsync();
+    Task<IReadOnlyList<string>> PickModZipsAsync();
     Task<string?> SaveModZipAsync(string suggestedName);
     Task<string?> PickProfileZipAsync();
     Task<string?> SaveProfileZipAsync(string suggestedName);
@@ -82,6 +83,7 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
     public Task<string?> SaveModZipAsync(string suggestedName) => SaveZipAsync(Localizer.Text("Export repatched mod"), suggestedName);
     public Task<string?> SaveProfileZipAsync(string suggestedName) => SaveZipAsync(Localizer.Text("Export profile"), suggestedName);
     public Task<string?> PickModZipAsync() => PickZipAsync(Localizer.Text("Import mod ZIP"));
+    public Task<IReadOnlyList<string>> PickModZipsAsync() => PickZipsAsync(Localizer.Text("Import mod ZIP"), allowMultiple: true);
     public Task<string?> PickProfileZipAsync() => PickZipAsync(Localizer.Text("Import profile ZIP"));
     private async Task<string?> SaveZipAsync(string title, string suggestedName)
     {
@@ -96,14 +98,16 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
         return file?.TryGetLocalPath();
     }
     private async Task<string?> PickZipAsync(string title)
+        => (await PickZipsAsync(title, allowMultiple: false)).FirstOrDefault();
+    private async Task<IReadOnlyList<string>> PickZipsAsync(string title, bool allowMultiple)
     {
         var files = await owner().StorageProvider.OpenFilePickerAsync(new()
         {
             Title = title,
-            AllowMultiple = false,
+            AllowMultiple = allowMultiple,
             FileTypeFilter = [new FilePickerFileType(Localizer.Text("ZIP archives")) { Patterns = ["*.zip"] }]
         });
-        return files.FirstOrDefault()?.TryGetLocalPath();
+        return files.Select(file => file.TryGetLocalPath()).OfType<string>().ToArray();
     }
     public async Task<string?> PickFolderAsync(string title)
     {

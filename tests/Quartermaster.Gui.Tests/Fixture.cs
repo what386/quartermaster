@@ -49,6 +49,7 @@ internal sealed class FakeDialogs : IDialogService
             !CancelModFile && (ConfirmationAnswers.TryDequeue(out var answer) ? answer : Confirm);
     }
     public string? ZipPath { get; set; }
+    public IReadOnlyList<string>? ZipPaths { get; set; }
     public string? FolderPath { get; set; }
     public string? SavePath { get; set; }
     public string? SuggestedSaveName { get; private set; }
@@ -65,6 +66,7 @@ internal sealed class FakeDialogs : IDialogService
     { InitialInputText = initialValue; return Task.FromResult(InputText); }
     public List<(string Title, string Message, string AcceptLabel, string CancelLabel)> Confirmations { get; } = [];
     public Task<string?> PickModZipAsync() => Task.FromResult(ZipPath);
+    public Task<IReadOnlyList<string>> PickModZipsAsync() => Task.FromResult<IReadOnlyList<string>>(ZipPaths ?? (ZipPath is { } path ? [path] : []));
     public Task<string?> PickProfileZipAsync() => Task.FromResult(ZipPath);
     public Task<string?> SaveProfileZipAsync(string suggestedName)
     { SuggestedSaveName = suggestedName; return Task.FromResult(SavePath); }

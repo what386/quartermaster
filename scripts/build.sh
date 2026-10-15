@@ -150,56 +150,56 @@ error() {
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -c|--configuration)
-            [[ $# -ge 2 ]] || error "$1 requires a value"
-            CONFIGURATION="$2"
-            shift 2
-            ;;
+    -c | --configuration)
+        [[ $# -ge 2 ]] || error "$1 requires a value"
+        CONFIGURATION="$2"
+        shift 2
+        ;;
 
-        -r|--runtime)
-            [[ $# -ge 2 ]] || error "$1 requires a value"
-            RUNTIME="$2"
-            shift 2
-            ;;
+    -r | --runtime)
+        [[ $# -ge 2 ]] || error "$1 requires a value"
+        RUNTIME="$2"
+        shift 2
+        ;;
 
-        -s|--self-contained)
-            SELF_CONTAINED=true
-            shift
-            ;;
+    -s | --self-contained)
+        SELF_CONTAINED=true
+        shift
+        ;;
 
-        -f|--framework-dependent)
-            SELF_CONTAINED=false
-            shift
-            ;;
+    -f | --framework-dependent)
+        SELF_CONTAINED=false
+        shift
+        ;;
 
-        --single-file)
-            SINGLE_FILE=true
-            shift
-            ;;
+    --single-file)
+        SINGLE_FILE=true
+        shift
+        ;;
 
-        --ready-to-run)
-            READY_TO_RUN=true
-            shift
-            ;;
+    --ready-to-run)
+        READY_TO_RUN=true
+        shift
+        ;;
 
-        -t|--trim)
-            TRIM=true
-            shift
-            ;;
+    -t | --trim)
+        TRIM=true
+        shift
+        ;;
 
-        --no-clean)
-            CLEAN=false
-            shift
-            ;;
+    --no-clean)
+        CLEAN=false
+        shift
+        ;;
 
-        -h|--help)
-            usage
-            exit 0
-            ;;
+    -h | --help)
+        usage
+        exit 0
+        ;;
 
-        *)
-            error "unknown option '$1'"
-            ;;
+    *)
+        error "unknown option '$1'"
+        ;;
     esac
 done
 
@@ -207,10 +207,10 @@ done
 # Validate environment
 # ============================================================================
 
-command -v dotnet >/dev/null 2>&1 || \
+command -v dotnet >/dev/null 2>&1 ||
     error "dotnet was not found in PATH"
 
-[[ -f "$PROJECT" ]] || \
+[[ -f "$PROJECT" ]] ||
     error "project not found: $PROJECT"
 
 # ============================================================================
@@ -341,7 +341,7 @@ METADATA="$OUTPUT_ROOT/build-info.txt"
         echo "Failed runtimes:"
         printf '  %s\n' "${FAILED[@]}"
     fi
-} > "$METADATA"
+} >"$METADATA"
 
 # ============================================================================
 # Summary

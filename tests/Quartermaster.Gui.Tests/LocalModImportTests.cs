@@ -12,6 +12,52 @@ public sealed class LocalModImportTests
     [AvaloniaTheory]
     [InlineData("zip")]
     [InlineData("add")]
+    [InlineData("profile")]
+    public async Task FilePickerImportsEverySelectedZipIntoTheRequestedDestination(string mode)
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        f.Dialogs.ZipPaths = [f.Zip("Armor", 1), f.Zip("Cape", 2)];
+        f.Dialogs.ModImport = new(ModImportKind.Zip);
+        if (mode == "profile")
+            await f.Services.Downloads.AddAsync(CancellationToken.None, f.Services.Session.ActiveProfile!.Id);
+        else
+        {
+            f.Shell.NavigationItems.Single(item => item.Page == PageKind.Mods).OpenCommand.Execute(null);
+            var mods = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
+            if (mode == "add") await mods.AddModCommand.ExecuteAsync();
+            else await mods.ImportZipCommand.ExecuteAsync();
+        }
+        Assert.False(f.Services.Operations.IsError);
+        Assert.Equal(f.Dialogs.ZipPaths, f.Dialogs.ImportConfirmations);
+        var state = await f.Services.Library.LoadAsync();
+        Assert.Equal(new[] { "Armor", "Cape" }, state.Mods.Select(mod => mod.Name).OrderBy(name => name));
+        Assert.Equal(2, f.Services.Session.State.Mods.Count);
+        if (mode == "profile")
+            Assert.Equal(state.Mods.Select(mod => mod.Id).OrderBy(id => id),
+                f.Services.Session.ActiveProfile!.Entries.Select(entry => entry.ModId).OrderBy(id => id));
+        else Assert.Empty(f.Services.Session.ActiveProfile!.Entries);
+    }
+
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CancellingTheFilePickerDoesNotImport(bool add)
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        f.Dialogs.ZipPaths = [];
+        f.Dialogs.ModImport = new(ModImportKind.Zip);
+        f.Shell.NavigationItems.Single(item => item.Page == PageKind.Mods).OpenCommand.Execute(null);
+        var mods = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
+        if (add) await mods.AddModCommand.ExecuteAsync();
+        else await mods.ImportZipCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError);
+        Assert.Empty(f.Dialogs.ImportConfirmations);
+        Assert.Empty(f.Services.Session.State.Mods);
+    }
+
+    [AvaloniaTheory]
+    [InlineData("zip")]
+    [InlineData("add")]
     [InlineData("folder")]
     [InlineData("drop")]
     public async Task LocalImportsSaveThePageFromTheConfirmation(string mode)

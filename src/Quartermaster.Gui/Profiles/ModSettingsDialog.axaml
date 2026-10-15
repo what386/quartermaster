@@ -7,16 +7,17 @@
       <Border IsEnabled="{Binding Operations.CanInteract}">
         <Border Classes="card"><ScrollViewer><StackPanel Spacing="12">
           <mods:ModOptionsView DataContext="{Binding Options}" PreviewRequested="OpenPreview" />
-          <Button Content="{loc:Loc 'Apply options'}" Classes="primary" Command="{Binding ApplyOptionsCommand}" HorizontalAlignment="Left" />
           <TextBlock Text="{loc:Loc 'Choose variants above, then apply them to this profile.'}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
         </StackPanel></ScrollViewer></Border>
       </Border>
       <TextBlock Grid.Row="1" Text="{Binding Operations.Message}" IsVisible="{Binding Operations.IsError}"
                  Classes="error" TextWrapping="Wrap" Margin="16,12,16,0" />
-      <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="16,12,16,16">
+      <Grid Grid.Row="2" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="16" Margin="16,12,16,16">
         <TextBlock Text="{Binding OptionsTitle}" Classes="sectionTitle" TextTrimming="CharacterEllipsis"
                    ToolTip.Tip="{Binding SelectedModName}" VerticalAlignment="Center" />
-        <Button Grid.Column="1" Content="{loc:Loc 'Close'}" Click="CloseDialog" />
+        <Button Grid.Column="1" Content="{loc:Loc 'Apply options'}" Classes="primary" Command="{Binding ApplyOptionsCommand}"
+                IsEnabled="{Binding Operations.CanInteract}" />
+        <Button Grid.Column="2" Content="{loc:Loc 'Close'}" Click="CloseDialog" />
       </Grid>
     </Grid>
   <mods:ModImagePreview x:Name="ImagePreview" IsVisible="False" BackRequested="ClosePreview" />

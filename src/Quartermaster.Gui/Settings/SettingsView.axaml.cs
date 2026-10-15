@@ -13,7 +13,9 @@ public partial class SettingsView : UserControl
         AttachedToVisualTree += async (_, _) =>
         {
             overviewCancellation = new();
-            if (DataContext is SettingsViewModel model) await model.RefreshStorageOverviewAsync(overviewCancellation.Token);
+            if (DataContext is SettingsViewModel model)
+                await Task.WhenAll(model.RefreshStorageOverviewAsync(overviewCancellation.Token),
+                    model.RefreshEchelonDirectoriesAsync(overviewCancellation.Token));
         };
         DetachedFromVisualTree += (_, _) => { overviewCancellation?.Cancel(); overviewCancellation?.Dispose(); overviewCancellation = null; };
     }

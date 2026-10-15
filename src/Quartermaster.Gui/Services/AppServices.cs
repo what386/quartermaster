@@ -24,6 +24,7 @@ public sealed class AppServices : IAsyncDisposable
     public LibrarySession Session { get; }
     public StorageManager Storage { get; }
     public Interop.Arsenal.ArsenalImporter ArsenalImporter { get; }
+    public Interop.Echelon.EchelonImporter EchelonImporter { get; }
     public ThemeManager Theme { get; } = new();
     public OperationState Operations { get; }
     public Action LaunchGame { get; }
@@ -48,6 +49,7 @@ public sealed class AppServices : IAsyncDisposable
         Storage = new(DataDirectory);
         Library = new LibraryService(store, content);
         ArsenalImporter = new(store, content);
+        EchelonImporter = new(store, content);
         Keys = new(DataDirectory);
         Nexus = new(ct => Keys.GetAsync("nexusmods", ct), nexusApi, nexusDownloads);
         ValidateNexusKeyAsync = async (key, ct) =>

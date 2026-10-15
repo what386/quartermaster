@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Original supply-crate badge inspired by HD2's flat Stratagem silhouettes. -->
+  <path d="M48 24h416l24 24v416l-24 24H48l-24-24V48Z" fill="#49ADC9"/>
+  <path d="M56 44h400l12 12v400l-12 12H56l-12-12V56Z" fill="#101214"/>
+  <!-- The four corner markers echo the Resupply Stratagem frame. -->
+  <path d="M64 64h48l-48 48Zm384 0v48l-48-48ZM64 448v-48l48 48Zm384 0h-48l48-48Z" fill="#49ADC9"/>
+  <!-- Hard-edged carry handle, separate lid, and chamfered crate body. -->
+  <path d="M200 164v-40h112v40h-24v-16h-64v16Z" fill="#49ADC9"/>
+  <path d="M148 184h216l20 20v28H128v-28Zm-20 68h256v116l-24 24H152l-24-24Z" fill="#49ADC9"/>
+  <!-- Reinforcing straps and a central latch retain the supply-crate identity. -->
+  <path d="M168 184h24v208h-24Zm152 0h24v208h-24Z" fill="#F4F6F5"/>
+  <path d="M236 216h40v64h-40Z" fill="#F4F6F5"/>
+  <path d="M248 236h16v24h-16Z" fill="#101214"/>
+</svg>

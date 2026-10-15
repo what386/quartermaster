@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Runtime.Versioning;
 using Microsoft.Win32;
@@ -10,6 +11,7 @@ namespace Quartermaster.Providers.Protocol;
 /// <summary>Per-user registration and a private inbox for links forwarded to an already running application.</summary>
 public static class NxmProtocol
 {
+    [UnconditionalSuppressMessage("SingleFile", "IL3000", Justification = "Assembly.Location is only accessed when launched through the dotnet host; single-file apps use Environment.ProcessPath directly.")]
     public static async Task RegisterAsync(CancellationToken ct = default)
     {
         var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate Quartermaster.");

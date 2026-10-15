@@ -79,6 +79,21 @@
             <Button x:Name="ImportArsenalButton" Grid.Column="2" Content="{loc:Loc 'Import Arsenal profiles'}" Classes="primary" Command="{Binding ImportArsenalCommand}" />
           </Grid>
         </Grid>
+        <Grid ColumnDefinitions="180,*">
+          <StackPanel Spacing="4">
+            <TextBlock Text="{loc:Loc 'Echelon profiles'}" FontWeight="SemiBold" />
+            <TextBlock Text="{loc:Loc 'Includes mods, groups, load order and option choices'}" Classes="muted" FontSize="11" TextWrapping="Wrap" Margin="0,0,12,0" />
+          </StackPanel>
+          <Grid Grid.Column="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" HorizontalAlignment="Left">
+            <StackPanel Spacing="8">
+              <shared:ContentSizedTextBox x:Name="EchelonDirectoryInput" Text="{Binding EchelonDirectory, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Echelon data folder'}" />
+              <ComboBox x:Name="EchelonDirectorySelector" ItemsSource="{Binding EchelonDirectories}" SelectedItem="{Binding SelectedEchelonDirectory, Mode=TwoWay}"
+                        IsVisible="{Binding HasMultipleEchelonDirectories}" PlaceholderText="{loc:Loc 'Choose the Echelon data folder'}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+            <Button Content="{loc:Loc 'Browse'}" Command="{Binding BrowseEchelonCommand}" Grid.Column="1" />
+            <Button x:Name="ImportEchelonButton" Grid.Column="2" Content="{loc:Loc 'Import Echelon profiles'}" Classes="primary" Command="{Binding ImportEchelonCommand}" />
+          </Grid>
+        </Grid>
       </StackPanel></Border>
       <Border x:Name="StorageSettingsSection" Classes="card" IsVisible="{Binding ShowStorage}"><StackPanel Spacing="12">
         <TextBlock Text="{loc:Loc 'Storage'}" Classes="sectionTitle" />

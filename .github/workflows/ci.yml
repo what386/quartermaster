@@ -64,3 +64,17 @@ jobs:
 
       - name: Test updater
         run: ctest --test-dir winupdater/build --build-config MinSizeRel --output-on-failure
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          $compiler = ./packaging/windows/install-inno.ps1 -Destination (Join-Path $env:RUNNER_TEMP 'inno-setup')
+          "INNO_COMPILER=$compiler" >> $env:GITHUB_ENV
+
+      - name: Test Windows installer
+        shell: pwsh
+        run: >
+          ./packaging/windows/test-installer.ps1
+          -CompilerPath $env:INNO_COMPILER
+          -TestApplicationPath winupdater/build/MinSizeRel/updater-test-app.exe
+          -UpdaterPath winupdater/build/MinSizeRel/Quartermaster.Updater.exe
