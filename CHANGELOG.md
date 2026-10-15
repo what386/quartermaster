@@ -1,6 +1,16 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-12*
+*Generated on 2026-10-15*
+
+## 0.8.0 — 2026-10-15
+
+### Changes
+
+- feat: add multiple files through picker dialog
+- feat: import support for echelon ([`858b257`])
+- feat: add a per-user Windows installer ([`ccaf2e4`])
+- fix: move Apply options to mod options dialog footer ([`d683d86`])
+
 
 ## 0.7.0 — 2026-10-12
 
