@@ -20,7 +20,9 @@ for name in ("slim_init", "is_slim_version", "load_package", "get_package_toc",
              "get_resource_from_bundle", "get_resource_from_package"):
     setattr(slim, name, lambda *args: None)
 sys.modules["slim"] = slim
-reference = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "examples/hd2-repatcher"
+if len(sys.argv) != 2:
+    raise SystemExit("Usage: generate_reference.py /path/to/hd2-repatcher")
+reference = Path(sys.argv[1])
 spec = importlib.util.spec_from_file_location(
     "update_unit_mods", reference / "update_unit_mods.py")
 engine = importlib.util.module_from_spec(spec)

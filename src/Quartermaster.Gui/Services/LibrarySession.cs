@@ -4,6 +4,8 @@ using Quartermaster.Library;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Repatcher.Archives;
+using Quartermaster.Repatcher;
+using Quartermaster.Repatcher.Formats;
 using Quartermaster.Gui.Shared;
 using Quartermaster.Library.Importing;
 
@@ -18,6 +20,15 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public ApplicationSettings Settings { get; private set; } = new();
     public DeploymentInspection? Inspection { get; private set; }
     public string DeploymentProblem { get; private set; } = "";
+    public string RepatchWarnings { get; private set; } = "";
+    public bool HasRepatchWarnings => RepatchWarnings.Length > 0;
+    private void SetRepatchWarnings(IEnumerable<string> warnings)
+    {
+        RepatchWarnings = string.Join("\n", warnings.Distinct());
+        Notify(nameof(RepatchWarnings)); Notify(nameof(HasRepatchWarnings));
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+    private RepairOptions RepatchOptions => new(Culling: Settings.UpdateArmCulling ? CullingPolicy.CurrentGameArms : CullingPolicy.Patch);
     public Profile? ActiveProfile => State.Profiles.FirstOrDefault(p => p.Id == State.ActiveProfileId);
     public string GameDirectory => Settings.GameDataDirectory ?? "";
     public string DeploymentStatus => GameDirectory == "" ? Localizer.Text("Choose your game folder in Settings") :
@@ -172,27 +183,36 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public async Task DeployAsync(Guid profileId, IDialogService dialogs, CancellationToken ct, IProgress<DeploymentProgress>? progress = null)
     {
         var request = ProfilePatches.Resolve(State, profileId); var target = RequireGame();
+        SetRepatchWarnings([]);
         IPatchRepairer? adapter = null;
         if (Settings.Repatch != RepatchMode.Never && request.Patches.Count > 0)
         {
-            adapter = await Task.Run(() => new RepatcherAdapter(GameArchives.Open(target, ct)), ct);
+            adapter = await Task.Run(() => new RepatcherAdapter(GameArchives.Open(target, ct), RepatchOptions), ct);
             var affected = await Task.Run(async () =>
             {
                 var changed = new HashSet<Guid>();
+                var warnings = new List<string>();
                 foreach (var patch in request.Patches)
                 {
-                    var file = patch.Files.Single(f => f.Kind == PatchFileKind.Main);
-                    var original = await contents.ReadVerifiedAsync(patch.SourceId, file, ct);
-                    var result = adapter.Repair(original, ct);
+                    var payloads = new Dictionary<PatchFileKind, ReadOnlyMemory<byte>>();
+                    foreach (var file in patch.Files) payloads[file.Kind] = await contents.ReadVerifiedAsync(patch.SourceId, file, ct);
+                    var input = new PatchSetData(payloads[PatchFileKind.Main],
+                        payloads.TryGetValue(PatchFileKind.GpuResources, out var gpu) ? gpu : (ReadOnlyMemory<byte>?)null,
+                        payloads.TryGetValue(PatchFileKind.Stream, out var stream) ? stream : (ReadOnlyMemory<byte>?)null);
+                    var result = adapter.RepairSet(input, ct);
+                    warnings.AddRange(result.Warnings);
                     if (result.RemovedUnits > 0) throw new InvalidDataException(Localizer.Text("Repatching would remove missing units. Use an updated mod."));
-                    if (!original.AsSpan().SequenceEqual(result.Data)) changed.Add(patch.SourceId);
+                    if (!input.Main.Span.SequenceEqual(result.Output.Main.Span) || !SameCompanion(input.Gpu, result.Output.Gpu) ||
+                        !SameCompanion(input.Stream, result.Output.Stream)) changed.Add(patch.SourceId);
                 }
-                return changed;
+                return (Changed: changed, Warnings: warnings);
             }, ct);
-            if (affected.Count == 0) adapter = null;
+            SetRepatchWarnings(affected.Warnings);
+            var changedMods = affected.Changed;
+            if (changedMods.Count == 0) adapter = null;
             else if (Settings.Repatch == RepatchMode.Ask)
             {
-                var names = string.Join("\n", State.Mods.Where(m => affected.Contains(m.Id)).Select(m => m.Name));
+                var names = string.Join("\n", State.Mods.Where(m => changedMods.Contains(m.Id)).Select(m => m.Name));
                 if (!await dialogs.ConfirmAsync(Localizer.Text("Repatch required"), Localizer.Interpolate($"These mods need repatching for the installed game:\n\n{names}\n\nRepatch and deploy? Originals will remain unchanged."), Localizer.Text("Repatch and deploy"))) return;
             }
         }
@@ -207,8 +227,10 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         }
         finally { await ReloadAsync(CancellationToken.None); }
     }
+    private static bool SameCompanion(ReadOnlyMemory<byte>? a, ReadOnlyMemory<byte>? b) => a.HasValue == b.HasValue &&
+        (!a.HasValue || a.Value.Span.SequenceEqual(b!.Value.Span));
     public async Task SaveSettingsAsync(string gamePath, RepatchMode mode, Guid? profileId, PriorityDirection priority, CancellationToken ct,
-        ThemePreset? theme = null, string? accentColor = null, bool? allowAutomaticUpdate = null, string? language = null)
+        ThemePreset? theme = null, string? accentColor = null, bool? allowAutomaticUpdate = null, string? language = null, bool? updateArmCulling = null)
     {
         if (!Enum.IsDefined(mode) || !Enum.IsDefined(priority)) throw new ArgumentException(Localizer.Text("Invalid settings choice."));
         var directory = string.IsNullOrWhiteSpace(gamePath) ? null :
@@ -222,7 +244,8 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             Theme = theme ?? Settings.Theme,
             AccentColor = accentColor ?? Settings.AccentColor,
             AllowAutomaticUpdate = allowAutomaticUpdate ?? Settings.AllowAutomaticUpdate,
-            Language = language ?? Settings.Language
+            Language = language ?? Settings.Language,
+            UpdateArmCulling = updateArmCulling ?? Settings.UpdateArmCulling
         };
         ThemeManager.Validate(updated.Theme, updated.AccentColor);
         // Validate the complete draft before persisting any fields.
@@ -273,13 +296,15 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         await Task.Run(() => settingsStore.SaveAsync(settings, ct), ct);
         Settings = settings; Publish();
     }
-    public Task ExportRepatchedAsync(Mod mod, string destination, CancellationToken ct)
+    public async Task ExportRepatchedAsync(Mod mod, string destination, CancellationToken ct)
     {
         var game = RequireGame();
         var relative = Path.GetRelativePath(game, Path.GetFullPath(destination));
         if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
             throw new ArgumentException(Localizer.Text("Export outside the game directory."));
-        return Task.Run(() => contents.ExportRepatchedAsync(mod, destination, new RepatcherAdapter(GameArchives.Open(game, ct)), ct), ct);
+        SetRepatchWarnings([]);
+        var warnings = await Task.Run(() => contents.ExportRepatchedAsync(mod, destination, new RepatcherAdapter(GameArchives.Open(game, ct), RepatchOptions), ct), ct);
+        SetRepatchWarnings(warnings);
     }
     public async Task PurgeAsync(CancellationToken ct)
     {

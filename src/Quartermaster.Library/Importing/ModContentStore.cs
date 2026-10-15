@@ -1,5 +1,6 @@
 using Quartermaster.Core.Patching;
 using Quartermaster.Core.Deployment;
+using Quartermaster.Repatcher.Formats;
 using global::System.IO.Compression;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Storage;
@@ -80,8 +81,8 @@ public sealed class ModContentStore : IModContentStore
         return bytes;
     }
 
-    /// <summary>Exports every variant and its metadata, replacing only main patches in the ZIP.</summary>
-    public async Task ExportRepatchedAsync(Mod mod, string destination, IPatchRepairer repairer, CancellationToken ct = default)
+    /// <summary>Exports every repaired patch set and its metadata without changing library files.</summary>
+    public async Task<IReadOnlyList<string>> ExportRepatchedAsync(Mod mod, string destination, IPatchRepairer repairer, CancellationToken ct = default)
     {
         destination = Path.GetFullPath(destination);
         var parent = ManagedPaths.CanonicalDirectory(Path.GetDirectoryName(destination)!);
@@ -92,48 +93,55 @@ public sealed class ModContentStore : IModContentStore
         ManagedPaths.CheckLink(destination);
         var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
         var patchFiles = mod.PatchSets.SelectMany(p => p.Files).ToDictionary(f => f.RelativePath, StringComparer.Ordinal);
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        var warnings = new List<string>();
         try
         {
             await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
                 using (var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
                 {
+                    foreach (var patch in mod.PatchSets)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var payloads = new Dictionary<PatchFileKind, ReadOnlyMemory<byte>>();
+                        foreach (var file in patch.Files)
+                            payloads[file.Kind] = await ReadVerifiedAsync(mod.Id, file, ct).ConfigureAwait(false);
+                        var input = new PatchSetData(payloads[PatchFileKind.Main],
+                            payloads.TryGetValue(PatchFileKind.GpuResources, out var gpu) ? gpu : (ReadOnlyMemory<byte>?)null,
+                            payloads.TryGetValue(PatchFileKind.Stream, out var sourceStream) ? sourceStream : (ReadOnlyMemory<byte>?)null);
+                        var result = repairer.RepairSet(input, ct);
+                        if (result.RemovedUnits > 0) throw new InvalidDataException("Repatching would remove missing units. Use an updated mod.");
+                        warnings.AddRange(result.Warnings);
+                        payloads[PatchFileKind.Main] = result.Output.Main;
+                        if (result.Output.Gpu is { } repairedGpu) payloads[PatchFileKind.GpuResources] = repairedGpu;
+                        else if (payloads.ContainsKey(PatchFileKind.GpuResources)) throw new InvalidDataException("Repair unexpectedly removed a companion.");
+                        if (result.Output.Stream is { } repairedStream) payloads[PatchFileKind.Stream] = repairedStream;
+                        else if (payloads.ContainsKey(PatchFileKind.Stream)) throw new InvalidDataException("Repair unexpectedly removed a companion.");
+                        var mainPath = patch.Files.Single(f => f.Kind == PatchFileKind.Main).RelativePath;
+                        foreach (var (kind, bytes) in payloads)
+                        {
+                            var name = patch.Files.SingleOrDefault(f => f.Kind == kind)?.RelativePath ?? mainPath + PatchFiles.Suffix(kind);
+                            var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
+                            await using var stream = entry.Open();
+                            await stream.WriteAsync(bytes, ct).ConfigureAwait(false);
+                        }
+                    }
                     foreach (var path in ManagedPaths.Enumerate(GetModDirectory(mod.Id)))
                     {
                         ct.ThrowIfCancellationRequested();
                         var name = Path.GetRelativePath(GetModDirectory(mod.Id), path).Replace('\\', '/');
+                        if (patchFiles.ContainsKey(name)) continue;
                         var entry = zip.CreateEntry(name, CompressionLevel.Optimal);
                         await using var stream = entry.Open();
-                        if (patchFiles.TryGetValue(name, out var file))
-                        {
-                            seen.Add(name);
-                            if (file.Kind == PatchFileKind.Main)
-                            {
-                                var original = await ReadVerifiedAsync(mod.Id, file, ct).ConfigureAwait(false);
-                                var result = repairer.Repair(original, ct);
-                                if (result.RemovedUnits > 0) throw new InvalidDataException("Repatching would remove missing units. Use an updated mod.");
-                                await stream.WriteAsync(result.Data, ct).ConfigureAwait(false);
-                            }
-                            else
-                            {
-                                await FileIntegrity.VerifyAsync(path, file.Size, file.Sha256, ct).ConfigureAwait(false);
-                                await using var input = File.OpenRead(path);
-                                await input.CopyToAsync(stream, ct).ConfigureAwait(false);
-                            }
-                        }
-                        else
-                        {
-                            await using var input = File.OpenRead(path);
-                            await input.CopyToAsync(stream, ct).ConfigureAwait(false);
-                        }
+                        await using var input = File.OpenRead(path);
+                        await input.CopyToAsync(stream, ct).ConfigureAwait(false);
                     }
                 }
-                if (seen.Count != patchFiles.Count) throw new IOException("Mod files are missing from library storage.");
                 await output.FlushAsync(ct).ConfigureAwait(false); output.Flush(true);
             }
             ct.ThrowIfCancellationRequested();
             File.Move(temporary, destination, overwrite: true);
+            return warnings.Distinct().ToArray();
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

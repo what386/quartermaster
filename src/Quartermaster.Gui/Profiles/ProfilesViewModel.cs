@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Quartermaster.Core.Deployment;
+using Quartermaster.Core.Patching;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Gui.Mods;
@@ -290,9 +291,9 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         var expected = PatchSelection.Select(mod, entry).SelectMany(set => set.Files.Select(file => (set.Id, File: file)))
             .ToDictionary(item => (item.Id, item.File.Kind), item => item.File);
         var optionsHash = PatchSelection.OptionsHash(mod, entry);
-        return owned.Length == expected.Count && owned.All(file =>
+        return owned.Count(file => !file.GeneratedByRepair) == expected.Count && owned.All(file =>
             health.GetValueOrDefault(file.Name, ManagedFileStatus.Missing) == ManagedFileStatus.Present &&
-            expected.TryGetValue((file.PatchSetId, file.Kind), out var original) &&
+            expected.TryGetValue((file.PatchSetId, file.GeneratedByRepair ? PatchFileKind.Main : file.Kind), out var original) &&
             original.Sha256.Equals(file.SourceSha256, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(file.SelectionHash, optionsHash, StringComparison.OrdinalIgnoreCase))
             ? ModDeploymentState.Loaded : ModDeploymentState.Warning;

@@ -1338,7 +1338,7 @@ public class GuiTests
             Assert.Equal("Second loadout", persisted.Session.ActiveProfile!.Name);
             Assert.Equal(4, persisted.Session.State.Profiles.Count);
             Dispatcher.UIThread.RunJobs(); window.CaptureRenderedFrame()?.Dispose();
-            Assert.DoesNotContain(window.GetVisualDescendants(), control => control is Expander);
+            Assert.DoesNotContain(window.FindControl<ItemsControl>("ProfileList")!.GetVisualDescendants(), control => control is Expander);
         }
         finally { window.Close(); }
     }
@@ -1700,7 +1700,7 @@ public class GuiTests
     }
 
     [AvaloniaFact]
-    public async Task CompatibleModsDoNotPromptAndMissingUnitsBlockAutomaticDeployment()
+    public async Task CompatibleModsDoNotPromptAndMissingUnitsAreKeptWithWarnings()
     {
         using var f = new Fixture(); await f.Shell.InitializeAsync();
         await f.Services.Session.ImportAsync(f.UnitSource("Current armor", compatible: true), CancellationToken.None);
@@ -1712,8 +1712,24 @@ public class GuiTests
         await profiles.AddCommand.ExecuteAsync();
         await f.Services.Session.SetRepatchModeAsync(RepatchMode.Automatic, CancellationToken.None);
         await profiles.DeployCommand.ExecuteAsync();
-        Assert.True(f.Services.Operations.IsError); Assert.Contains("missing units", f.Services.Operations.Message);
+        Assert.False(f.Services.Operations.IsError);
+        Assert.Contains("absent from installed game", f.Services.Session.RepatchWarnings);
         Assert.Equal(previous, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
+    }
+
+    [AvaloniaFact]
+    public async Task ArmCullingSettingIsOptInAndPersistsWithOtherRepatchSettings()
+    {
+        using var f = new Fixture(); await f.Shell.InitializeAsync();
+        var settings = Page<SettingsViewModel>(f, PageKind.Settings);
+        Assert.False(settings.UpdateArmCulling);
+        settings.UpdateArmCulling = true;
+        await settings.SaveCommand.ExecuteAsync();
+        Assert.False(f.Services.Operations.IsError);
+        Assert.True(f.Services.Session.Settings.UpdateArmCulling);
+        Assert.True((await new SettingsStore(f.Data).LoadAsync(CancellationToken.None)).UpdateArmCulling);
+        settings.ResetCommand.Execute(null);
+        Assert.False(settings.UpdateArmCulling);
     }
 
     [AvaloniaFact]

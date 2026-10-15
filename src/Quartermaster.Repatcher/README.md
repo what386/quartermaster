@@ -1,102 +1,108 @@
 # Quartermaster.Repatcher
 
-Native .NET 10 translation of the unit-repair engine in
-[hd2-repatcher](https://github.com/RaidingForPants/hd2-repatcher), based on commit
-`2222f6432ee3ead75a906b9a756618e4802a1ad5`. It has no Python or Avalonia runtime
-dependency. DSAR blocks use
-[K4os.Compression.LZ4](https://github.com/MiloszKrajewski/K4os.Compression.LZ4).
+Native .NET 10 updates for HELLDIVERS 2 mods. The engine updates unit version and
+layout fields against installed game data, preserves the mod's equipment identity
+and appearance, and writes only to separate staging destinations. It does not
+retarget cosmetics or scale models.
+
+Runtime dependencies are managed .NET only; DSAR decoding uses
+K4os.Compression.LZ4. Source and dependency attribution is recorded in
+[THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
+
+See [Repatching mods](../../docs/repatcher.md) for application behavior and settings.
 
 ## Usage
 
 ```csharp
 using Quartermaster.Repatcher;
 using Quartermaster.Repatcher.Archives;
+using Quartermaster.Repatcher.Formats;
 
 // Indexing performs synchronous disk I/O; run it off the UI thread.
 var archives = await Task.Run(() => GameArchives.Open(gameDataDirectory, cancellationToken));
-var repatcher = new Repatcher(archives);
-
-var result = await repatcher.RepairFolderAsync(
-    importedModDirectory,
-    stagingDirectory,
-    new Progress<FileRepair>(file => ReportRepair(file)),
-    cancellationToken);
-
-if (result.HasErrors)
-{
-    // Inspect result.Files before deploying any staged files.
-}
+var repatcher = new Repatcher(archives); // Keep missing units and custom LODs.
+var result = await repatcher.RepairFolderAsync(importedModDirectory, stagingDirectory,
+    new Progress<FileRepair>(ReportRepair), cancellationToken);
+if (result.HasErrors) { /* Inspect failures before deploying staged results. */ }
 ```
 
-`RepairFileAsync(source, destination)` handles a single patch set. The destination
-main file and companions must not exist. Main patches are discovered by the
-filename pattern `<16 hex characters>.patch` or `.patch_<decimal slot>`;
-`.stream` and `.gpu_resources` are companions, never standalone repair inputs.
-Nested directories and their relative paths are preserved by folder repair.
+`RepairSet(PatchSetData)` validates the main patch and optional GPU/stream
+companions, returns a `PatchSetRepair` with the complete output, changed flag,
+per-unit outcomes, warnings, equipment classification, armor-core diagnostics,
+and runtime identity audit. A null companion is different from an empty file.
+`IGameResourceSource` supplies full unit payloads and archive resource tables;
+`IUnitResourceSource` remains sufficient for ordinary version/layout updates.
+`GameArchives.ReadResourcePayload` also supports non-unit resources.
 
-The engine creates ordinary independent files in staging, preserves companion
-bytes, and publishes the main file last. It does not change imported originals
-or deploy into the game. Folder repair requires staging outside the source tree.
-Individual failures are reported and remaining patches are processed;
-cancellation propagates. A batch may contain successful staged patches alongside
-failures, so callers must decide whether to deploy it. Publication is not a
-crash-proof multi-file transaction; abandoned staging can be discarded.
+`RepairPatch(ReadOnlyMemory<byte>)` is a strict main-buffer API. It cannot
+validate companions, recover legacy layouts, classify equipment, or replace
+culling. Requesting current-game culling through this API throws; use `RepairSet`.
 
-`RepairPatch(ReadOnlyMemory<byte>)` repairs bytes without filesystem writes.
-`IUnitResourceSource` allows another installed-resource reader or test fixture
-to supply current unit data. Sources must support concurrent reads if the engine
-is used concurrently. Input game assets must remain stable during indexing/repair;
-reopen the archive index after game updates.
+## Policies
 
-## Implemented behavior
+`RepairOptions` defaults to:
 
-- Read-only indexing of legacy, compressed DSAR, and bundled/slim installations.
-- Bounds-checked little-endian patch/type/resource tables with 64-bit IDs/offsets.
-- Raw and LZ4 DSAR chunks, including resource reads across chunk and bundle boundaries.
-- Units already matching the installed format version are preserved byte for byte,
-  including custom LOD tables and mesh references. LOD differences alone do not
-  indicate that a mod needs repatching.
-- Unit version and LOD replacement from installed game resources when versions differ.
-- Upstream's pre-`0xA4CD36` vertex-format upgrade (`format > 16` becomes `format + 4`).
-- Adjustment of the sixteen unit offset fields starting at `0x34`.
-- Removal of TOC entries for units absent from the installed game's index,
-  reported through `RemovedUnits`. Their unreferenced payload bytes are retained,
-  matching the reference engine; companions remain unchanged.
-- Structured `Updated`, `NoUnits`, `Corrupted`, and batch `Failed` results.
+- `MissingUnits = Keep`: preserve unavailable units with a warning that their
+  compatibility could not be verified. `Drop` and `Fail` are explicit options.
+- `Lod = EquipmentSafe`: preserve custom LOD groups while applying supported
+  version/layout upgrades. Canonical armor/helmet IDs and weighted resource/ref
+  fingerprints provide equipment diagnostics. Unclassified mods also retain
+  their LODs conservatively and report that decision. `Preserve` suppresses this
+  classification warning; `CurrentGame` explicitly opts into vanilla LOD replacement
+  on version changes. Already-current units are preserved byte for byte.
+- `Culling = Patch`: preserve patch culling and companion payloads.
+  `CurrentGameArms` imports current-game culling only for canonical slim/stocky
+  left/right arms. It preserves visible meshes, merges required transforms and
+  BoneInfo records, imports culling GPU data, and rebuilds matching TOC/companion
+  offsets. Body, waist, legs, helmet, and custom units retain patch culling.
+  If any eligible arm fails, the entire culling pass falls back to patch culling
+  with a warning. Culling is disabled for recovered legacy patches.
+- `RecoverLegacy = true`: recover an impossible TOC body offset only when exactly
+  one complete unclaimed payload gap matches its declared size. Valid physical
+  offsets are authoritative regardless of TOC row order. Recovered output is
+  rebuilt by `(FileId, TypeId)` and every retained sidecar payload is audited.
 
-Compared with the Python implementation, the port updates resource data sizes
-after LOD replacement, truncates shrinking output correctly, validates the entire
-type table, and keeps game/archive state scoped to an instance. Unknown TOC fields,
-companion offsets, and unaffected bytes are preserved. Conflicting duplicate
-installed units fail indexing instead of choosing an arbitrary copy.
-`RepairedUnits` counts units whose bytes actually changed.
+Unknown enums, overlapping main bodies, duplicate resource keys, malformed ranges,
+unsupported unit downgrades, and failed output audits are rejected. Cancellation
+propagates. The engine never publishes partially repaired units after a format
+error. Optional culling may repack buffers and retain unused source streams;
+reapplying it can append data again.
 
-## Validation and limits
+## Staging and application integration
 
-Run `dotnet test Quartermaster.slnx`. Tests use synthetic assets for all three
-archive layouts, compressed/raw chunks, split bundles, malformed inputs,
-staging, cancellation, missing units, and LOD growth/shrinkage.
+`RepairFileAsync(source, destination)` accepts a main patch, reads its companions,
+validates the complete output, stages all files, and publishes the main file last.
+Destinations must not exist. Folder repair discovers `<16 hex>.patch` and
+`.patch_<decimal slot>`, preserves nested paths, and requires staging outside the
+source tree. Companions are never standalone repair inputs. Failures are reported
+per file; callers decide whether to deploy a partially successful batch.
+Publication is not a crash-proof multi-file transaction; abandoned staging can be
+discarded.
 
-The checked-in JSON golden fixtures are produced by the original Python repair
-function. Expected outputs normalize only its stale resource sizes and trailing
-bytes after shrinkage. Regenerate them with:
+Quartermaster's adapter, deployment staging, repair preflight, and ZIP export use
+the complete patch-set contract. Deployment hashes describe the repaired bytes;
+source hashes continue to describe imported originals. Newly generated companions
+are tracked explicitly against their source main patch. Repatch warnings appear
+in the application, and current-game arm culling is an opt-in setting used for
+both deployment updates and exports.
+
+## Tests and operational limits
+
+Run `dotnet test Quartermaster.slnx`. Tests use committed JSON golden fixtures and
+synthetic archives. They do not require an examples checkout, installed game,
+Python, or Rust.
+
+Fixture generators are development tools and require an explicit source checkout:
 
 ```sh
 python3 tests/Quartermaster.Repatcher.Tests/generate_reference.py /path/to/hd2-repatcher
+python3 tests/Quartermaster.Repatcher.Tests/generate_rust_reference.py /path/to/hd2-mod-crates
 ```
 
-The script stubs archive imports and injects synthetic current-unit data, so it
-needs no Python LZ4 package. C# tests consume the JSON without running Python.
+The Rust generator requires a development toolchain to regenerate its fixtures.
+The application and C# tests consume committed fixture data directly.
 
-The engine has been checked against a local slim game installation and the
-Impatient Diver example mod; see [local validation results](../../docs/repatcher-validation.md).
-These are file-level checks, not an in-game loading test. Impatient Diver contains
-no unit resources, so unit repairs were exercised with temporary patches derived
-from actual installed unit data.
-Unknown compression modes and malformed/overlapping binary layouts are rejected.
-Individual buffers are limited to .NET array sizes; full patch files and the slim
-bundle index are processed in memory. Archive access decompresses only intersecting
-chunks. Recovered Echelon-specific string rebuilding and additional format-upgrade
-rules are outside this upstream unit-engine port.
-
-Source and dependency license notices are distributed in `THIRD_PARTY_NOTICES.txt`.
+Buffers are limited to .NET array sizes. Indexing and repair assume stable game
+assets; reopen archive indexes after game updates. Sources used concurrently must
+support concurrent reads. Structural and preservation checks do not establish
+in-game compatibility for every mod.

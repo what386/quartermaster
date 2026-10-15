@@ -48,9 +48,11 @@ public static class DeploymentTracking
             (Name: PatchFiles.Name(p.Archive, p.Slot, f.Kind), p.PatchSetId, f.Kind, f.Sha256, p.SelectionHash))).ToArray();
         if (deployed.Length == 0) return ModDeploymentStatus.NotDeployed;
         if (ledger.Status != DeploymentStatus.Complete || deployed.Any(f => health.All(h => h.Name != f.Name || h.Status != ManagedFileStatus.Present))) return ModDeploymentStatus.Damaged;
-        return selected.Length == deployed.Length && selected.All(s => deployed.Any(f => f.Name == s.Name && f.PatchSetId == s.PatchSetId &&
+        return selected.Length == deployed.Count(f => !f.GeneratedByRepair) && selected.All(s => deployed.Any(f => !f.GeneratedByRepair && f.Name == s.Name && f.PatchSetId == s.PatchSetId &&
             f.Kind == s.Kind && f.SourceSha256.Equals(s.Sha256, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(f.SelectionHash, s.SelectionHash, StringComparison.OrdinalIgnoreCase)))
+            string.Equals(f.SelectionHash, s.SelectionHash, StringComparison.OrdinalIgnoreCase))) &&
+            deployed.Where(f => f.GeneratedByRepair).All(f => selected.Any(s => s.PatchSetId == f.PatchSetId && s.Kind == PatchFileKind.Main &&
+                s.Sha256.Equals(f.SourceSha256, StringComparison.OrdinalIgnoreCase) && string.Equals(f.SelectionHash, s.SelectionHash, StringComparison.OrdinalIgnoreCase)))
             ? ModDeploymentStatus.Deployed : ModDeploymentStatus.DifferentSelection;
     }
 }

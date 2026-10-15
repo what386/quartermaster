@@ -7,29 +7,67 @@ namespace Quartermaster.Repatcher;
 
 public enum RepairStatus { Updated, NoUnits, Corrupted, Failed }
 public sealed record PatchRepair(RepairStatus Status, byte[]? Data, int RepairedUnits = 0,
-    int RemovedUnits = 0, string? Error = null);
+    int RemovedUnits = 0, string? Error = null)
+{
+    public IReadOnlyList<RepairWarning> Warnings { get; init; } = [];
+    public IReadOnlyList<UnitRepairOutcome> Units { get; init; } = [];
+    public bool Changed { get; init; }
+}
+public sealed record PatchSetRepair(RepairStatus Status, PatchSetData? Output, int RepairedUnits = 0,
+    int RemovedUnits = 0, string? Error = null)
+{
+    public IReadOnlyList<RepairWarning> Warnings { get; init; } = [];
+    public IReadOnlyList<UnitRepairOutcome> Units { get; init; } = [];
+    public IReadOnlyList<string> Equipment { get; init; } = [];
+    public IReadOnlyList<ArmorCoreAudit> ArmorAudits { get; init; } = [];
+    public RuntimeIdentityAudit? Audit { get; init; }
+    public bool Changed { get; init; }
+}
 public sealed record FileRepair(string SourcePath, string DestinationPath, RepairStatus Status,
-    int RepairedUnits = 0, int RemovedUnits = 0, string? Error = null);
+    int RepairedUnits = 0, int RemovedUnits = 0, string? Error = null)
+{
+    public IReadOnlyList<RepairWarning> Warnings { get; init; } = [];
+    public bool Changed { get; init; }
+}
 public sealed record BatchRepair(string Directory, IReadOnlyList<FileRepair> Files)
 {
     public int PatchesFound => Files.Count;
     public bool HasErrors => Files.Any(f => f.Status is RepairStatus.Corrupted or RepairStatus.Failed);
 }
 
-/// <summary>Native hd2-repatcher unit repair. All file operations write to separate staging destinations.</summary>
-public sealed partial class Repatcher(IUnitResourceSource resources)
+/// <summary>Native C# mod updates. All file operations write to separate staging destinations.</summary>
+public sealed partial class Repatcher(IUnitResourceSource resources, RepairOptions? options = null)
 {
     private readonly IUnitResourceSource resources = resources ?? throw new ArgumentNullException(nameof(resources));
+    private readonly RepairOptions options = Validate(options ?? new());
+    private static RepairOptions Validate(RepairOptions value)
+    {
+        if (!Enum.IsDefined(value.MissingUnits) || !Enum.IsDefined(value.Lod) || !Enum.IsDefined(value.Culling))
+            throw new ArgumentException("Invalid repair policy.");
+        return value;
+    }
     private sealed record Edit(int Offset, int Length, byte[] Replacement);
 
-    /// <summary>Repairs an in-memory patch without changing its source buffer.</summary>
+    /// <summary>Strict main-buffer update without companion reconstruction or legacy recovery.
+    /// Use RepairSet for full validation, equipment diagnostics, and optional culling.</summary>
     public PatchRepair RepairPatch(ReadOnlyMemory<byte> patch, CancellationToken cancellationToken = default)
     {
+        if (options.Culling != CullingPolicy.Patch)
+            throw new InvalidOperationException("Current-game culling requires RepairSet with companion payloads.");
+        return RepairMain(patch, options.Lod != LodPolicy.CurrentGame, cancellationToken);
+    }
+
+    private PatchRepair RepairMain(ReadOnlyMemory<byte> patch, bool preserveLod, CancellationToken cancellationToken)
+    {
+        var warnings = new List<RepairWarning>();
+        var outcomes = new List<UnitRepairOutcome>();
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             var data = patch.Span;
             var table = PatchTable.Read(data);
+            if (table.Resources.Select(r => (r.FileId, r.TypeId)).Distinct().Count() != table.Resources.Count)
+                throw new InvalidDataException("Duplicate resource identity.");
             var ranges = table.Resources.Where(r => r.DataSize > 0).OrderBy(r => r.DataOffset).ToArray();
             ulong previousEnd = (ulong)table.DataStart;
             foreach (var record in ranges)
@@ -52,19 +90,33 @@ public sealed partial class Repatcher(IUnitResourceSource resources)
                 if (record.TypeId != PatchTable.UnitTypeId) { retained.Add(record); continue; }
                 if (!resources.ContainsUnit(record.FileId))
                 {
-                    edits.Add(new(table.ItemTableOffset + i * 80, 80, []));
-                    removed++;
+                    if (options.MissingUnits == MissingUnitPolicy.Fail)
+                        throw new InvalidDataException($"Unit {record.FileId:x16} is absent from the installed game.");
+                    if (options.MissingUnits == MissingUnitPolicy.Keep)
+                    {
+                        retained.Add(record);
+                        warnings.Add(new("MissingUnitKept", $"Kept unit {record.FileId:x16}, absent from installed game data; its compatibility could not be verified.", record.FileId));
+                        outcomes.Add(new(record.FileId, "MissingKept", true));
+                    }
+                    else
+                    {
+                        edits.Add(new(table.ItemTableOffset + i * 80, 80, []));
+                        removed++;
+                        warnings.Add(new("MissingUnitDropped", $"Removed missing unit {record.FileId:x16} by explicit policy.", record.FileId));
+                        outcomes.Add(new(record.FileId, "MissingDropped"));
+                    }
                     continue;
                 }
                 var original = resources.ReadUnit(record.FileId, cancellationToken);
                 var unit = BinaryData.Slice(data, BinaryData.Length(record.DataOffset), record.DataSize);
-                var replacement = UnitRepair.Repair(unit, original);
+                var replacement = UnitRepair.Repair(unit, original, preserveLod);
+                outcomes.Add(new(record.FileId, unit.SequenceEqual(replacement) ? "AlreadyCurrent" : "Updated", preserveLod));
                 if (unit.SequenceEqual(replacement)) { retained.Add(record); continue; }
                 edits.Add(new(BinaryData.Length(record.DataOffset), BinaryData.Length(record.DataSize), replacement));
                 retained.Add(record with { DataSize = (uint)replacement.Length });
                 repaired++;
             }
-            if (edits.Count == 0) return new(RepairStatus.Updated, data.ToArray());
+            if (edits.Count == 0) return new(RepairStatus.Updated, data.ToArray()) { Warnings = warnings, Units = outcomes };
             edits.Sort((a, b) => a.Offset.CompareTo(b.Offset));
             using var output = new MemoryStream();
             var cursor = 0;
@@ -93,15 +145,15 @@ public sealed partial class Repatcher(IUnitResourceSource resources)
             }
             // Re-read the rebuilt table before any output can be published.
             PatchTable.Read(result);
-            return new(RepairStatus.Updated, result, repaired, removed);
+            return new(RepairStatus.Updated, result, repaired, removed) { Warnings = warnings, Units = outcomes, Changed = true };
         }
         catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException or OverflowException)
         {
-            return new(RepairStatus.Corrupted, null, Error: ex.Message);
+            return new(RepairStatus.Corrupted, null, Error: ex.Message) { Warnings = warnings, Units = outcomes };
         }
     }
 
-    /// <summary>Writes the repaired main patch and byte-identical companions into a new staging location.
+    /// <summary>Writes a validated repaired patch set into a new staging location.
     /// Destinations must not exist. The main patch is published after its companions.</summary>
     public async Task<FileRepair> RepairFileAsync(string sourcePath, string destinationPath,
         CancellationToken cancellationToken = default)
@@ -118,10 +170,15 @@ public sealed partial class Repatcher(IUnitResourceSource resources)
         }
         foreach (var pair in pairs)
             if (File.Exists(pair.Destination)) throw new IOException($"Staging destination already exists: {pair.Destination}");
-        var bytes = await File.ReadAllBytesAsync(sourcePath, cancellationToken).ConfigureAwait(false);
-        var repair = await Task.Run(() => RepairPatch(bytes, cancellationToken), cancellationToken).ConfigureAwait(false);
-        if (repair.Status == RepairStatus.Corrupted)
-            return new(sourcePath, destinationPath, repair.Status, Error: repair.Error);
+        var input = new PatchSetData(await File.ReadAllBytesAsync(sourcePath, cancellationToken).ConfigureAwait(false),
+            File.Exists(sourcePath + ".gpu_resources") ? await File.ReadAllBytesAsync(sourcePath + ".gpu_resources", cancellationToken).ConfigureAwait(false) : (ReadOnlyMemory<byte>?)null,
+            File.Exists(sourcePath + ".stream") ? await File.ReadAllBytesAsync(sourcePath + ".stream", cancellationToken).ConfigureAwait(false) : (ReadOnlyMemory<byte>?)null);
+        var repair = await Task.Run(() => RepairSet(input, cancellationToken), cancellationToken).ConfigureAwait(false);
+        if (repair.Output is null)
+            return new(sourcePath, destinationPath, repair.Status, Error: repair.Error) { Warnings = repair.Warnings };
+        foreach (var suffix in new[] { ".gpu_resources", ".stream" })
+            if ((suffix == ".gpu_resources" ? repair.Output.Gpu.HasValue : repair.Output.Stream.HasValue) &&
+                !pairs.Any(p => p.Destination == destinationPath + suffix)) pairs.Add((sourcePath + suffix, destinationPath + suffix));
         Directory.CreateDirectory(Path.GetDirectoryName(destinationPath)!);
         var temporary = new List<(string Temp, string Final)>();
         var published = new List<string>();
@@ -132,12 +189,9 @@ public sealed partial class Repatcher(IUnitResourceSource resources)
                 var temp = pair.Destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
                 temporary.Add((temp, pair.Destination));
                 await using var output = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, true);
-                if (pair.Source == sourcePath) await output.WriteAsync(repair.Data!, cancellationToken).ConfigureAwait(false);
-                else
-                {
-                    await using var input = File.OpenRead(pair.Source);
-                    await input.CopyToAsync(output, cancellationToken).ConfigureAwait(false);
-                }
+                var payload = pair.Source == sourcePath ? repair.Output.Main :
+                    pair.Source.EndsWith(".gpu_resources", StringComparison.Ordinal) ? repair.Output.Gpu!.Value : repair.Output.Stream!.Value;
+                await output.WriteAsync(payload, cancellationToken).ConfigureAwait(false);
                 await output.FlushAsync(cancellationToken).ConfigureAwait(false);
             }
             foreach (var pair in temporary)
@@ -146,7 +200,7 @@ public sealed partial class Repatcher(IUnitResourceSource resources)
                 File.Move(pair.Temp, pair.Final, overwrite: false);
                 published.Add(pair.Final);
             }
-            return new(sourcePath, destinationPath, repair.Status, repair.RepairedUnits, repair.RemovedUnits);
+            return new(sourcePath, destinationPath, repair.Status, repair.RepairedUnits, repair.RemovedUnits) { Warnings = repair.Warnings, Changed = repair.Changed };
         }
         catch
         {

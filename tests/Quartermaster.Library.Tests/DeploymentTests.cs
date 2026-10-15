@@ -3,6 +3,7 @@ using Quartermaster.Core.Deployment;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
 using Quartermaster.Library.Storage;
+using Quartermaster.Repatcher.Formats;
 using Xunit;
 
 namespace Quartermaster.Library.Tests;
@@ -165,7 +166,7 @@ public class DeploymentTests
         using var cancellation = new CancellationTokenSource(); cancellation.Cancel();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair(), cancellation.Token));
         File.Delete(f.Contents.GetFilePath(mod.Id, mod.PatchSets[0].Files.Single(file => file.Kind == PatchFileKind.Stream)));
-        await Assert.ThrowsAsync<IOException>(() => f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair()));
+        await Assert.ThrowsAnyAsync<IOException>(() => f.Contents.ExportRepatchedAsync(mod, destination, new FakeRepair()));
         Assert.Equal(new byte[] { 9, 8, 7 }, await File.ReadAllBytesAsync(destination));
         Assert.Empty(Directory.EnumerateFiles(f.Root, "*.tmp"));
         await Assert.ThrowsAsync<ArgumentException>(() => f.Contents.ExportRepatchedAsync(mod, Path.Combine(f.Contents.GetModDirectory(mod.Id), "export.zip"), new FakeRepair()));
@@ -175,5 +176,55 @@ public class DeploymentTests
     {
         public RepairedPatch Repair(ReadOnlyMemory<byte> patch, CancellationToken cancellationToken = default)
         { var bytes = patch.ToArray(); bytes[^1] = 0xaa; return new(bytes, removed); }
+    }
+
+    [Fact]
+    public async Task PatchSetRepairUpdatesCompanionsAndTracksGeneratedFilesThroughDeploymentAndExport()
+    {
+        using var f = new Fixture();
+        var mod = await f.Library.ImportAsync(f.Source("source"));
+        var profile = ProfileEditor.Add(ProfileEditor.Create("Rebuilt"), mod);
+        await f.Library.SaveProfileAsync(profile);
+        var state = await f.Library.LoadAsync();
+        var service = new ProfileDeploymentService(new DeploymentService(new FileDeploymentStorage(f.App, f.Contents), new CompleteRepair()));
+        var ledger = await service.DeployAsync(state, profile.Id, f.Game, new(Repatch: true));
+        Assert.Equal(3, ledger.Files.Count);
+        Assert.Single(ledger.Files, file => file.GeneratedByRepair);
+        Assert.Equal(new byte[] { 4, 5 }, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0.stream")));
+        Assert.Equal(new byte[] { 6, 7, 8 }, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0.gpu_resources")));
+        foreach (var file in ledger.Files)
+            Assert.Equal(file.Sha256, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                await File.ReadAllBytesAsync(Path.Combine(f.Game, file.Name)))).ToLowerInvariant());
+        var health = await service.InspectAsync(f.Game);
+        Assert.Equal(ModDeploymentStatus.Deployed, DeploymentTracking.ForMod(mod.Id,
+            DeploymentPlanner.Create(ProfilePatches.Resolve(state, profile.Id)), health.Ledger, health.Files));
+        var output = Path.Combine(f.Root, "rebuilt.zip");
+        var warnings = await f.Contents.ExportRepatchedAsync(mod, output, new CompleteRepair());
+        Assert.Contains("Companions rebuilt", warnings);
+        var exported = await f.Library.ImportAsync(output);
+        Assert.Equal(3, exported.PatchSets.Single().Files.Count);
+        foreach (var file in exported.PatchSets.Single().Files)
+        {
+            var deployed = ledger.Files.Single(item => item.Kind == file.Kind);
+            Assert.Equal(File.ReadAllBytes(Path.Combine(f.Game, deployed.Name)), File.ReadAllBytes(f.Contents.GetFilePath(exported.Id, file)));
+        }
+        Assert.Equal(new byte[] { 1, 2, 3 }, File.ReadAllBytes(f.Contents.GetFilePath(mod.Id,
+            mod.PatchSets.Single().Files.Single(file => file.Kind == PatchFileKind.Stream))));
+        await service.PurgeAsync(f.Game);
+        Assert.False(File.Exists(Path.Combine(f.Game, Fixture.Archive + ".patch_0.gpu_resources")));
+    }
+
+    private sealed class CompleteRepair : IPatchRepairer
+    {
+        public RepairedPatch Repair(ReadOnlyMemory<byte> patch, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Complete repair must use the patch-set contract.");
+        public RepairedPatchSet RepairSet(PatchSetData patch, CancellationToken cancellationToken = default)
+        {
+            Assert.Equal(new byte[] { 1, 2, 3 }, patch.Stream!.Value.ToArray());
+            Assert.Null(patch.Gpu);
+            var bytes = patch.Main.ToArray(); bytes[^1] = 0xaa;
+            return new(patch with { Main = bytes, Stream = new byte[] { 4, 5 }, Gpu = new byte[] { 6, 7, 8 } })
+            { Warnings = ["Companions rebuilt"] };
+        }
     }
 }

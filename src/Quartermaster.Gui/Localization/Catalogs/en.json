@@ -2,6 +2,9 @@
   "language": "en",
   "name": "English",
   "strings": {
+    "Update arm culling from the current game": "Update arm culling from the current game",
+    "Applies to repatching and exports. Custom LODs and other equipment culling are preserved.": "Applies to repatching and exports. Custom LODs and other equipment culling are preserved.",
+    "Repatch warnings": "Repatch warnings",
     "\n\nActive warnings:\n": "\n\nActive warnings:\n",
     "\n\nWould you like to apply them now?": "\n\nWould you like to apply them now?",
     " Purge patches, then redeploy.": " Purge patches, then redeploy.",

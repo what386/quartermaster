@@ -19,6 +19,8 @@ public sealed record DeploymentPlan(Guid SelectionId, string Signature, IReadOnl
 public sealed record OwnedFile(string Name, string Archive, int Slot, [property: JsonPropertyName("modId")] Guid SourceId, Guid PatchSetId,
     PatchFileKind Kind, long Size, string Sha256, string SourceSha256)
 {
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool GeneratedByRepair { get; init; }
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SelectionHash { get; init; }
 }

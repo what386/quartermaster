@@ -14,6 +14,8 @@ public sealed partial class SettingsViewModel : SessionViewModel
     private int repatchChoice;
     private int priorityChoice;
     private bool allowAutomaticUpdate;
+    private bool updateArmCulling;
+    public bool UpdateArmCulling { get => updateArmCulling; set { if (Set(ref updateArmCulling, value)) SaveCommand.Refresh(); } }
     private LanguageOption selectedLanguage = new("", "System default");
     public IReadOnlyList<LanguageOption> Languages
     {
@@ -62,7 +64,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
     private bool Matches(string keywords) => string.IsNullOrWhiteSpace(Search) || Localizer.Current.SearchTerms(keywords).Contains(Search.Trim(), StringComparison.OrdinalIgnoreCase);
     public bool ShowInstallation => Matches("Game and deployment Helldivers 2 installation folder Steam path");
     public bool ShowPriority => Matches("Game and deployment Profile load priority earlier later entries order " + ActiveProfileName);
-    public bool ShowRepatch => Matches("Game and deployment Repatching repair automatic ask never patches");
+    public bool ShowRepatch => Matches("Game and deployment Repatching repair automatic ask never patches culling arm current game LOD compatibility");
     public bool ShowStorage => Matches("Storage Library storage management cleanup disk space temporary files previous versions originals profiles " + LibraryDirectory);
     public bool ShowVersion => Matches("App information Quartermaster application version build " + ApplicationVersion);
     public bool ShowPlatform => Matches("App information Operating system platform architecture " + PlatformInformation);
@@ -102,12 +104,12 @@ public sealed partial class SettingsViewModel : SessionViewModel
         {
             var account = await ValidateProviderDraftAsync(ct);
             await Session.SaveSettingsAsync(GamePath.Trim(), (RepatchMode)RepatchChoice, profileId, (PriorityDirection)PriorityChoice, ct,
-                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor), AllowAutomaticUpdate, SelectedLanguage.Code);
+                (ThemePreset)ThemeChoice, ThemeManager.Format(AccentColor), AllowAutomaticUpdate, SelectedLanguage.Code, UpdateArmCulling);
             await SaveProviderDraftAsync(account, ct);
             LoadDrafts();
         }, () => ValidAppearance && RepatchChoice >= 0 && RepatchChoice < RepatchChoices.Count && PriorityChoice >= 0 && PriorityChoice < PriorityChoices.Count &&
             (GamePath.Trim() != Session.GameDirectory || RepatchChoice != (int)Session.Settings.Repatch ||
-             HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged || AllowAutomaticUpdate != Session.Settings.AllowAutomaticUpdate ||
+             UpdateArmCulling != Session.Settings.UpdateArmCulling || HasProfile && PriorityChoice != (int)Session.ActiveProfile!.Priority || ProviderDraftChanged || AppearanceChanged || AllowAutomaticUpdate != Session.Settings.AllowAutomaticUpdate ||
              SelectedLanguage.Code != (Session.Settings.Language ?? "")));
         CheckAppUpdatesCommand = new(() => AppUpdates.CheckAsync(), () => Operations.CanInteract && !AppUpdates.IsChecking, Operations.ReportError);
         AppUpdates.PropertyChanged += (_, _) => CheckAppUpdatesCommand.Refresh();
@@ -121,6 +123,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             SelectedInstallation = null;
             GamePath = defaults.GameDataDirectory ?? "";
             RepatchChoice = (int)defaults.Repatch;
+            UpdateArmCulling = defaults.UpdateArmCulling;
             PriorityChoice = (int)PriorityDirection.LastWins;
             ThemeChoice = (int)defaults.Theme;
             AccentColor = Avalonia.Media.Color.Parse(defaults.AccentColor);
@@ -151,6 +154,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
         GamePath = Session.GameDirectory; RepatchChoice = (int)Session.Settings.Repatch; PriorityChoice = savedPriority;
         LoadAppearance();
         AllowAutomaticUpdate = Session.Settings.AllowAutomaticUpdate;
+        UpdateArmCulling = Session.Settings.UpdateArmCulling;
         Notify(nameof(Languages));
         SelectedLanguage = Languages.FirstOrDefault(language => language.Code == (Session.Settings.Language ?? "")) ?? Languages[0];
         Notify(nameof(RepatchChoices)); Notify(nameof(PriorityChoices)); Notify(nameof(ThemeChoices));
@@ -165,6 +169,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
             // Keep unsaved edits when unrelated session state refreshes.
             if (GamePath == (saved.GameDataDirectory ?? "")) GamePath = Session.GameDirectory;
             if (RepatchChoice == (int)saved.Repatch) RepatchChoice = (int)Session.Settings.Repatch;
+            if (UpdateArmCulling == saved.UpdateArmCulling) UpdateArmCulling = Session.Settings.UpdateArmCulling;
             var currentPriority = (int)(Session.ActiveProfile?.Priority ?? PriorityDirection.LastWins);
             if (profileId != Session.ActiveProfile?.Id || PriorityChoice == savedPriority) PriorityChoice = currentPriority;
             RefreshAppearance(saved);

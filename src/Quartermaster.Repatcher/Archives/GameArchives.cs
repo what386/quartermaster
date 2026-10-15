@@ -1,4 +1,5 @@
 using System.Text;
+using System.Collections.Concurrent;
 using Quartermaster.Repatcher.Formats;
 
 namespace Quartermaster.Repatcher.Archives;
@@ -10,16 +11,24 @@ public interface IUnitResourceSource
     byte[] ReadUnit(ulong unitId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Installed resource tables and full unit payloads for classification and culling.</summary>
+public interface IGameResourceSource : IUnitResourceSource
+{
+    ResourcePayload ReadUnitPayload(ulong unitId, CancellationToken cancellationToken = default);
+    IReadOnlyList<ResourceRecord> ReadArchiveResources(string archive, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Read-only, instance-scoped access to legacy, DSAR and bundled game archives.</summary>
-public sealed class GameArchives : IUnitResourceSource
+public sealed class GameArchives : IGameResourceSource
 {
     private sealed record BundleEntry(ulong ArchiveOffset, ulong BundleOffset, byte BundleIndex);
     private sealed record Package(ulong Size, BundleEntry[] Entries);
-    private sealed record UnitLocation(string Package, ulong Offset, int Size);
+    private sealed record UnitLocation(string Package, ulong Offset, int Size, ResourceRecord Record);
     private readonly string directory;
     private readonly Dictionary<string, Package> packages = new(StringComparer.Ordinal);
     private readonly Dictionary<string, DsarReader> dsar = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, UnitLocation> units = new();
+    private readonly ConcurrentDictionary<string, IReadOnlyList<ResourceRecord>> resourceTables = new(StringComparer.Ordinal);
     public bool IsSlim { get; }
     public int UnitCount => units.Count;
     public IEnumerable<ulong> UnitIds => units.Keys;
@@ -101,7 +110,7 @@ public sealed class GameArchives : IUnitResourceSource
             {
                 if (record.DataOffset < (ulong)table.DataStart || record.DataSize < 0x74)
                     throw new InvalidDataException("Invalid installed unit resource.");
-                var location = new UnitLocation(name, record.DataOffset, BinaryData.Length(record.DataSize));
+                var location = new UnitLocation(name, record.DataOffset, BinaryData.Length(record.DataSize), record);
                 if (units.TryGetValue(record.FileId, out var previous))
                 {
                     // Duplicated resources must agree; never pick an arbitrary archive's version.
@@ -124,6 +133,36 @@ public sealed class GameArchives : IUnitResourceSource
         return ReadPackage(unit.Package, unit.Offset, unit.Size, cancellationToken);
     }
 
+    public IReadOnlyList<ResourceRecord> ReadArchiveResources(string archive, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ValidatePackageName(archive);
+        if (resourceTables.TryGetValue(archive, out var cached)) return cached;
+        var header = ReadPackage(archive, 0, 72, cancellationToken);
+        var length = BinaryData.Length(72UL + 32UL * BinaryData.U32(header, 4) + 80UL * BinaryData.U32(header, 8));
+        var table = PatchTable.Read(ReadPackage(archive, 0, length, cancellationToken)).Resources;
+        return resourceTables.GetOrAdd(archive, table);
+    }
+
+    public ResourcePayload ReadResourcePayload(string archive, ulong fileId, ulong typeId, CancellationToken cancellationToken = default)
+    {
+        var records = ReadArchiveResources(archive, cancellationToken).Where(r => r.FileId == fileId && r.TypeId == typeId).ToArray();
+        if (records.Length != 1) throw new InvalidDataException("Installed resource is missing or ambiguous.");
+        return ReadPayload(archive, records[0], cancellationToken);
+    }
+
+    public ResourcePayload ReadUnitPayload(ulong unitId, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!units.TryGetValue(unitId, out var unit)) throw new KeyNotFoundException($"Unit {unitId:x16} not found.");
+        return ReadPayload(unit.Package, unit.Record, cancellationToken);
+    }
+
+    private ResourcePayload ReadPayload(string archive, ResourceRecord record, CancellationToken cancellationToken) => new(record,
+        record.DataSize == 0 ? ReadOnlyMemory<byte>.Empty : ReadPackage(archive, record.DataOffset, BinaryData.Length(record.DataSize), cancellationToken),
+        record.GpuSize == 0 ? ReadOnlyMemory<byte>.Empty : ReadPackage(archive + ".gpu_resources", record.GpuOffset, BinaryData.Length(record.GpuSize), cancellationToken),
+        record.StreamSize == 0 ? ReadOnlyMemory<byte>.Empty : ReadPackage(archive + ".stream", record.StreamOffset, BinaryData.Length(record.StreamSize), cancellationToken));
+
     private byte[] ReadPackage(string name, ulong offset, int size, CancellationToken cancellationToken)
     {
         if (dsar.TryGetValue(name, out var compressed)) return compressed.Read(offset, size, cancellationToken);
@@ -131,6 +170,8 @@ public sealed class GameArchives : IUnitResourceSource
         if (File.Exists(path))
         {
             using var file = File.OpenRead(path);
+            if (file.Length >= 4 && BinaryData.U32(BinaryData.ReadAt(file, 0, 4), 0) == DsarReader.Magic)
+                return new DsarReader(path).Read(offset, size, cancellationToken);
             return BinaryData.ReadAt(file, offset, size);
         }
         if (!packages.TryGetValue(name, out var package)) throw new InvalidDataException($"Missing package: {name}");

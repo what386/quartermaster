@@ -6,6 +6,11 @@ namespace Quartermaster.Repatcher.Tests;
 
 public class RepatcherTests
 {
+    // Historical Python parity is an explicit policy; production defaults preserve
+    // missing units and custom LODs (covered separately in PatchSetRepairTests).
+    private static Repatcher ReferenceEngine(IUnitResourceSource source) =>
+        new(source, new(MissingUnits: MissingUnitPolicy.Drop, Lod: LodPolicy.CurrentGame));
+
     public static IEnumerable<object[]> ReferenceCases()
     {
         using var document = System.Text.Json.JsonDocument.Parse(
@@ -27,7 +32,7 @@ public class RepatcherTests
             .EnumerateObject()
             .Select(u => (ulong.Parse(u.Name), Convert.FromHexString(u.Value.GetString()!)))
             .ToArray();
-        var result = new Repatcher(new UnitSource(units)).RepairPatch(
+        var result = ReferenceEngine(new UnitSource(units)).RepairPatch(
             Convert.FromHexString(reference.GetProperty("patch").GetString()!)
         );
         Assert.Equal(RepairStatus.Updated, result.Status);
@@ -51,7 +56,7 @@ public class RepatcherTests
         var tail = new byte[] { 1, 2, 3, 4, 5 };
         var source = Fixtures.Patch((1, PatchTable.UnitTypeId, mod), (2, Fixtures.OtherType, tail));
         var snapshot = source.ToArray();
-        var result = new Repatcher(new UnitSource((1, game))).RepairPatch(source);
+        var result = ReferenceEngine(new UnitSource((1, game))).RepairPatch(source);
         Assert.Equal(RepairStatus.Updated, result.Status);
         Assert.Equal(1, result.RepairedUnits);
         Assert.Equal(snapshot, source);
@@ -74,7 +79,7 @@ public class RepatcherTests
         Assert.Equal(0x99, result.Data[20]);
         Assert.Equal(
             result.Data,
-            new Repatcher(new UnitSource((1, game))).RepairPatch(result.Data).Data
+            ReferenceEngine(new UnitSource((1, game))).RepairPatch(result.Data).Data
         );
     }
 
@@ -83,7 +88,7 @@ public class RepatcherTests
     {
         var unit = Fixtures.Unit(8);
         var patch = Fixtures.Patch((1, PatchTable.UnitTypeId, unit));
-        var result = new Repatcher(new UnitSource((1, unit))).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource((1, unit))).RepairPatch(patch);
         Assert.Equal(patch, result.Data);
     }
 
@@ -99,7 +104,7 @@ public class RepatcherTests
             (1, PatchTable.UnitTypeId, mod),
             (2, Fixtures.OtherType, new byte[] { 1, 2, 3 })
         );
-        var result = new Repatcher(new UnitSource((1, game))).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource((1, game))).RepairPatch(patch);
         Assert.Equal(RepairStatus.Updated, result.Status);
         Assert.Equal(0, result.RepairedUnits);
         Assert.Equal(patch, result.Data);
@@ -114,7 +119,7 @@ public class RepatcherTests
             (1, PatchTable.UnitTypeId, current),
             (2, PatchTable.UnitTypeId, outdated)
         );
-        var result = new Repatcher(
+        var result = ReferenceEngine(
             new UnitSource((1, Fixtures.Unit(320)), (2, Fixtures.Unit(24)))
         ).RepairPatch(patch);
         Assert.Equal(RepairStatus.Updated, result.Status);
@@ -138,7 +143,7 @@ public class RepatcherTests
             (2, Fixtures.OtherType, new byte[] { 9 })
         );
         var before = PatchTable.Read(patch);
-        var result = new Repatcher(new UnitSource((1, unit))).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource((1, unit))).RepairPatch(patch);
         Assert.Equal(1, result.RemovedUnits);
         var table = PatchTable.Read(result.Data!);
         Assert.Equal(2, table.Resources.Count);
@@ -152,7 +157,7 @@ public class RepatcherTests
     public void CanRemoveAllUnits()
     {
         var patch = Fixtures.Patch((99, PatchTable.UnitTypeId, Fixtures.Unit(8)));
-        var result = new Repatcher(new UnitSource()).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource()).RepairPatch(patch);
         Assert.Equal(RepairStatus.Updated, result.Status);
         Assert.Empty(PatchTable.Read(result.Data!).Resources);
         Assert.Equal(1, result.RemovedUnits);
@@ -171,7 +176,7 @@ public class RepatcherTests
         first.CopyTo(patch, 184);
         var game1 = Fixtures.Unit(24, version: 0xA4CD40, fill: 0xee);
         var game2 = Fixtures.Unit(8, version: 0xA4CD40, fill: 0xff);
-        var result = new Repatcher(new UnitSource((1, game1), (2, game2))).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource((1, game1), (2, game2))).RepairPatch(patch);
         Assert.Equal(RepairStatus.Updated, result.Status);
         var table = PatchTable.Read(result.Data!);
         Assert.Equal(game2, Payload(result.Data!, table.Resources[0]));
@@ -219,7 +224,7 @@ public class RepatcherTests
                 Fixtures.U32(patch, offset + 0x5c, uint.MaxValue);
                 break;
         }
-        var result = new Repatcher(new UnitSource((1, unit), (2, unit))).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource((1, unit), (2, unit))).RepairPatch(patch);
         Assert.Equal(RepairStatus.Corrupted, result.Status);
         Assert.Null(result.Data);
         Assert.NotEmpty(result.Error!);
@@ -229,7 +234,7 @@ public class RepatcherTests
     public void NoUnitPatchIsUnchanged()
     {
         var patch = Fixtures.Patch((1, Fixtures.OtherType, new byte[] { 1, 2 }));
-        var result = new Repatcher(new UnitSource()).RepairPatch(patch);
+        var result = ReferenceEngine(new UnitSource()).RepairPatch(patch);
         Assert.Equal(RepairStatus.NoUnits, result.Status);
         Assert.Equal(patch, result.Data);
     }
@@ -242,9 +247,9 @@ public class RepatcherTests
         var destination = Path.Combine(temp.Path, "stage", Path.GetFileName(source));
         var patch = Fixtures.Patch((1, PatchTable.UnitTypeId, Fixtures.Unit(24)));
         File.WriteAllBytes(source, patch);
-        File.WriteAllBytes(source + ".stream", [1, 2, 3]);
-        File.WriteAllBytes(source + ".gpu_resources", [4, 5, 6]);
-        var engine = new Repatcher(new UnitSource((1, Fixtures.Unit(8, version: 0xA4CD40))));
+        File.WriteAllBytes(source + ".stream", new byte[143]);
+        File.WriteAllBytes(source + ".gpu_resources", new byte[486]);
+        var engine = ReferenceEngine(new UnitSource((1, Fixtures.Unit(8, version: 0xA4CD40))));
         var result = await engine.RepairFileAsync(source, destination);
         Assert.Equal(RepairStatus.Updated, result.Status);
         Assert.Equal(patch, File.ReadAllBytes(source));
@@ -269,10 +274,11 @@ public class RepatcherTests
         using var stage = new TemporaryDirectory();
         var good = Path.Combine(source.Path, Fixtures.ArchiveName + ".patch_0");
         File.WriteAllBytes(good, Fixtures.Patch((1, Fixtures.OtherType, new byte[] { 1 })));
-        File.WriteAllBytes(good + ".stream", [2]);
+        File.WriteAllBytes(good + ".stream", new byte[143]);
+        File.WriteAllBytes(good + ".gpu_resources", new byte[486]);
         File.WriteAllBytes(Path.Combine(source.Path, Fixtures.ArchiveName + ".patch_1"), [1, 2, 3]);
         File.WriteAllBytes(Path.Combine(source.Path, "notes.patch_backup"), [3]);
-        var engine = new Repatcher(new UnitSource());
+        var engine = ReferenceEngine(new UnitSource());
         var result = await engine.RepairFolderAsync(source.Path, stage.Path);
         Assert.Equal(2, result.PatchesFound);
         Assert.True(result.HasErrors);
@@ -292,7 +298,7 @@ public class RepatcherTests
         File.WriteAllBytes(source, Fixtures.Patch());
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
-        var engine = new Repatcher(new UnitSource());
+        var engine = ReferenceEngine(new UnitSource());
         Assert.Throws<OperationCanceledException>(() =>
             engine.RepairPatch(File.ReadAllBytes(source), cancellation.Token)
         );
@@ -324,7 +330,7 @@ public class RepatcherTests
         Assert.Equal(unit, archives.ReadUnit(ulong.MaxValue));
         // Readers hold no writable handles; concurrent independent reads are supported.
         Parallel.For(0, 8, _ => Assert.Equal(unit, archives.ReadUnit(ulong.MaxValue)));
-        var result = new Repatcher(archives).RepairPatch(
+        var result = ReferenceEngine(archives).RepairPatch(
             Fixtures.Patch((ulong.MaxValue, PatchTable.UnitTypeId, Fixtures.Unit(8)))
         );
         Assert.Equal(RepairStatus.Updated, result.Status);
@@ -373,7 +379,7 @@ public class RepatcherTests
         File.WriteAllBytes(source, Fixtures.Patch());
         File.WriteAllBytes(destination + ".stream", [0xaa]);
         await Assert.ThrowsAsync<IOException>(() =>
-            new Repatcher(new UnitSource()).RepairFileAsync(source, destination)
+            ReferenceEngine(new UnitSource()).RepairFileAsync(source, destination)
         );
         Assert.False(File.Exists(destination));
         Assert.Equal(new byte[] { 0xaa }, File.ReadAllBytes(destination + ".stream"));

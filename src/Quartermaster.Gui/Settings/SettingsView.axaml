@@ -48,7 +48,11 @@
         </Grid>
         <Grid x:Name="RepatchSettings" ColumnDefinitions="180,*" IsVisible="{Binding ShowRepatch}">
           <StackPanel Spacing="4"><TextBlock Text="{loc:Loc 'Repatching'}" FontWeight="SemiBold" /><TextBlock Text="{loc:Loc 'Before deployment'}" Classes="muted" FontSize="11" /></StackPanel>
-          <ComboBox Grid.Column="1" ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
+          <StackPanel Grid.Column="1" Spacing="8">
+            <ComboBox ItemsSource="{Binding RepatchChoices}" SelectedIndex="{Binding RepatchChoice, Mode=TwoWay}" Width="320" HorizontalAlignment="Left" />
+            <CheckBox Content="{loc:Loc 'Update arm culling from the current game'}" IsChecked="{Binding UpdateArmCulling, Mode=TwoWay}" />
+            <TextBlock Text="{loc:Loc 'Applies to repatching and exports. Custom LODs and other equipment culling are preserved.'}" TextWrapping="Wrap" Classes="muted" />
+          </StackPanel>
         </Grid>
       </StackPanel></Border>
       <Border x:Name="DownloadsSettingsSection" Classes="card" IsVisible="{Binding ShowDownloads}"><StackPanel Spacing="16">

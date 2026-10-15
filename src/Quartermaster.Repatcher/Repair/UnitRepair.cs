@@ -4,7 +4,7 @@ namespace Quartermaster.Repatcher.Repair;
 
 internal static class UnitRepair
 {
-    public static byte[] Repair(ReadOnlySpan<byte> mod, ReadOnlySpan<byte> original)
+    public static byte[] Repair(ReadOnlySpan<byte> mod, ReadOnlySpan<byte> original, bool preserveLod = false)
     {
         BinaryData.Slice(mod, 0, 0x74);
         BinaryData.Slice(original, 0, 0x74);
@@ -15,7 +15,8 @@ internal static class UnitRepair
         if (lodOffset < 0x74 || jointOffset < lodOffset || gameLodOffset < 0x74 || gameJointOffset < gameLodOffset)
             throw new InvalidDataException("Invalid unit LOD offsets.");
         BinaryData.Slice(mod, lodOffset, (long)jointOffset - lodOffset);
-        var lod = BinaryData.Slice(original, gameLodOffset, (long)gameJointOffset - gameLodOffset);
+        var gameLod = BinaryData.Slice(original, gameLodOffset, (long)gameJointOffset - gameLodOffset);
+        var lod = preserveLod ? BinaryData.Slice(mod, lodOffset, (long)jointOffset - lodOffset) : gameLod;
         for (var i = 0; i < 16; i++)
         {
             var offset = BinaryData.U32(mod, 0x34 + i * 4);
@@ -26,6 +27,9 @@ internal static class UnitRepair
         // imply an outdated format; substituting vanilla mesh indices can crash the game.
         if (BinaryData.U32(mod, 0x2c) == BinaryData.U32(original, 0x2c))
             return mod.ToArray();
+
+        if (BinaryData.U32(mod, 0x2c) > BinaryData.U32(original, 0x2c))
+            throw new InvalidDataException("Mod unit version is newer than the installed game; downgrade is unsupported.");
 
         var working = mod.ToArray();
         if (BinaryData.U32(mod, 0x2c) < 0xA4CD36)
