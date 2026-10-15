@@ -182,6 +182,10 @@ To test release packaging locally:
 ./scripts/package.sh
 # Or select a target explicitly:
 ./scripts/package.sh --runtime linux-x64
+# Build just one package format:
+./scripts/package.sh --format appimage
+./scripts/package.sh --format setup    # Run on Windows, in Git Bash
+./scripts/package.sh --format zip
 ```
 
 This uses the CI release settings: Release, self-contained, single-file, and
@@ -198,6 +202,8 @@ can supply `--inno-compiler FILE`.
 For cross-building Windows portable packages, use `--runtime win-x64
 --updater-toolchain FILE --skip-installer` with a Windows x64 CMake toolchain.
 Use `--runtime all` to package both targets. `--help` lists all options.
+`--format appimage` selects Linux x64 automatically; `--format setup` selects
+Windows x64. Each invocation writes checksums for only the artifacts it builds.
 
 See the [repatcher documentation](src/Quartermaster.Repatcher/README.md) for
 patching details and the [changelog](CHANGELOG.md) for release changes.
