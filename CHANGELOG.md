@@ -2,6 +2,13 @@
 
 *Generated on 2026-10-15*
 
+## 0.8.1 — 2026-10-15
+
+### Changes
+
+- feat: add link to mod page in rightclick menu
+
+
 ## 0.8.0 — 2026-10-15
 
 ### Changes

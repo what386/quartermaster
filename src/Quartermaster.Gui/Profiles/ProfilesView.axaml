@@ -70,6 +70,7 @@
         <ListBox.ContextMenu><ContextMenu>
           <MenuItem x:Name="ModOptionsMenuItem" Header="{loc:Loc 'Options'}" IsEnabled="{Binding SelectedMod.HasOptions}" Click="OpenModOptions" />
           <MenuItem x:Name="ModDetailsMenuItem" Header="{loc:Loc 'Mod details'}" IsEnabled="{Binding HasSelectedMod}" Click="OpenModDetails" />
+          <MenuItem Header="{loc:Loc 'Open mod page'}" Command="{Binding OpenModPageCommand}" />
           <MenuItem Header="{loc:Loc 'Inspect conflicts'}" IsEnabled="{Binding HasSelectedMod}" Click="OpenConflicts" />
           <MenuItem Header="{Binding DependencyActionLabel}" IsVisible="{Binding HasDependencyAction}" Command="{Binding GetDependenciesCommand}" />
           <MenuItem Header="{Binding ToggleLabel}" Command="{Binding ToggleCommand}" />
