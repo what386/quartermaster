@@ -24,18 +24,33 @@ public sealed class EchelonTests
         Directory.Move(f.Source("unused", 5), Path.Combine(root, "mods", "unused"));
         var data = new
         {
-            version = 2, active_profile = "second", settings = new { priority = firstWins ? "first" : "last" },
+            version = 2,
+            active_profile = "second",
+            settings = new { priority = firstWins ? "first" : "last" },
             library = new Dictionary<string, object>
             {
-                ["a"] = new { id = "a", name = "Options", store = "Options (a)", description = "Description", version = "1.2", added_at = 1751582418.129,
-                    nexus = new { mod_id = 123 }, tags = new[] { "Weapons" },
-                    sets = Enumerable.Range(0, 3).Select(index => new { hash = Fixture.Archive, files = new Dictionary<string,string>
-                    { [""] = $"opt/{index}/{Fixture.Archive}.patch_0", [".stream"] = $"opt/{index}/{Fixture.Archive}.patch_0.stream" } }).ToArray(),
+                ["a"] = new
+                {
+                    id = "a",
+                    name = "Options",
+                    store = "Options (a)",
+                    description = "Description",
+                    version = "1.2",
+                    added_at = 1751582418.129,
+                    nexus = new { mod_id = 123 },
+                    tags = new[] { "Weapons" },
+                    sets = Enumerable.Range(0, 3).Select(index => new
+                    {
+                        hash = Fixture.Archive,
+                        files = new Dictionary<string, string>
+                        { [""] = $"opt/{index}/{Fixture.Archive}.patch_0", [".stream"] = $"opt/{index}/{Fixture.Archive}.patch_0.stream" }
+                    }).ToArray(),
                     options = new[] { new { name = "Color", description = "Pick one", include = new[] {0},
                         subs = new[] { new { name = "Red", include = new[] {1} }, new { name = "Blue", include = new[] {2} } } } },
-                    option_defaults = new { on = new[] {false}, sel = new[] {1} } },
-                ["b"] = new { id = "b", name = "Simple", store = @"C:\Old\Echelon\mods\b", sets = new[] { new { files = new Dictionary<string,string> { [""] = Fixture.Archive + ".patch_7", [".stream"] = Fixture.Archive + ".patch_7.stream" } } } },
-                ["unused"] = new { id = "unused", name = "Unused", sets = new[] {new {files = new Dictionary<string,string> { [""] = Fixture.Archive + ".patch_7" } } } }
+                    option_defaults = new { on = new[] { false }, sel = new[] { 1 } }
+                },
+                ["b"] = new { id = "b", name = "Simple", store = @"C:\Old\Echelon\mods\b", sets = new[] { new { files = new Dictionary<string, string> { [""] = Fixture.Archive + ".patch_7", [".stream"] = Fixture.Archive + ".patch_7.stream" } } } },
+                ["unused"] = new { id = "unused", name = "Unused", sets = new[] { new { files = new Dictionary<string, string> { [""] = Fixture.Archive + ".patch_7" } } } }
             },
             profiles = new object[]
             {
@@ -66,14 +81,14 @@ public sealed class EchelonTests
         var state = await f.Store.LoadAsync(); Assert.Equal(3, state.Profiles.Count);
         var mod = state.Mods.Single(m => m.Name == "Options");
         Assert.Equal(3, mod.PatchSets.Count); Assert.Equal("1.2", mod.Version);
-        Assert.Equal("Description", mod.Description); Assert.Equal(new[] {"Weapons"}, mod.Tags);
+        Assert.Equal("Description", mod.Description); Assert.Equal(new[] { "Weapons" }, mod.Tags);
         Assert.Equal("123", Assert.Single(mod.Sources).ModId); Assert.Null(mod.Sources[0].FileId);
         Assert.Equal(DateTimeOffset.UnixEpoch.AddSeconds(1751582418.129), mod.ImportedAt);
         var first = result.Profiles[0]; Assert.Equal(priority, first.Priority);
-        Assert.Equal(new[] {"Simple", "Options"}, first.Entries.Select(e => state.Mods.Single(m => m.Id == e.ModId).Name));
+        Assert.Equal(new[] { "Simple", "Options" }, first.Entries.Select(e => state.Mods.Single(m => m.Id == e.ModId).Name));
         Assert.False(first.Entries[0].Enabled); Assert.True(first.Entries[1].Enabled);
         Assert.Null(first.Entries[0].GroupId); Assert.Equal(first.Groups[0].Id, first.Entries[1].GroupId);
-        Assert.Equal(new[] {"Weapons", "Empty"}, first.Groups.Select(g => g.Name));
+        Assert.Equal(new[] { "Weapons", "Empty" }, first.Groups.Select(g => g.Name));
         Assert.Equal("#FEE800", first.Groups[0].BackgroundColor);
         var choice = Assert.Single(first.Entries[1].Options); Assert.True(choice.Enabled); Assert.Equal(1, choice.ChoiceIndex);
         var second = result.Profiles[1]; Assert.False(Assert.Single(second.Entries).Enabled);
@@ -91,7 +106,7 @@ public sealed class EchelonTests
     {
         using var f = new Fixture(); var root = await Data(f);
         var image = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==");
-        foreach (var folder in new[] {"images", "icons", "mods/Options (a)/img"})
+        foreach (var folder in new[] { "images", "icons", "mods/Options (a)/img" })
         {
             Directory.CreateDirectory(Path.Combine(root, folder));
             await File.WriteAllBytesAsync(Path.Combine(root, folder, "test.png"), image);
@@ -121,7 +136,7 @@ public sealed class EchelonTests
         using var f = new Fixture(); var root = await Data(f);
         var custom = Path.Combine(f.Root, "custom storage"); Directory.Move(Path.Combine(root, "mods"), custom);
         Directory.CreateDirectory(Path.Combine(root, "mods"));
-        await File.WriteAllTextAsync(Path.Combine(root, "locations.json"), JsonSerializer.Serialize(new {mods = custom}));
+        await File.WriteAllTextAsync(Path.Combine(root, "locations.json"), JsonSerializer.Serialize(new { mods = custom }));
         var plan = await EchelonReader.ReadAsync(root, ["second"]);
         Assert.Single(plan.Profiles); Assert.Equal(3, plan.Mods.Count);
         await Assert.ThrowsAsync<InvalidDataException>(() => EchelonReader.ReadAsync(root, ["missing"]));

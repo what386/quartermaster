@@ -52,8 +52,9 @@ public static class EchelonReader
             if (sets.Length == 0) throw new InvalidDataException("An Echelon mod contains no patch sets.");
             var options = OptionalArray(value, "options").Select(option => new EchelonOption(Required(option, "name"), Text(option, "description") ?? "",
                 Indices(option, "include", sets.Length), OptionalArray(option, "subs").Select(choice => new EchelonChoice(
-                    Required(choice, "name"), Text(choice, "description") ?? "", Indices(choice, "include", sets.Length)) { Image = ReadImage(path, Text(choice, "image")) }).ToArray())
-                { Image = ReadImage(path, Text(option, "image")) }).ToArray();
+                    Required(choice, "name"), Text(choice, "description") ?? "", Indices(choice, "include", sets.Length))
+                { Image = ReadImage(path, Text(choice, "image")) }).ToArray())
+            { Image = ReadImage(path, Text(option, "image")) }).ToArray();
             // Echelon excludes unreferenced sets when options exist; Quartermaster treats
             // them as always-on content. Reject inconsistent definitions rather than
             // silently enabling files the source profile would never deploy.

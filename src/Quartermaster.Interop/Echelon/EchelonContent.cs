@@ -26,10 +26,18 @@ internal static class EchelonContent
                 }
                 var manifest = new
                 {
-                    Version = 1, Guid = mod.ManifestId, mod.Name, mod.Description, ModVersion = mod.Version, IconPath = Image(mod.Image),
+                    Version = 1,
+                    Guid = mod.ManifestId,
+                    mod.Name,
+                    mod.Description,
+                    ModVersion = mod.Version,
+                    IconPath = Image(mod.Image),
                     Options = mod.Options.Select(option => new
                     {
-                        option.Name, option.Description, Image = Image(option.Image), Include = option.Sets.Select(Folder).ToArray(),
+                        option.Name,
+                        option.Description,
+                        Image = Image(option.Image),
+                        Include = option.Sets.Select(Folder).ToArray(),
                         SubOptions = option.Choices.Select(choice => new { choice.Name, choice.Description, Image = Image(choice.Image), Include = choice.Sets.Select(Folder).ToArray() }).ToArray()
                     }).ToArray()
                 };

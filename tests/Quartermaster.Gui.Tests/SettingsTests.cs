@@ -77,9 +77,10 @@ public sealed class SettingsTests
         var file = Directory.GetFiles(Path.Combine(root, "mods", "sample")).Single(path => System.Text.RegularExpressions.Regex.IsMatch(path, @"\.patch_\d+$"));
         var data = new
         {
-            version = 2, active_profile = "profile",
-            library = new Dictionary<string, object> { ["sample"] = new {id = "sample", name = "Imported", sets = new[] {new {files = new Dictionary<string,string> {[""] = Path.GetFileName(file)}}}} },
-            profiles = new[] {new {id = "profile", name = "Echelon profile", entries = new[] {new {type = "mod", id = "sample", enabled = true}}}}
+            version = 2,
+            active_profile = "profile",
+            library = new Dictionary<string, object> { ["sample"] = new { id = "sample", name = "Imported", sets = new[] { new { files = new Dictionary<string, string> { [""] = Path.GetFileName(file) } } } } },
+            profiles = new[] { new { id = "profile", name = "Echelon profile", entries = new[] { new { type = "mod", id = "sample", enabled = true } } } }
         };
         await File.WriteAllTextAsync(Path.Combine(root, "state.json"), System.Text.Json.JsonSerializer.Serialize(data));
         f.Dialogs.FolderPath = root;
