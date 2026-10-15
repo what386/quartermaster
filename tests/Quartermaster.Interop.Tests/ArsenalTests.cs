@@ -111,6 +111,34 @@ public sealed class ArsenalTests
         Assert.Equal(3, (await f.Library.LoadAsync()).Profiles.Count);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ImportsTrailingCommasInProfileDataAndModernOrLegacyManifests(bool legacy)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var statePath = Path.Combine(root, "hd2a_data.json");
+        var data = (await File.ReadAllTextAsync(statePath)).Replace("[\"second\",\"first\"]", "[\"second\",\"first\",]");
+        data = data[..^1] + ",}";
+        await File.WriteAllTextAsync(statePath, data);
+        var folder = Path.Combine(root, "mods", "b");
+        var optionFolder = Path.Combine(folder, "Base"); Directory.CreateDirectory(optionFolder);
+        foreach (var file in Directory.EnumerateFiles(folder)) File.Move(file, Path.Combine(optionFolder, Path.GetFileName(file)));
+        var manifest = legacy
+            ? """{"Version":"1.03","Options":["Base",],}"""
+            : """{"Version":1,"Options":[{"Name":"Base","Include":["Base",],},],}""";
+        var manifestPath = Path.Combine(folder, "manifest.json");
+        await File.WriteAllTextAsync(manifestPath, manifest);
+        var plan = await ArsenalReader.ReadAsync(root);
+        Assert.Equal(new[] { "Second", "First" }, plan.Profiles.Select(profile => profile.Name));
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        Assert.Equal(2, result.AddedMods); Assert.Equal(2, result.AddedProfiles);
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
+        Assert.Equal("Base", Assert.Single(mod.Options).Name);
+        Assert.Equal(data, await File.ReadAllTextAsync(statePath));
+        Assert.Equal(manifest, await File.ReadAllTextAsync(manifestPath));
+    }
+
     [Fact]
     public async Task SelectedProfilesResolveReferenceOnlyModsAndDoNotRequireUnusedLibraryFiles()
     {
