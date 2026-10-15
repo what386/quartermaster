@@ -93,8 +93,11 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public Command ResetCommand { get; }
     public AsyncCommand BrowseCommand { get; }
     public AsyncCommand DiscoverCommand { get; }
-    public SettingsViewModel(AppServices services, Func<Task>? replayOnboarding = null) : base(services)
+    public SettingsViewModel(AppServices services, Func<Task>? replayOnboarding = null,
+        Func<CancellationToken, Task<IReadOnlyList<string>>>? discoverEchelonDirectories = null) : base(services)
     {
+        this.discoverEchelonDirectories = discoverEchelonDirectories ??
+            (ct => Task.Run(() => Quartermaster.Interop.Echelon.EchelonDiscovery.FindDirectories(ct: ct), ct));
         SaveCommand = Operations.CreateCommand("Saving settings", async ct =>
         {
             var account = await ValidateProviderDraftAsync(ct);
