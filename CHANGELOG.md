@@ -2,6 +2,13 @@
 
 *Generated on 2026-10-15*
 
+## 0.8.2 — 2026-10-15
+
+### Changes
+
+- fix: allow json objects to contain trailing commas
+
+
 ## 0.8.1 — 2026-10-15
 
 ### Changes

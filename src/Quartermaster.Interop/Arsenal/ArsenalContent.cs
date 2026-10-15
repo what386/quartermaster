@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Quartermaster.Library.Importing;
 using Quartermaster.Library.Mods;
@@ -13,7 +14,8 @@ internal static class ArsenalContent
         var manifests = files.Where(file => Path.GetFileName(file).Equals("manifest.json", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (manifests.Length != 1) return await contents.ImportAsync(mod.Directory, mod.Name, ct).ConfigureAwait(false);
         var manifestPath = manifests[0];
-        var document = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath, ct).ConfigureAwait(false)) as JsonObject;
+        var document = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath, ct).ConfigureAwait(false),
+            documentOptions: new JsonDocumentOptions { AllowTrailingCommas = true }) as JsonObject;
         if (document is null) return await contents.ImportAsync(mod.Directory, mod.Name, ct).ConfigureAwait(false);
         var changed = false;
         var version = document.FirstOrDefault(pair => pair.Key.Equals("Version", StringComparison.OrdinalIgnoreCase));

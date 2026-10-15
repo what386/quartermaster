@@ -16,7 +16,7 @@ public static class ArsenalReader
     {
         directory = Path.GetFullPath(directory);
         await using var stream = File.OpenRead(Path.Combine(directory, "hd2a_data.json"));
-        using var document = await JsonDocument.ParseAsync(stream, cancellationToken: ct).ConfigureAwait(false);
+        using var document = await JsonDocument.ParseAsync(stream, new JsonDocumentOptions { AllowTrailingCommas = true }, ct).ConfigureAwait(false);
         var root = document.RootElement;
         if (!root.TryGetProperty("modsList", out var lists) || lists.ValueKind != JsonValueKind.Object)
             throw new InvalidDataException("The folder does not contain an Arsenal profile library.");

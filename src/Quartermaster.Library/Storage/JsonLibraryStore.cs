@@ -62,6 +62,7 @@ internal static class JsonFiles
     public static readonly JsonSerializerOptions Options = new()
     {
         WriteIndented = true,
+        AllowTrailingCommas = true,
         PropertyNameCaseInsensitive = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }

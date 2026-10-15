@@ -10,13 +10,13 @@
       "quartermaster.core": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Repatcher": "[0.5.0, )"
+          "Quartermaster.Repatcher": "[0.8.1, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Core": "[0.5.0, )"
+          "Quartermaster.Core": "[0.8.1, )"
         }
       },
       "quartermaster.repatcher": {
