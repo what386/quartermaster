@@ -80,10 +80,9 @@ apply a different direction, then redeploy.
 Right-click a profile to rename, duplicate, delete, or export it. Import a profile
 ZIP through the create-profile dialog or by dropping it into the sidebar.
 
-To migrate from HD2 Arsenal, use **Settings → Imports → Import Arsenal profiles**.
-This copies the profiles and their mods, preserving colored groups, thumbnails,
-tags, load order, enabled states, and option choices.
-See [Arsenal importing](docs/interop.md) for details.
+To migrate from a different mod manager, use **Settings → Imports → Import <manager> profiles**
+This copies profiles, including mods, options, artwork, tags, mod pages, and tracking.
+Import supports HD2Arsenal and Echelon. If youd like more managers supported, let me know.
 
 ## Search and updates
 
