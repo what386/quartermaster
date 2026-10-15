@@ -96,6 +96,35 @@ jobs:
           path: dist/Quartermaster-${{ matrix.rid }}-${{ matrix.deployment }}.zip
           if-no-files-found: error
 
+  appimage:
+    name: Build Linux AppImage
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Download Linux bundled archive
+        uses: actions/download-artifact@v8
+        with:
+          name: Quartermaster-linux-x64-bundled
+          path: bundled
+
+      - name: Extract Linux bundled archive
+        run: python3 -m zipfile -e bundled/Quartermaster-linux-x64-bundled.zip publish
+
+      - name: Build AppImage
+        run: |
+          tool="$(bash packaging/linux/install-appimagetool.sh "$RUNNER_TEMP/appimage-tools")"
+          bash packaging/linux/build-appimage.sh publish dist "$tool" "$RUNNER_TEMP/appimage-tools/runtime-x86_64"
+
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v7
+        with:
+          name: Quartermaster-linux-x64-AppImage
+          path: dist/Quartermaster-linux-x64.AppImage
+          if-no-files-found: error
+
   installer:
     name: Build Windows installer
     needs: build
@@ -137,7 +166,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build, installer]
+    needs: [build, installer, appimage]
     runs-on: ubuntu-latest
 
     steps:
@@ -154,6 +183,7 @@ jobs:
           cd dist
           set -- \
             Quartermaster-linux-x64-bundled.zip \
+            Quartermaster-linux-x64.AppImage \
             Quartermaster-win-x64-bundled.zip \
             Quartermaster-win-x64-setup.exe
           for asset in "$@"; do

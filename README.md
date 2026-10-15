@@ -42,6 +42,11 @@ Download a package from the [latest release](https://github.com/what386/quarterm
 - **Windows x64:** run `Quartermaster-win-x64-setup.exe` to install for your user,
   with a Start menu shortcut and an optional desktop shortcut. Administrator
   permissions are not required. Uninstalling preserves your mod library and settings.
+- **Linux x64:** download `Quartermaster-linux-x64.AppImage`, mark it executable
+  in your file manager (or run `chmod +x Quartermaster-linux-x64.AppImage`), and
+  launch it. The icon and desktop entry are bundled; AppImageLauncher can add it
+  to your application menu. If FUSE is unavailable, launch it with
+  `APPIMAGE_EXTRACT_AND_RUN=1 ./Quartermaster-linux-x64.AppImage`.
 - **Portable Windows or Linux x64:** extract the matching `bundled.zip` archive
   and launch `Quartermaster.Gui.exe` or `Quartermaster.Gui`. Both archives include
   `icon.png`; the Windows executable also embeds the app icon.
@@ -180,8 +185,11 @@ To test release packaging locally:
 ```
 
 This uses the CI release settings: Release, self-contained, single-file, and
-ReadyToRun. ZIPs and `SHA256SUMS.txt` are written to `dist/`, with unpacked apps
-under `dist/package/<runtime>/publish/`. Windows packages also build and include
+ReadyToRun. ZIPs, the Linux AppImage, and `SHA256SUMS.txt` are written to `dist/`,
+with unpacked apps under `dist/package/<runtime>/publish/`. Linux AppImages must
+be built on Linux; `curl` and `sha256sum` are required. The pinned AppImage tool
+and runtime are downloaded and verified automatically, and building requires
+no FUSE installation. Windows packages also build and include
 the native updater, and produce the Inno Setup installer. On Windows, run from
 Git Bash with CMake, Visual Studio C++ build tools, Python 3, and PowerShell 7
 installed. The pinned Inno Setup compiler is downloaded automatically, or you

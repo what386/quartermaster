@@ -62,6 +62,10 @@ public sealed partial class SelfUpdateManager : IDisposable
         )
             throw new ArgumentException("Update limits must be positive.", nameof(options));
         installedVersion = ReleaseVersion.Parse(options.CurrentVersion);
+        if (options.UsesAppImage && (options.RuntimeIdentifier != "linux-x64" ||
+            options.AppImageFileName is "" or "." or ".." || Path.GetFileName(options.AppImageFileName) != options.AppImageFileName ||
+            options.AppImageFileName!.Any(character => char.IsControl(character) || "\\/:*?\"<>|".Contains(character))))
+            throw new ArgumentException("An AppImage update requires Linux x64 and a valid filename.", nameof(options));
         this.options = options with
         {
             InstallDirectory = UpdatePaths.ResolveRoot(options.InstallDirectory),
@@ -200,13 +204,26 @@ public sealed partial class SelfUpdateManager : IDisposable
                 && !digest.Equals(checksum, StringComparison.OrdinalIgnoreCase)
             )
                 throw new InvalidDataException("Release digest and SHA256SUMS.txt disagree.");
-            var archive = Path.Combine(directory, "release.zip");
+            var archive = Path.Combine(directory, options.UsesAppImage ? "release.AppImage" : "release.zip");
             await DownloadAsync(release.Package, archive, checksum, progress, ct)
                 .ConfigureAwait(false);
             var staged = Path.Combine(directory, "staged");
-            await ReleaseExtraction
-                .ExtractAsync(archive, staged, options, progress, ct)
-                .ConfigureAwait(false);
+            if (options.UsesAppImage)
+            {
+                // Check the ELF and type-2 AppImage markers without executing downloaded code.
+                var header = new byte[20];
+                await using (var input = File.OpenRead(archive))
+                    await input.ReadExactlyAsync(header, ct).ConfigureAwait(false);
+                if (!header.AsSpan(0, 6).SequenceEqual(new byte[] { 0x7f, (byte)'E', (byte)'L', (byte)'F', 2, 1 }) ||
+                    header[8] != (byte)'A' || header[9] != (byte)'I' || header[10] != 2 || header[18] != 62 || header[19] != 0)
+                    throw new InvalidDataException("The release is not an x64 type-2 AppImage.");
+                Directory.CreateDirectory(staged);
+                File.Copy(archive, Path.Combine(staged, options.ExecutableName));
+            }
+            else
+                await ReleaseExtraction
+                    .ExtractAsync(archive, staged, options, progress, ct)
+                    .ConfigureAwait(false);
             var helper = "";
             if (options.UsesWindowsUpdater)
             {

@@ -8,10 +8,12 @@ public sealed record SelfUpdateOptions(string CurrentVersion, string RuntimeIden
     public long MaxDownloadBytes { get; init; } = 512L * 1024 * 1024;
     public long MaxExtractedBytes { get; init; } = 2L * 1024 * 1024 * 1024;
     public int MaxFiles { get; init; } = 4096;
-    public string ExecutableName => "Quartermaster.Gui" + (RuntimeIdentifier.StartsWith("win-", StringComparison.Ordinal) ? ".exe" : "");
+    public string? AppImageFileName { get; init; }
+    public bool UsesAppImage => AppImageFileName is not null;
+    public string ExecutableName => AppImageFileName ?? ("Quartermaster.Gui" + (RuntimeIdentifier.StartsWith("win-", StringComparison.Ordinal) ? ".exe" : ""));
     public bool UsesWindowsUpdater => RuntimeIdentifier == "win-x64";
     public string UpdaterName => "Quartermaster.Updater" + (RuntimeIdentifier.StartsWith("win-", StringComparison.Ordinal) ? ".exe" : "");
-    public string AssetName => $"Quartermaster-{RuntimeIdentifier}-bundled.zip";
+    public string AssetName => UsesAppImage ? "Quartermaster-linux-x64.AppImage" : $"Quartermaster-{RuntimeIdentifier}-bundled.zip";
 
     public static SelfUpdateOptions ForCurrentApplication(string currentVersion, string workDirectory)
     {
@@ -19,6 +21,14 @@ public sealed record SelfUpdateOptions(string CurrentVersion, string RuntimeIden
             throw new PlatformNotSupportedException("Self-update supports Windows and Linux.");
         if (RuntimeInformation.ProcessArchitecture != Architecture.X64)
             throw new PlatformNotSupportedException("Self-update supports x64 applications.");
+        if (OperatingSystem.IsLinux() && Environment.GetEnvironmentVariable("APPIMAGE") is { Length: > 0 } image)
+        {
+            if (!Path.IsPathFullyQualified(image)) throw new InvalidOperationException("The AppImage path must be absolute.");
+            image = UpdatePaths.ResolveRoot(image);
+            UpdatePaths.RequireRegularFile(image);
+            return new(currentVersion, "linux-x64", Path.GetDirectoryName(image)!, workDirectory)
+            { AppImageFileName = Path.GetFileName(image) };
+        }
         var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot locate the application executable.");
         var options = new SelfUpdateOptions(currentVersion, $"{system}-x64", Path.GetDirectoryName(executable)!, workDirectory);
         if (!Path.GetFileName(executable).Equals(options.ExecutableName, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))

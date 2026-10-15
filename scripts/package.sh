@@ -9,17 +9,19 @@ usage() {
 Usage: scripts/package.sh [OPTIONS]
 
 Build local release artifacts using the settings in .github/workflows/release.yml.
-Defaults to the host platform. Outputs ZIPs, installers, and SHA256SUMS.txt in dist/;
+Defaults to the host platform. Outputs ZIPs, AppImages, installers, and SHA256SUMS.txt in dist/;
 unpacked applications and build tools are kept under dist/package/.
 
 Options:
   -r, --runtime RID          linux-x64, win-x64, or all
   --updater-toolchain FILE   CMake toolchain for cross-building the Windows updater
   --inno-compiler FILE       Existing ISCC.exe (otherwise install the pinned CI version)
-  --skip-installer           Build only portable ZIPs (required for Windows on Linux)
+  --skip-installer           Skip the Windows installer (required for Windows on Linux)
   -h, --help                Show this help
 
-Requirements: .NET 10 SDK, Python 3; Windows packages also need CMake and a C++
+Requirements: .NET 10 SDK, Python 3; Linux AppImages also need curl and sha256sum.
+Pinned AppImage tools are downloaded automatically; no FUSE setup is required to build.
+Windows packages also need CMake and a C++
 compiler. Windows installer builds require Windows and PowerShell 7 (pwsh).
 Run from Git Bash on Windows, with the Visual Studio C++ build tools installed.
 This script builds artifacts locally; it does not create tags or upload releases.
@@ -82,6 +84,11 @@ if command -v python3 >/dev/null 2>&1; then python=python3; else
     python=python
 fi
 for rid in "${runtimes[@]}"; do
+    if [[ "$rid" == linux-x64 ]]; then
+        [[ "$host" == linux ]] || error "Linux AppImage packaging requires a Linux host"
+        require curl
+        require sha256sum
+    fi
     if [[ "$rid" == win-x64 ]]; then
         require cmake
         if [[ "$host" != windows ]]; then
@@ -157,6 +164,14 @@ with ZipFile(destination, 'w', compression=ZIP_DEFLATED) as archive:
             archive.write(file, file.relative_to(publish))
 PY
     artifacts+=("$archive")
+
+    if [[ "$rid" == linux-x64 ]]; then
+        echo "==> Building Linux AppImage"
+        appimage_tool="$(bash packaging/linux/install-appimagetool.sh "$work_root/appimage-tools")"
+        bash packaging/linux/build-appimage.sh "$publish_dir" "$repo_root/dist" \
+            "$appimage_tool" "$work_root/appimage-tools/runtime-x86_64"
+        artifacts+=("$repo_root/dist/Quartermaster-linux-x64.AppImage")
+    fi
 
     if [[ "$rid" == win-x64 && "$skip_installer" == false ]]; then
         echo "==> Building Windows installer"

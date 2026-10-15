@@ -187,6 +187,85 @@ public class SelfUpdateTests
         Assert.Throws<InvalidOperationException>(() => manager.Start(update));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AppImageUpdatesReplaceOnlyTheOuterImageAndRollBackIfRestartFails(bool failRestart)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var f = new Fixture(rid: "linux-x64", configure: options => options with { AppImageFileName = "My Quartermaster ü.AppImage" });
+        var image = new byte[64];
+        new byte[] { 0x7f, (byte)'E', (byte)'L', (byte)'F', 2, 1 }.CopyTo(image, 0);
+        image[8] = (byte)'A'; image[9] = (byte)'I'; image[10] = 2; image[18] = 62;
+        f.Package = image; f.Checksums = Hash(image) + "  " + f.Options.AssetName;
+        var unrelated = Path.Combine(f.Options.InstallDirectory, "other-file");
+        File.WriteAllText(unrelated, "keep me");
+        using var manager = f.Manager();
+        var release = Assert.IsType<AppRelease>(await manager.CheckAsync());
+        Assert.Equal("Quartermaster-linux-x64.AppImage", release.Package.Name);
+        using var update = await manager.PrepareAsync(release);
+        Assert.Equal(image, File.ReadAllBytes(Assert.Single(Directory.GetFiles(update.StagedDirectory))));
+        var executable = Path.Combine(f.Options.InstallDirectory, f.Options.ExecutableName);
+        if (failRestart)
+        {
+            f.Launcher = _ => throw new IOException("restart failed");
+            Assert.Throws<IOException>(() => manager.Start(update));
+            Assert.Equal("installed application", File.ReadAllText(executable));
+            Assert.Empty(Directory.GetDirectories(f.Options.InstallDirectory, ".quartermaster-update-*"));
+        }
+        else
+        {
+            Assert.Equal(12345, manager.Start(update));
+            Assert.Equal(image, File.ReadAllBytes(executable));
+            Assert.Equal(executable, Assert.Single(f.Starts).FileName);
+            Assert.True((File.GetUnixFileMode(executable) & UnixFileMode.UserExecute) != 0);
+        }
+        Assert.Equal("keep me", File.ReadAllText(unrelated));
+    }
+
+    [Fact]
+    public void AppImageDetectionUsesTheOuterImageInsteadOfTheMountedExecutable()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var f = new Fixture(rid: "linux-x64", configure: options => options with { AppImageFileName = "Renamed Quartermaster.AppImage" });
+        var previous = Environment.GetEnvironmentVariable("APPIMAGE");
+        try
+        {
+            Environment.SetEnvironmentVariable("APPIMAGE", Path.Combine(f.Options.InstallDirectory, f.Options.ExecutableName));
+            var options = SelfUpdateOptions.ForCurrentApplication("0.4.0", f.Options.WorkDirectory);
+            Assert.True(options.UsesAppImage);
+            Assert.Equal(f.Options.InstallDirectory, options.InstallDirectory);
+            Assert.Equal("Renamed Quartermaster.AppImage", options.ExecutableName);
+            Assert.Equal("Quartermaster-linux-x64.AppImage", options.AssetName);
+        }
+        finally { Environment.SetEnvironmentVariable("APPIMAGE", previous); }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AppImagePreparationRejectsInvalidFormatOrChecksum(bool badChecksum)
+    {
+        using var f = new Fixture(rid: "linux-x64", configure: options => options with { AppImageFileName = "Quartermaster.AppImage" });
+        f.Package = new byte[64];
+        f.Checksums = (badChecksum ? new string('f', 64) : Hash(f.Package)) + "  " + f.Options.AssetName;
+        using var manager = f.Manager();
+        await Assert.ThrowsAsync<InvalidDataException>(() => manager.PrepareAsync(f.Release()));
+        f.AssertUnchanged(); f.AssertNoStaging();
+    }
+
+    [Theory]
+    [InlineData("../escape")]
+    [InlineData("folder/image.AppImage")]
+    [InlineData("folder\\image.AppImage")]
+    [InlineData("")]
+    [InlineData("..")]
+    public void AppImageUpdateRejectsUnsafeFilenames(string name)
+    {
+        using var f = new Fixture(rid: "linux-x64");
+        Assert.Throws<ArgumentException>(() => f.Manager(f.Options with { AppImageFileName = name }));
+    }
+
     [Fact]
     public async Task LinuxCanReplaceAnExecutingBinaryAndLaunchItsReplacement()
     {
