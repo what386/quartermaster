@@ -9,7 +9,8 @@ Runtime dependencies are managed .NET only; DSAR decoding uses
 K4os.Compression.LZ4. Source and dependency attribution is recorded in
 [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt).
 
-See [Repatching mods](../../docs/repatcher.md) for application behavior and settings.
+See the [implementation guide](../../docs/repatcher.md) for processing flow, binary
+invariants, integration contracts, and maintenance.
 
 ## Usage
 
@@ -82,9 +83,9 @@ discarded.
 Quartermaster's adapter, deployment staging, repair preflight, and ZIP export use
 the complete patch-set contract. Deployment hashes describe the repaired bytes;
 source hashes continue to describe imported originals. Newly generated companions
-are tracked explicitly against their source main patch. Repatch warnings appear
-in the application, and current-game arm culling is an opt-in setting used for
-both deployment updates and exports.
+are tracked explicitly against their source main patch. Callers retain warning
+messages and pass consistent repair options through preflight, deployment, and
+export.
 
 ## Tests and operational limits
 
