@@ -132,6 +132,30 @@ internal static class Fixtures
         writer.Flush();
         return output.ToArray();
     }
+
+    public static void SlimPackages(string folder, params (string Name, byte[] Data)[] packages)
+    {
+        using var first = new MemoryStream(); using var second = new MemoryStream();
+        var namesOffset = 24 + packages.Length * (24 + 32);
+        var index = new byte[namesOffset + packages.Sum(p => System.Text.Encoding.UTF8.GetByteCount(p.Name) + 1)];
+        U32(index, 12, 2); U32(index, 16, (uint)packages.Length);
+        var nameCursor = namesOffset;
+        for (var i = 0; i < packages.Length; i++)
+        {
+            var (name, bytes) = packages[i]; var split = bytes.Length / 2;
+            var row = 24 + i * 24; var entries = 24 + packages.Length * 24 + i * 32;
+            U64(index, row, (ulong)bytes.Length); U32(index, row + 8, (uint)nameCursor);
+            U32(index, row + 12, 2); U32(index, row + 16, (uint)entries);
+            U64(index, entries, 0); U32(index, entries + 8, (uint)first.Position); index[entries + 15] = 0;
+            U64(index, entries + 16, (ulong)split); U32(index, entries + 24, (uint)second.Position); index[entries + 31] = 1;
+            first.Write(bytes.AsSpan(0, split)); second.Write(bytes.AsSpan(split));
+            nameCursor += System.Text.Encoding.UTF8.GetBytes(name, index.AsSpan(nameCursor)) + 1;
+        }
+        File.WriteAllBytes(Path.Combine(folder, "bundles.nxa"), Dsar(index));
+        File.WriteAllBytes(Path.Combine(folder, "bundles.00.nxa"), Dsar(first.ToArray()));
+        File.WriteAllBytes(Path.Combine(folder, "bundles.01.nxa"), Dsar(second.ToArray()));
+        File.WriteAllBytes(Path.Combine(folder, "bundle_database.data"), BundleDatabase(packages.Select(p => p.Name).ToArray()));
+    }
 }
 
 internal sealed class UnitSource(params (ulong Id, byte[] Data)[] units) : Quartermaster.Repatcher.Archives.IUnitResourceSource

@@ -52,7 +52,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
         var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
         var ids = modIds.ToHashSet();
-        if (ids.Any(id => state.Mods.All(mod => mod.Id != id))) throw new KeyNotFoundException("Mod is not in the library.");
+        if (ids.Any(id => state.Mods.All(mod => mod.Id != id))) throw new KeyNotFoundException($"Mods are not in the library: {string.Join(", ", ids.Where(id => state.Mods.All(mod => mod.Id != id)))}");
         var profile = state.Profiles.SingleOrDefault(p => p.Id == profileId) ?? throw new KeyNotFoundException("Profile does not exist.");
         var original = profile;
         foreach (var mod in state.Mods.Where(mod => ids.Contains(mod.Id) && profile.Entries.All(entry => entry.ModId != mod.Id)))
@@ -69,7 +69,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
         var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
         var ids = modIds.ToHashSet();
-        if (ids.Any(id => state.Mods.All(mod => mod.Id != id))) throw new KeyNotFoundException("Mod is not in the library.");
+        if (ids.Any(id => state.Mods.All(mod => mod.Id != id))) throw new KeyNotFoundException($"Mods are not in the library: {string.Join(", ", ids.Where(id => state.Mods.All(mod => mod.Id != id)))}");
         if (ids.Count == 0) return;
         await store.SaveAsync(state with
         {
@@ -77,7 +77,12 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
             UpdateChecks = state.UpdateChecks.Where(c => !ids.Contains(c.ModId)).ToArray(),
             Profiles = state.Profiles.Select(p => p with { Entries = p.Entries.Where(entry => !ids.Contains(entry.ModId)).ToArray() }).ToArray()
         }, cancellationToken).ConfigureAwait(false);
-        foreach (var id in ids) await contents.DeleteAsync(id, cancellationToken).ConfigureAwait(false);
+        foreach (var id in ids)
+        {
+            try { await contents.DeleteAsync(id, cancellationToken).ConfigureAwait(false); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            { throw new IOException($"Could not remove mod '{state.Mods.Single(mod => mod.Id == id).Name}': {ex.Message}", ex); }
+        }
     }
 
     public async Task SaveProfileAsync(Profile profile, bool makeActive = false, CancellationToken cancellationToken = default)
@@ -106,7 +111,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
     {
         await using var lease = await store.AcquireLockAsync(cancellationToken).ConfigureAwait(false);
         var state = await store.LoadAsync(cancellationToken).ConfigureAwait(false);
-        if (state.Mods.All(m => m.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        if (state.Mods.All(m => m.Id != modId)) throw new KeyNotFoundException($"Mod {modId} is not in the library.");
         await store.SaveAsync(state with
         {
             Mods = state.Mods.Select(m => m.Id == modId ? m with
@@ -126,7 +131,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         var validated = ModDependencyExclusions.Filter(dependencies).Select(Validate).ToArray();
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
-        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException($"Mod {modId} is not in the library.");
         await store.SaveAsync(state with
         {
             Mods = state.Mods.Select(mod => mod.Id == modId
@@ -139,7 +144,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         var normalized = ModTags.Normalize(tags);
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
-        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException($"Mod {modId} is not in the library.");
         await store.SaveAsync(state with { Mods = state.Mods.Select(mod => mod.Id == modId ? mod with { Tags = normalized } : mod).ToArray() }, ct).ConfigureAwait(false);
     }
 
@@ -148,7 +153,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         link = ModLinks.ValidatePage(link);
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
-        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException($"Mod {modId} is not in the library.");
         await store.SaveAsync(state with { Mods = state.Mods.Select(mod => mod.Id == modId ? mod with { PageLink = link } : mod).ToArray() }, ct).ConfigureAwait(false);
     }
 
@@ -157,7 +162,7 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
         page = ModLinks.ValidatePage(page);
         await using var lease = await store.AcquireLockAsync(ct).ConfigureAwait(false);
         var state = await store.LoadAsync(ct).ConfigureAwait(false);
-        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException("Mod is not in the library.");
+        if (state.Mods.All(mod => mod.Id != modId)) throw new KeyNotFoundException($"Mod {modId} is not in the library.");
         await store.SaveAsync(state with
         {
             Mods = state.Mods.Select(mod => mod.Id == modId ? mod with
@@ -179,9 +184,9 @@ public sealed class LibraryService(ILibraryStore store, IModContentStore content
             {
                 var oldOption = oldMod.Options.Single(o => o.Id == selection.OptionId);
                 var option = newMod.Options.SingleOrDefault(o => o.Name == oldOption.Name)
-                    ?? throw new InvalidOperationException("Updated mod options changed. Configure the new mod before replacing it in profiles.");
+                    ?? throw new InvalidOperationException($"Mod '{oldMod.Name}': updated mod '{newMod.Name}' no longer offers option '{oldOption.Name}'. Configure the new mod before replacing it in profiles.");
                 var choice = oldOption.Choices.Count == 0 ? 0 : option.Choices.ToList().FindIndex(c => c.Name == oldOption.Choices[selection.ChoiceIndex].Name);
-                if (choice < 0) throw new InvalidOperationException("An updated mod option no longer offers the selected choice.");
+                if (choice < 0) throw new InvalidOperationException($"Mod '{oldMod.Name}': updated mod '{newMod.Name}' no longer offers the selected choice for option '{oldOption.Name}'.");
                 return new OptionSelection(option.Id, selection.Enabled, choice);
             }).ToArray();
             var replacement = entry with { ModId = newId, Options = options };

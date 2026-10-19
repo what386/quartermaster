@@ -36,6 +36,11 @@ Download a package from the [latest release](https://github.com/what386/quarterm
 - **Windows x64:** run `Quartermaster-win-x64-setup.exe` to install for your user,
   with a Start menu shortcut and an optional desktop shortcut. Administrator
   permissions are not required. Uninstalling preserves your mod library and settings.
+- **Linux x64:** download `Quartermaster-linux-x64.AppImage`, mark it executable
+  in your file manager (or run `chmod +x Quartermaster-linux-x64.AppImage`), and
+  launch it. The icon and desktop entry are bundled; AppImageLauncher can add it
+  to your application menu. If FUSE is unavailable, launch it with
+  `APPIMAGE_EXTRACT_AND_RUN=1 ./Quartermaster-linux-x64.AppImage`.
 - **Portable Windows or Linux x64:** extract the matching `bundled.zip` archive
   and launch `Quartermaster.Gui.exe` or `Quartermaster.Gui`. Both archives include
   `icon.png`; the Windows executable also embeds the app icon.
@@ -167,19 +172,36 @@ To test release packaging locally:
 ./scripts/package.sh
 # Or select a target explicitly:
 ./scripts/package.sh --runtime linux-x64
+# Build just one package format:
+./scripts/package.sh --format appimage
+./scripts/package.sh --format setup    # Run on Windows, in Git Bash
+./scripts/package.sh --format zip
 ```
 
 This uses the CI release settings: Release, self-contained, single-file, and
-ReadyToRun. ZIPs and `SHA256SUMS.txt` are written to `dist/`, with unpacked apps
-under `dist/package/<runtime>/publish/`. Windows packages also build and include
+ReadyToRun. ZIPs, the Linux AppImage with its `.zsync` update file, and
+`SHA256SUMS.txt` are written to `dist/`,
+with unpacked apps under `dist/package/<runtime>/publish/`. Linux AppImages must
+be built on Linux; `curl` and `sha256sum` are required. The pinned AppImage tool
+and runtime are downloaded and verified automatically, and building requires
+no FUSE installation. Windows packages also build and include
 the native updater, and produce the Inno Setup installer. On Windows, run from
 Git Bash with CMake, Visual Studio C++ build tools, Python 3, and PowerShell 7
 installed. The pinned Inno Setup compiler is downloaded automatically, or you
 can supply `--inno-compiler FILE`.
 
+AppImages embed update information for the latest GitHub release so external
+AppImage update tools can discover the accompanying `.zsync` file. Release
+uploads and checksums include both files. For in-app AppImage updates, Quartermaster
+uses `zsync2` or `zsync` from `PATH` when installed, otherwise it downloads the full
+AppImage. A failed synchronization stops the update; both download methods verify
+the release SHA-256 before installation.
+
 For cross-building Windows portable packages, use `--runtime win-x64
 --updater-toolchain FILE --skip-installer` with a Windows x64 CMake toolchain.
 Use `--runtime all` to package both targets. `--help` lists all options.
+`--format appimage` selects Linux x64 automatically; `--format setup` selects
+Windows x64. Each invocation writes checksums for only the artifacts it builds.
 
 See the [repatcher documentation](src/Quartermaster.Repatcher/README.md) for
 patching details and the [changelog](CHANGELOG.md) for release changes.

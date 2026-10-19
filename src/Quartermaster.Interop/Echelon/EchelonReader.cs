@@ -35,42 +35,50 @@ public static class EchelonReader
         {
             ct.ThrowIfCancellationRequested();
             var value = property.Value;
-            var id = Required(value, "id");
-            if (id != property.Name || !metadata.TryAdd(id, value)) throw new InvalidDataException("Invalid or duplicate Echelon library mod ID.");
-            var storage = Text(value, "store") ?? id;
-            var local = Path.Combine(modRoot, storage.Replace('\\', '/').TrimEnd('/').Split('/').Last());
-            var storageRoot = Directory.Exists(local) || string.IsNullOrWhiteSpace(customRoot) ? modRoot : ResolveDirectory(directory, customRoot);
-            var path = ResolveDirectory(storageRoot, storage);
-            if (!Directory.Exists(path)) throw new DirectoryNotFoundException($"Echelon mod files were not found: {Required(value, "name")} ({path})");
-            var sets = Array(value, "sets").EnumerateArray().Select(set =>
+            try
             {
-                var files = Object(set, "files").EnumerateObject().Select(file => file.Value.GetString() ?? "").ToArray();
-                if (files.Length == 0) throw new InvalidDataException("An Echelon patch set contains no files.");
-                foreach (var file in files) ResolveFile(path, file);
-                return (IReadOnlyList<string>)files;
-            }).ToArray();
-            if (sets.Length == 0) throw new InvalidDataException("An Echelon mod contains no patch sets.");
-            var options = OptionalArray(value, "options").Select(option => new EchelonOption(Required(option, "name"), Text(option, "description") ?? "",
-                Indices(option, "include", sets.Length), OptionalArray(option, "subs").Select(choice => new EchelonChoice(
-                    Required(choice, "name"), Text(choice, "description") ?? "", Indices(choice, "include", sets.Length))
-                { Image = ReadImage(path, Text(choice, "image")) }).ToArray())
-            { Image = ReadImage(path, Text(option, "image")) }).ToArray();
-            // Echelon excludes unreferenced sets when options exist; Quartermaster treats
-            // them as always-on content. Reject inconsistent definitions rather than
-            // silently enabling files the source profile would never deploy.
-            var assigned = options.SelectMany(option => option.Sets.Concat(option.Choices.SelectMany(choice => choice.Sets))).ToHashSet();
-            if (options.Length > 0 && assigned.Count != sets.Length)
-                throw new InvalidDataException("Echelon mod has stored patch sets outside its option definitions.");
-            var addedAt = value.TryGetProperty("added_at", out var time) && time.TryGetDouble(out var seconds) && double.IsFinite(seconds)
-                ? DateTimeOffset.UnixEpoch.AddSeconds(seconds) : DateTimeOffset.TryParse(Text(value, "added"), CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : (DateTimeOffset?)null;
-            var release = Text(value, "version");
-            mods.Add(new(id, Required(value, "name"), path, Text(value, "description") ?? "", addedAt, release, ReadSource(value, release),
-                ModTags.Normalize(OptionalArray(value, "tags").Select(tag => tag.GetString() ?? "")), sets, options)
-            {
-                ManifestId = Guid.TryParse(Text(value, "guid"), out var manifestId) ? manifestId.ToString() : null,
-                PageLink = ReadPage(Text(value, "web")),
-                Image = ReadImage(Path.Combine(directory, "images"), Text(value, "image"))
-            });
+                var id = Required(value, "id");
+                if (id != property.Name || !metadata.TryAdd(id, value)) throw new InvalidDataException("Invalid or duplicate Echelon library mod ID.");
+                var storage = Text(value, "store") ?? id;
+                var local = Path.Combine(modRoot, storage.Replace('\\', '/').TrimEnd('/').Split('/').Last());
+                var storageRoot = Directory.Exists(local) || string.IsNullOrWhiteSpace(customRoot) ? modRoot : ResolveDirectory(directory, customRoot);
+                var path = ResolveDirectory(storageRoot, storage);
+                if (!Directory.Exists(path)) throw new DirectoryNotFoundException($"Echelon mod files were not found: {Required(value, "name")} ({path})");
+                var sets = Array(value, "sets").EnumerateArray().Select(set =>
+                {
+                    var files = Object(set, "files").EnumerateObject().Select(file => file.Value.GetString() ?? "").ToArray();
+                    if (files.Length == 0) throw new InvalidDataException("An Echelon patch set contains no files.");
+                    foreach (var file in files) ResolveFile(path, file);
+                    return (IReadOnlyList<string>)files;
+                }).ToArray();
+                if (sets.Length == 0) throw new InvalidDataException("An Echelon mod contains no patch sets.");
+                var options = OptionalArray(value, "options").Select(option => new EchelonOption(Required(option, "name"), Text(option, "description") ?? "",
+                    Indices(option, "include", sets.Length), OptionalArray(option, "subs").Select(choice => new EchelonChoice(
+                        Required(choice, "name"), Text(choice, "description") ?? "", Indices(choice, "include", sets.Length))
+                    { Image = ReadImage(path, Text(choice, "image")) }).ToArray())
+                { Image = ReadImage(path, Text(option, "image")) }).ToArray();
+                // Echelon excludes unreferenced sets when options exist; Quartermaster treats
+                // them as always-on content. Reject inconsistent definitions rather than
+                // silently enabling files the source profile would never deploy.
+                var assigned = options.SelectMany(option => option.Sets.Concat(option.Choices.SelectMany(choice => choice.Sets))).ToHashSet();
+                if (options.Length > 0 && assigned.Count != sets.Length)
+                    throw new InvalidDataException("Echelon mod has stored patch sets outside its option definitions.");
+                var addedAt = value.TryGetProperty("added_at", out var time) && time.TryGetDouble(out var seconds) && double.IsFinite(seconds)
+                    ? DateTimeOffset.UnixEpoch.AddSeconds(seconds) : DateTimeOffset.TryParse(Text(value, "added"), CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? date : (DateTimeOffset?)null;
+                var release = Text(value, "version");
+                mods.Add(new(id, Required(value, "name"), path, Text(value, "description") ?? "", addedAt, release, ReadSource(value, release),
+                    ModTags.Normalize(OptionalArray(value, "tags").Select(tag => tag.GetString() ?? "")), sets, options)
+                {
+                    ManifestId = Guid.TryParse(Text(value, "guid"), out var manifestId) ? manifestId.ToString() : null,
+                    PageLink = ReadPage(Text(value, "web")),
+                    Image = ReadImage(Path.Combine(directory, "images"), Text(value, "image"))
+                });
+            }
+            catch (InvalidDataException ex)
+            { throw new InvalidDataException($"Invalid Echelon mod '{Text(value, "name") ?? property.Name}': {ex.Message}", ex); }
+            catch (ArgumentException ex)
+            { throw new InvalidDataException($"Invalid Echelon mod '{Text(value, "name") ?? property.Name}': {ex.Message}", ex); }
+
         }
         var byId = mods.ToDictionary(mod => mod.Id, StringComparer.Ordinal);
         var importedProfiles = new List<EchelonProfile>();
@@ -98,15 +106,21 @@ public static class EchelonReader
                     continue;
                 }
                 if (type != "mod") throw new InvalidDataException($"Unsupported Echelon profile entry: {type}");
-                if (!seen.Add(modId) || !byId.TryGetValue(modId, out var mod)) throw new InvalidDataException($"Duplicate or missing Echelon profile mod: {modId}");
-                var saved = entry.TryGetProperty("options", out var configuration) && configuration.ValueKind == JsonValueKind.Object && configuration.EnumerateObject().Any()
-                    ? configuration : metadata[modId].TryGetProperty("option_defaults", out var defaults) ? defaults : default;
-                var on = OptionalArray(saved, "on");
-                var selected = OptionalArray(saved, "sel");
-                var choices = mod.Options.Select((option, index) => new EchelonOptionSelection(
-                    index >= on.Length || Boolean(on[index]), index < selected.Length && selected[index].TryGetInt32(out var choice)
-                        ? Math.Clamp(choice, 0, Math.Max(0, option.Choices.Count - 1)) : 0)).ToArray();
-                rows.Add(new(modId, null, Bool(entry, "enabled", true), choices));
+                if (!seen.Add(modId) || !byId.TryGetValue(modId, out var mod)) throw new InvalidDataException($"Duplicate or missing Echelon profile mod: {byId.GetValueOrDefault(modId)?.Name ?? modId} ({modId})");
+                try
+                {
+                    var saved = entry.TryGetProperty("options", out var configuration) && configuration.ValueKind == JsonValueKind.Object && configuration.EnumerateObject().Any()
+                        ? configuration : metadata[modId].TryGetProperty("option_defaults", out var defaults) ? defaults : default;
+                    var on = OptionalArray(saved, "on");
+                    var selected = OptionalArray(saved, "sel");
+                    var choices = mod.Options.Select((option, index) => new EchelonOptionSelection(
+                        index >= on.Length || Boolean(on[index]), index < selected.Length && selected[index].TryGetInt32(out var choice)
+                            ? Math.Clamp(choice, 0, Math.Max(0, option.Choices.Count - 1)) : 0)).ToArray();
+                    rows.Add(new(modId, null, Bool(entry, "enabled", true), choices));
+                }
+                catch (Exception ex) when (ex is InvalidDataException or ArgumentException or InvalidOperationException)
+                { throw new InvalidDataException($"Invalid options for Echelon mod '{mod.Name}' in profile '{Required(profile, "name")}': {ex.Message}", ex); }
+
             }
             string? thumbnail = null;
             if (Text(profile, "icon") is { Length: > 0 } icon)

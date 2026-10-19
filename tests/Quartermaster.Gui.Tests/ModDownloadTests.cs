@@ -72,6 +72,48 @@ public sealed class ModDownloadTests
         finally { window.Close(); }
     }
 
+    [AvaloniaTheory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task UpdateCheckErrorsNameEveryAffectedModIncludingIdenticalFailures(bool requestFails)
+    {
+        using var api = Api(request => requestFails && request.RequestUri!.AbsolutePath.EndsWith("files.json"));
+        using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        var names = new[] { "Armor alpha", "Cape beta", "Helmet gamma", "Weapon delta" };
+        foreach (var name in names)
+        {
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+            var mod = f.Services.Session.State.Mods.Single(mod => mod.Name == name);
+            // An absent file has no replacement chain, reproducing the archived-file report.
+            await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", "123", "999", "1")]);
+        }
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        await ((ModsViewModel)Navigate(f, PageKind.Mods)).CheckUpdatesCommand.ExecuteAsync();
+        Assert.True(f.Services.Operations.IsError);
+        Assert.Contains("Could not check 4 mods:", f.Services.Operations.Message);
+        foreach (var name in names) Assert.Contains(name + " (nexusmods):", f.Services.Operations.Message);
+        if (!requestFails) Assert.Equal(4, f.Services.Operations.Message.Split("has no linked replacement.").Length - 1);
+        Assert.Equal(f.Services.Operations.Message, f.Services.Operations.NotificationMessage);
+    }
+
+    [AvaloniaFact]
+    public async Task ModCommandsIncludeIdentityAndPreserveCancellation()
+    {
+        var operations = new OperationState();
+        var original = new IOException("could not read data");
+        await operations.RunAsync("Updating mod", _ => Task.FromException(original), modName: "Named armor");
+        Assert.Contains("Named armor", operations.NotificationMessage);
+        Assert.Contains(original.Message, operations.NotificationMessage);
+        await operations.RunAsync("Updating mod", ct =>
+        {
+            operations.CancelCommand.Execute(null);
+            ct.ThrowIfCancellationRequested();
+            return Task.CompletedTask;
+        }, modName: "Named armor");
+        Assert.False(operations.IsError);
+        Assert.Equal("Operation cancelled", operations.Message);
+    }
+
     [AvaloniaFact]
     public async Task FailedUpdateDoesNotPreventOtherUpdatesOrTheManualPrompt()
     {

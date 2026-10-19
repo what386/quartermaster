@@ -26,6 +26,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public NavigationItem LibraryNavigation => NavigationItems.Single(item => item.Page == PageKind.Mods);
     public IReadOnlyList<NavigationItem> UtilityNavigationItems => NavigationItems.Where(item => item.Page is PageKind.Search or PageKind.Downloads or PageKind.ManualChecks or PageKind.Settings).ToArray();
     public OperationState Operations { get; }
+    public LibrarySession Session => services.Session;
     public ModDownloads Downloads => services.Downloads;
     public bool ShowDownloadProgress => Downloads.HasPendingDownloads && SelectedNavigation.Page != PageKind.Downloads;
     public NavigationItem SelectedNavigation

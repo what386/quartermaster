@@ -1,6 +1,15 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-15*
+*Generated on 2026-10-19*
+
+## 0.9.0 — 2026-10-19
+
+### Changes
+
+- improve repatcher
+- improve error output
+- some arsenal import fixes
+
 
 ## 0.8.2 — 2026-10-15
 

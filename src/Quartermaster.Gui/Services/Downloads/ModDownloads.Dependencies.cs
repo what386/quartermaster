@@ -1,5 +1,6 @@
 using Quartermaster.Library.Mods;
 using Quartermaster.Gui.Mods;
+using Quartermaster.Gui.Shared;
 using Quartermaster.Providers.Clients;
 using Quartermaster.Providers.Clients.NexusMods;
 
@@ -19,8 +20,8 @@ public sealed partial class ModDownloads
             var page = $"https://www.nexusmods.com/{NexusLink.Game}/mods/{source.ModId}";
             try { NexusLink.Parse(page); }
             catch (ArgumentException) { continue; }
-            var planned = await PlanNexusDependenciesAsync(new(mod.Id.ToString(), mod.Name, mod.Description, mod.Version,
-                RequirementPage(page, source.FileId), []), profileId, ct, metadata);
+            var planned = await ModOperation.RunAsync(mod.Name, () => PlanNexusDependenciesAsync(new(mod.Id.ToString(), mod.Name, mod.Description, mod.Version,
+                RequirementPage(page, source.FileId), []), profileId, ct, metadata));
             if (planned is null) return;
             dependencies.AddRange(planned);
         }
@@ -56,7 +57,7 @@ public sealed partial class ModDownloads
                 .Aggregate((left, right) => { left.IntersectWith(right); return left; }) : null;
         async Task Visit(string page)
         {
-            var requirements = await services.Providers.GetRequirementsAsync(page, ct);
+            var requirements = await ModOperation.RunAsync(page, () => services.Providers.GetRequirementsAsync(page, ct));
             var snapshot = requirements.Select(requirement => requirement.ToDependency()).ToArray();
             metadata[NexusLink.Parse(page).ModId.ToString()] = snapshot;
             var link = NexusLink.Parse(page);
@@ -75,7 +76,7 @@ public sealed partial class ModDownloads
                     !mod.Superseded && ModDependencyMatching.Matches(mod, item.ToDependency() with { Alternatives = [] }))) ?? alternatives[0];
                 var modId = NexusLink.Parse(selectedRequirement.Page.AbsoluteUri).ModId;
                 if (!visited.Add(modId)) continue;
-                if (visited.Count > 256) throw new InvalidDataException(Localizer.Text("This mod's dependency list is too large to install together."));
+                if (visited.Count > 256) throw new InvalidDataException(Localizer.Interpolate($"The dependency list for {root.Name} is too large to install together."));
                 var installed = services.Session.State.Mods.FirstOrDefault(mod => !mod.Superseded && ModDependencyMatching.Matches(mod, selectedRequirement.ToDependency() with { Alternatives = [] }));
                 var pending = services.Providers.State.Jobs.Any(job => job.File.Provider == "nexusmods" && job.File.ModId == modId.ToString() &&
                     (selectedRequirement.AllowedFileIds is null || selectedRequirement.AllowedFileIds.Contains(job.File.FileId)) &&
@@ -91,7 +92,7 @@ public sealed partial class ModDownloads
                     ProviderMod? resolved = null;
                     foreach (var alternative in alternatives.OrderByDescending(item => ReferenceEquals(item, selectedRequirement)))
                     {
-                        var candidate = await services.Providers.ResolveAsync(alternative.Page.AbsoluteUri, ct);
+                        var candidate = await ModOperation.RunAsync(alternative.Name, () => services.Providers.ResolveAsync(alternative.Page.AbsoluteUri, ct));
                         var compatible = candidate.Files.Where(file => file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
                             (alternative.AllowedFileIds is null || alternative.AllowedFileIds.Contains(file.FileId))).ToArray();
                         if (compatible.Length == 0) continue;
@@ -144,13 +145,13 @@ public sealed partial class ModDownloads
                 file => review!.ChangeFileAsync(file))).ToArray();
             return new(items, external.Values.ToArray());
         }
-        var plan = await BuildPlan();
+        var plan = await ModOperation.RunAsync(root.Name, BuildPlan);
         if (missing.Count == 0 && external.Count == 0) return [];
         review = new(root.Name, missing.Count == 0 ? Localizer.Text("Continue") : profileIds.Count == 0 ? Localizer.Text("Install dependencies") : Localizer.Text("Add dependencies"),
             Localizer.Text(declineLabel), plan, async file =>
             {
                 choices[file.ModId] = file.FileId;
-                return await BuildPlan();
+                return await ModOperation.RunAsync(root.Name, BuildPlan);
             });
         return await services.Dialogs.ReviewDependenciesAsync(review, ct) ? missing.ToArray() : [];
     }
@@ -162,7 +163,7 @@ public sealed partial class ModDownloads
         var mod = services.Session.State.Mods.Single(item => item.Id == modId);
         if (NexusPage(mod) is not { } page) return;
         var fileId = mod.Sources.FirstOrDefault(source => source.Provider == "nexusmods")?.FileId;
-        var requirements = await services.Providers.GetRequirementsAsync(RequirementPage(page, fileId).AbsoluteUri, ct);
+        var requirements = await ModOperation.RunAsync(mod.Name, () => services.Providers.GetRequirementsAsync(RequirementPage(page, fileId).AbsoluteUri, ct));
         await services.Library.SetDependenciesAsync(mod.Id, requirements.Select(item => item.ToDependency()).ToArray(), ct);
         await services.Session.ReloadAsync(ct);
     }

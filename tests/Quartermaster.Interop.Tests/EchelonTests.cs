@@ -174,7 +174,8 @@ public sealed class EchelonTests
         var existing = ProfileEditor.Create("Existing"); await f.Library.SaveProfileAsync(existing, true);
         var plan = await EchelonReader.ReadAsync(root);
         File.Delete(Path.Combine(root, "mods", "b", Fixture.Archive + ".patch_7"));
-        await Assert.ThrowsAsync<FileNotFoundException>(() => new EchelonImporter(f.Store, f.Contents).ImportAsync(plan));
+        var error = await Assert.ThrowsAsync<FileNotFoundException>(() => new EchelonImporter(f.Store, f.Contents).ImportAsync(plan));
+        Assert.Contains("Simple", error.Message); Assert.IsType<FileNotFoundException>(error.InnerException);
         var state = await f.Store.LoadAsync(); Assert.Empty(state.Mods); Assert.Equal(existing.Id, Assert.Single(state.Profiles).Id);
         Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App, "library")));
     }

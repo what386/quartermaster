@@ -20,6 +20,8 @@ public class PatchAnalysisTests
         Assert.Equal(new[] { a.SourceId, other.SourceId, b.SourceId }, plan.Patches.Select(p => p.SourceId));
         Assert.Equal(request.SelectionId, plan.SelectionId);
         Assert.Equal(plan.Signature, DeploymentPlanner.Create(request).Signature);
+        var renamed = DeploymentPlanner.Create(request with { Patches = [a with { SourceName = "Armor" }, other, b] });
+        Assert.Equal(plan.Signature, renamed.Signature); Assert.Equal("Armor", renamed.Patches[0].SourceName);
         Assert.NotEqual(plan.Signature, DeploymentPlanner.Create(request with { Patches = [b, other, a] }).Signature);
         var changed = a with { Files = [a.Files[0] with { Sha256 = new string('b', 64) }] };
         Assert.NotEqual(plan.Signature, DeploymentPlanner.Create(request with { Patches = [changed, other, b] }).Signature);

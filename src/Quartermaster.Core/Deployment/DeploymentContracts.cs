@@ -1,4 +1,5 @@
 using Quartermaster.Core.Patching;
+using Quartermaster.Repatcher.Formats;
 
 namespace Quartermaster.Core.Deployment;
 
@@ -41,7 +42,16 @@ public interface IDeploymentWorkspace : IAsyncDisposable
 }
 
 public sealed record RepairedPatch(byte[] Data, int RemovedUnits);
+public sealed record RepairedPatchSet(PatchSetData Output, int RemovedUnits = 0)
+{
+    public IReadOnlyList<string> Warnings { get; init; } = [];
+}
 public interface IPatchRepairer
 {
     RepairedPatch Repair(ReadOnlyMemory<byte> patch, CancellationToken cancellationToken = default);
+    RepairedPatchSet RepairSet(PatchSetData patch, CancellationToken cancellationToken = default)
+    {
+        var result = Repair(patch.Main, cancellationToken);
+        return new(patch with { Main = result.Data }, result.RemovedUnits);
+    }
 }

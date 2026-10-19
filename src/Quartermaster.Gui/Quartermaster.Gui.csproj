@@ -18,6 +18,11 @@
           CopyToOutputDirectory="PreserveNewest"
           CopyToPublishDirectory="PreserveNewest"
           ExcludeFromSingleFile="true" />
+    <None Include="../../packaging/linux/quartermaster.desktop"
+          Condition="$([System.String]::Copy('$(RuntimeIdentifier)').StartsWith('linux-'))"
+          TargetPath="quartermaster.desktop"
+          CopyToPublishDirectory="PreserveNewest"
+          ExcludeFromSingleFile="true" />
     <ProjectReference Include="../Quartermaster.Providers/Quartermaster.Providers.csproj" />
     <ProjectReference Include="../Quartermaster.Library/Quartermaster.Library.csproj" />
     <ProjectReference Include="../Quartermaster.Interop/Quartermaster.Interop.csproj" />

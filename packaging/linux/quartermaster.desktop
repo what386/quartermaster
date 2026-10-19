@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Quartermaster
+Comment=Manage Helldivers 2 mods and profiles
+Exec=Quartermaster.Gui
+Icon=quartermaster
+Terminal=false
+Categories=Game;
+Keywords=Helldivers;Mods;Mod Manager;

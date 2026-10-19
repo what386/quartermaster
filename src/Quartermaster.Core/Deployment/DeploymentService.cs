@@ -1,4 +1,5 @@
 using Quartermaster.Core.Patching;
+using Quartermaster.Repatcher.Formats;
 
 namespace Quartermaster.Core.Deployment;
 
@@ -81,27 +82,54 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                 ct.ThrowIfCancellationRequested();
                 progress?.Report(new(DeploymentPhase.Preparing, ++current, mods.Length, mod.Key));
                 foreach (var patch in mod)
-                    foreach (var source in patch.Files)
+                {
+                    try
                     {
-                        ct.ThrowIfCancellationRequested();
-                        var name = PatchFiles.Name(patch.Archive, patch.Slot, source.Kind);
-                        await workspace.StageAsync(patch.SourceId, source, name, ct).ConfigureAwait(false);
-                        var staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
-                        if (!Matches(staged, source.Size, source.Sha256)) throw new IOException("Source file changed while staging.");
-                        if (options.Repatch && source.Kind == PatchFileKind.Main)
+                        var payloads = new Dictionary<PatchFileKind, ReadOnlyMemory<byte>>();
+                        foreach (var source in patch.Files)
                         {
-                            var bytes = await workspace.ReadStagedAsync(name, ct).ConfigureAwait(false);
-                            var result = await Task.Run(() => repairer!.Repair(bytes, ct), ct).ConfigureAwait(false);
+                            ct.ThrowIfCancellationRequested();
+                            var name = PatchFiles.Name(patch.Archive, patch.Slot, source.Kind);
+                            await workspace.StageAsync(patch.SourceId, source, name, ct).ConfigureAwait(false);
+                            var staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
+                            if (!Matches(staged, source.Size, source.Sha256)) throw new IOException("Source file changed while staging.");
+                            if (options.Repatch) payloads[source.Kind] = await workspace.ReadStagedAsync(name, ct).ConfigureAwait(false);
+                        }
+                        if (options.Repatch)
+                        {
+                            var input = new PatchSetData(payloads[PatchFileKind.Main],
+                                payloads.TryGetValue(PatchFileKind.GpuResources, out var gpu) ? gpu : (ReadOnlyMemory<byte>?)null,
+                                payloads.TryGetValue(PatchFileKind.Stream, out var stream) ? stream : (ReadOnlyMemory<byte>?)null);
+                            var result = await Task.Run(() => repairer!.RepairSet(input, ct), ct).ConfigureAwait(false);
                             if (result.RemovedUnits > 0 && !options.AllowRemovedUnits)
                                 throw new InvalidDataException("Repair would remove missing units. Explicitly allow this or use an updated mod.");
-                            await workspace.WriteStagedAsync(name, result.Data, ct).ConfigureAwait(false);
-                            staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false);
+                            payloads[PatchFileKind.Main] = result.Output.Main;
+                            if (result.Output.Gpu is { } repairedGpu) payloads[PatchFileKind.GpuResources] = repairedGpu;
+                            else if (payloads.ContainsKey(PatchFileKind.GpuResources)) throw new InvalidDataException("Repair unexpectedly removed a companion.");
+                            if (result.Output.Stream is { } repairedStream) payloads[PatchFileKind.Stream] = repairedStream;
+                            else if (payloads.ContainsKey(PatchFileKind.Stream)) throw new InvalidDataException("Repair unexpectedly removed a companion.");
+                            foreach (var (kind, bytes) in payloads)
+                                await workspace.WriteStagedAsync(PatchFiles.Name(patch.Archive, patch.Slot, kind), bytes.ToArray(), ct).ConfigureAwait(false);
                         }
-                        if (staged is null) throw new IOException("Staged file disappeared.");
-                        files.Add(new(name, patch.Archive, patch.Slot, patch.SourceId, patch.PatchSetId, source.Kind,
-                            staged.Size, staged.Sha256, source.Sha256)
-                        { SelectionHash = patch.SelectionHash });
+                        var kinds = options.Repatch ? payloads.Keys.ToArray() : patch.Files.Select(f => f.Kind).ToArray();
+                        foreach (var kind in kinds)
+                        {
+                            var name = PatchFiles.Name(patch.Archive, patch.Slot, kind);
+                            var staged = await workspace.FingerprintAsync(DeploymentArea.Staged, name, ct).ConfigureAwait(false)
+                                ?? throw new IOException("Staged file disappeared.");
+                            var original = patch.Files.SingleOrDefault(f => f.Kind == kind);
+                            var sourceHash = original?.Sha256 ?? patch.Files.Single(f => f.Kind == PatchFileKind.Main).Sha256;
+                            files.Add(new(name, patch.Archive, patch.Slot, patch.SourceId, patch.PatchSetId, kind,
+                                staged.Size, staged.Sha256, sourceHash)
+                            { SelectionHash = patch.SelectionHash, GeneratedByRepair = original is null });
+                        }
                     }
+                    catch (InvalidDataException ex)
+                    { throw new InvalidDataException($"Could not prepare mod '{patch.SourceName ?? patch.SourceId.ToString()}' (archive {patch.Archive}): {ex.Message}", ex); }
+                    catch (IOException ex)
+                    { throw new IOException($"Could not prepare mod '{patch.SourceName ?? patch.SourceId.ToString()}' (archive {patch.Archive}): {ex.Message}", ex); }
+
+                }
             }
             var ledger = new DeploymentLedger(1, workspace.TargetDirectory, plan.SelectionId == Guid.Empty ? null : plan.SelectionId,
                 plan.Signature == "" ? null : plan.Signature, DateTimeOffset.UtcNow, files.ToArray())
@@ -118,7 +146,9 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                 foreach (var file in mod.OrderBy(f => f.Kind == PatchFileKind.Main))
                 {
                     ct.ThrowIfCancellationRequested();
-                    await workspace.PublishAsync(file.Name, operationId, ct).ConfigureAwait(false);
+                    try { await workspace.PublishAsync(file.Name, operationId, ct).ConfigureAwait(false); }
+                    catch (IOException ex)
+                    { throw new IOException($"Could not deploy mod '{plan.Patches.First(patch => patch.SourceId == file.SourceId).SourceName ?? file.SourceId.ToString()}' ({file.Name}): {ex.Message}", ex); }
                 }
             }
             current = 0;
@@ -129,7 +159,9 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                 foreach (var file in mod)
                 {
                     ct.ThrowIfCancellationRequested();
-                    await workspace.VerifyAsync(DeploymentArea.Target, file, ct).ConfigureAwait(false);
+                    try { await workspace.VerifyAsync(DeploymentArea.Target, file, ct).ConfigureAwait(false); }
+                    catch (IOException ex)
+                    { throw new IOException($"Could not verify deployed mod '{plan.Patches.First(patch => patch.SourceId == file.SourceId).SourceName ?? file.SourceId.ToString()}' ({file.Name}): {ex.Message}", ex); }
                 }
             }
             ct.ThrowIfCancellationRequested();
@@ -153,5 +185,10 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                 file.Size < 0 || !PatchValidation.IsHash(file.Sha256) || !PatchValidation.IsHash(file.SourceSha256) ||
                 file.SelectionHash is { } selection && !PatchValidation.IsHash(selection))
                 throw new InvalidDataException("Invalid owned-file ledger entry.");
+        foreach (var file in ledger.Files.Where(f => f.GeneratedByRepair))
+            if (file.Kind == PatchFileKind.Main || !ledger.Files.Any(main => main.Kind == PatchFileKind.Main && !main.GeneratedByRepair &&
+                main.SourceId == file.SourceId && main.PatchSetId == file.PatchSetId && main.Archive == file.Archive && main.Slot == file.Slot &&
+                main.SourceSha256 == file.SourceSha256 && main.SelectionHash == file.SelectionHash))
+                throw new InvalidDataException("Generated companion has no matching source patch.");
     }
 }

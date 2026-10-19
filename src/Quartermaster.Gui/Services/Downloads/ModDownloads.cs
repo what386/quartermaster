@@ -44,7 +44,7 @@ public sealed partial class ModDownloads : ViewModelBase
         services.Session.Changed += (_, _) => RefreshManualChecks();
         services.Providers.DownloadFailed += job => Dispatcher.UIThread.Post(() =>
         {
-            if (!services.IsDisposed) services.Operations.ShowErrorNotification(Localizer.Interpolate($"Could not import {job.File.Name}: {job.Error}"));
+            if (!services.IsDisposed) services.Operations.ShowErrorNotification(Localizer.Interpolate($"Could not import {job.File.Name} ({job.File.FileName}): {job.Error}"));
         });
         services.Providers.Changed += (_, _) => Dispatcher.UIThread.Post(Refresh);
         services.Providers.LibraryChanged += (_, _) => Dispatcher.UIThread.Post(async () =>
@@ -89,7 +89,7 @@ public sealed partial class ModDownloads : ViewModelBase
     public async Task AddLinkAsync(string link, CancellationToken ct, Guid? profileId = null)
     {
         var direct = services.Providers.IsDownloadLink(link);
-        var mod = await services.Providers.ResolveAsync(link, ct);
+        var mod = await ModOperation.RunAsync(new Uri(link).GetLeftPart(UriPartial.Path), () => services.Providers.ResolveAsync(link, ct));
         var file = direct ? mod.Files.Single() : await services.Dialogs.ChooseModFileAsync(mod);
         if (file is null) return;
         // A manager link may be fulfilling an existing profile download.
@@ -98,7 +98,7 @@ public sealed partial class ModDownloads : ViewModelBase
                 job.File.ModId == file.ModId && job.File.FileId == file.FileId &&
                 job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled)?.ProfileId;
         var metadata = new Dictionary<string, IReadOnlyList<ModDependency>>();
-        var dependencies = file.Provider == "nexusmods" ? await PlanNexusDependenciesAsync(mod with { Page = file.DownloadPage }, profileId, ct, metadata) : [];
+        var dependencies = file.Provider == "nexusmods" ? await ModOperation.RunAsync(mod.Name, () => PlanNexusDependenciesAsync(mod with { Page = file.DownloadPage }, profileId, ct, metadata)) : [];
         if (dependencies is null) return;
         if (metadata.TryGetValue(file.ModId, out var rootDependencies)) file = file with { Dependencies = rootDependencies };
         var selectedFiles = new List<Quartermaster.Providers.Clients.ProviderFile>();
@@ -130,8 +130,8 @@ public sealed partial class ModDownloads : ViewModelBase
         await services.Session.ReloadAsync(ct);
         var errors = services.Session.State.UpdateChecks.Where(check => check.CheckedAt >= started && check.Error is not null &&
             (modIds is null || modIds.Contains(check.ModId))).ToArray();
-        if (errors.Length > 0) throw new InvalidOperationException(Localizer.Interpolate($"Could not check {ModPresentation.Count(errors.Length, "mod")}: ") +
-            string.Join(" ", errors.Select(check => check.Error).Distinct().Take(3)));
+        if (errors.Length > 0) throw new InvalidOperationException(Localizer.Interpolate($"Could not check {ModPresentation.Count(errors.Select(check => check.ModId).Distinct().Count(), "mod")}:\n") +
+            string.Join("\n", errors.Select(check => $"{services.Session.State.Mods.FirstOrDefault(mod => mod.Id == check.ModId)?.Name ?? check.ModId.ToString()} ({check.Provider}): {check.Error}")));
         var updates = AvailableUpdates(modIds).Where(CanQueueUpdate).ToArray();
         Exception? applyError = null;
         if (updates.Length > 0 && await services.Dialogs.ConfirmAsync(Localizer.Text("Mod updates"),
@@ -180,7 +180,7 @@ public sealed partial class ModDownloads : ViewModelBase
         new AsyncCommand(() => services.Operations.RunAsync("Updating mod", async ct =>
         {
             await QueueModUpdateAsync(mod, ct);
-        }), () => !services.Operations.IsProgressVisible && CanQueueUpdate(mod), services.Operations.ReportError);
+        }, modName: mod.Name), () => !services.Operations.IsProgressVisible && CanQueueUpdate(mod), services.Operations.ReportError);
     public string? UpdateDescription(Mod mod) => AvailableUpdate(mod) is { } check
         ? Localizer.Interpolate($"Update available{(check.AvailableVersion is null ? "" : " · " + check.AvailableVersion)}. Click Update to upgrade.") : null;
 }
@@ -211,23 +211,23 @@ public sealed class DownloadRow : ViewModelBase
         this.job = job;
         downloadsDirectly = services.Providers.DownloadsDirectly(job.File);
         OpenCommand = services.Operations.CreateCommand("Opening download page", _ =>
-        { services.Providers.OpenDownloadPage(job.Id); return Task.CompletedTask; });
+        { services.Providers.OpenDownloadPage(job.Id); return Task.CompletedTask; }, modName: job.File.Name);
         RetryCommand = services.Operations.CreateCommand("Retrying download", ct => services.Providers.RetryAsync(job.Id, ct),
-            () => CanRetry);
+            () => CanRetry, modName: job.File.Name);
         ConfirmCommand = services.Operations.CreateCommand("Importing mod update", async ct =>
         {
             await services.Providers.ConfirmManualUpdateAsync(job.Id, ct);
             await services.Session.ReloadAsync(ct);
-        }, () => CanConfirm);
+        }, () => CanConfirm, modName: job.File.Name);
         AttachCommand = services.Operations.CreateCommand("Attaching mod ZIP", async ct =>
         {
             var path = await services.Dialogs.PickModZipAsync();
             if (path is null) return;
             await services.Providers.AttachZipAsync(job.Id, path, ct);
             await services.Session.ReloadAsync(ct);
-        }, () => CanAttach);
-        CancelCommand = services.Operations.CreateCommand("Cancelling download", ct => services.Providers.RemoveAsync(job.Id, ct), () => CanCancel);
-        RemoveCommand = services.Operations.CreateCommand("Removing download", ct => services.Providers.RemoveAsync(job.Id, ct), () => CanRemove);
+        }, () => CanAttach, modName: job.File.Name);
+        CancelCommand = services.Operations.CreateCommand("Cancelling download", ct => services.Providers.RemoveAsync(job.Id, ct), () => CanCancel, modName: job.File.Name);
+        RemoveCommand = services.Operations.CreateCommand("Removing download", ct => services.Providers.RemoveAsync(job.Id, ct), () => CanRemove, modName: job.File.Name);
     }
     public void Update(DownloadJob value)
     {
