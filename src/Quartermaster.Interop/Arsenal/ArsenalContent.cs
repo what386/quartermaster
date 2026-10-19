@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Quartermaster.Core.Patching;
 using Quartermaster.Library.Importing;
 using Quartermaster.Library.Mods;
 
@@ -38,6 +39,20 @@ internal static class ArsenalContent
             document![property!.Value.Key] = converted;
             changed = true;
         }
+        if (document!.FirstOrDefault(pair => pair.Key.Equals("Options", StringComparison.OrdinalIgnoreCase)).Value is JsonArray manifestOptions)
+        {
+            var manifestDirectory = Path.GetDirectoryName(manifestPath)!;
+            var patchFolders = files.Where(file => PatchNames.TryParse(Path.GetFileName(file), out _, out _, out var kind) && kind == PatchFileKind.Main)
+                .Select(file => Path.GetRelativePath(manifestDirectory, Path.GetDirectoryName(file)!).Replace('\\', '/'))
+                .Select(folder => folder == "." ? "" : folder).Distinct(StringComparer.Ordinal).ToArray();
+            foreach (var option in manifestOptions.OfType<JsonObject>())
+            {
+                changed |= NormalizeIncludes(option, manifestDirectory, patchFolders);
+                if (option.FirstOrDefault(pair => pair.Key.Equals("SubOptions", StringComparison.OrdinalIgnoreCase)).Value is JsonArray choices)
+                    foreach (var choice in choices.OfType<JsonObject>())
+                        changed |= NormalizeIncludes(choice, manifestDirectory, patchFolders);
+            }
+        }
         if (!changed) return await contents.ImportAsync(mod.Directory, mod.Name, ct).ConfigureAwait(false);
         var limits = new ImportLimits();
         if (files.Length > limits.MaxFiles) throw new InvalidDataException("Arsenal mod exceeds the import file limit.");
@@ -72,6 +87,43 @@ internal static class ArsenalContent
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
+
+    private static bool NormalizeIncludes(JsonObject option, string manifestDirectory, IReadOnlyList<string> patchFolders)
+    {
+        if (option.FirstOrDefault(pair => pair.Key.Equals("Include", StringComparison.OrdinalIgnoreCase)).Value is not JsonArray includes)
+            return false;
+        var changed = false;
+        for (var i = 0; i < includes.Count; i++)
+        {
+            if (includes[i] is not JsonValue value || !value.TryGetValue<string>(out var raw)) continue;
+            var folder = raw.Replace('\\', '/').TrimEnd('/');
+            // Leave unsafe paths and invalid values to the strict library parser.
+            if (folder == "" || !PatchValidation.IsRelativePath(folder)) continue;
+            if (patchFolders.Any(path => Matches(path, folder, StringComparison.Ordinal))) continue;
+            var candidates = patchFolders.Where(path => Matches(path, folder, StringComparison.OrdinalIgnoreCase))
+                .Select(path => path[..folder.Length]).Distinct(StringComparer.Ordinal).ToArray();
+            if (candidates.Length > 1) throw new InvalidDataException($"Ambiguous Arsenal manifest Include casing: {raw}");
+            if (candidates.Length == 1)
+            {
+                includes[i] = candidates[0];
+                changed = true;
+            }
+            else if (Directory.Exists(Path.Combine(manifestDirectory, folder.Replace('/', Path.DirectorySeparatorChar))))
+            {
+                // Existing includes can contain only artwork/docs, or be empty.
+                // Keep the option/choice as a no-op so saved selections still map.
+                includes.RemoveAt(i--);
+                changed = true;
+            }
+            // A missing folder may indicate lost mod files. Keep its include so
+            // importing still fails rather than silently changing the selection.
+        }
+        return changed;
+    }
+
+    private static bool Matches(string path, string folder, StringComparison comparison) =>
+        path.Equals(folder, comparison) || path.StartsWith(folder + "/", comparison);
+
     private static IEnumerable<string> Enumerate(string directory)
     {
         if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0) throw new InvalidDataException("Arsenal mod contains a symbolic link.");

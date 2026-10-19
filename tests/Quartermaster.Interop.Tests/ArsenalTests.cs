@@ -168,6 +168,138 @@ public sealed class ArsenalTests
         Assert.Equal(manifest, await File.ReadAllTextAsync(Path.Combine(folder, "manifest.json")));
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ExistingIncludesWithoutPatchesRemainNoOpOptions(bool legacy, bool empty)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var folder = Path.Combine(root, "mods", "b");
+        var header = Path.Combine(folder, "Header"); Directory.CreateDirectory(header);
+        if (!empty) await File.WriteAllTextAsync(Path.Combine(header, "readme.txt"), "Presentation only");
+        var manifest = legacy
+            ? """{"Version":"1.03","Options":["Header"]}"""
+            : """{"Version":1,"Options":[{"Name":"Header","Include":["Header"]}]}""";
+        var path = Path.Combine(folder, "manifest.json"); await File.WriteAllTextAsync(path, manifest);
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with { Profiles = plan.Profiles.Select(profile => profile with
+        { Rows = profile.Rows.Select(row => row.Id == B ? row with { Options = [new("Header", true, [])] } : row).ToArray() }).ToArray() };
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
+        Assert.Empty(Assert.Single(mod.Options).PatchSetIds);
+        foreach (var profile in result.Profiles)
+        {
+            var entry = profile.Entries.Single(entry => entry.ModId == mod.Id);
+            Assert.True(Assert.Single(entry.Options).Enabled);
+            Assert.Single(PatchSelection.Select(mod, entry with { Enabled = true }));
+        }
+        Assert.Equal(manifest, await File.ReadAllTextAsync(path));
+        if (!empty) Assert.Equal("Presentation only", await File.ReadAllTextAsync(Path.Combine(f.Contents.GetModDirectory(mod.Id), "Header", "readme.txt")));
+    }
+
+    [Fact]
+    public async Task CaseMismatchedIncludesResolveInTheCopyAndPreserveChoiceSelection()
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "mods", "a", "manifest.json");
+        var manifest = """{"Options":[{"Name":"Color","Include":["COMMON"],"SubOptions":[{"Name":"Red","Include":["RED"]},{"Name":"Blue","Include":["BLUE"]}]}]}""";
+        await File.WriteAllTextAsync(path, manifest);
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(await ArsenalReader.ReadAsync(root));
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Renamed A");
+        var entry = result.Profiles.Single(profile => profile.Name == "First").Entries.Single(entry => entry.ModId == mod.Id);
+        Assert.False(entry.Enabled);
+        Assert.Equal(new[] { "common", "blue" }, PatchSelection.Select(mod, entry with { Enabled = true }).Select(set => set.Folder));
+        Assert.Equal(1, Assert.Single(entry.Options).ChoiceIndex);
+        Assert.Equal(manifest, await File.ReadAllTextAsync(path));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task MetadataIncludesInParentsAndChoicesPreserveRealPatchesAndEmptyChoices(bool wrapped)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var folder = Path.Combine(root, "mods", "a");
+        if (wrapped)
+        {
+            var entries = Directory.GetFileSystemEntries(folder);
+            var nested = Path.Combine(folder, "Pack"); Directory.CreateDirectory(nested);
+            foreach (var entry in entries)
+                if (Directory.Exists(entry)) Directory.Move(entry, Path.Combine(nested, Path.GetFileName(entry)));
+                else File.Move(entry, Path.Combine(nested, Path.GetFileName(entry)));
+            folder = nested;
+        }
+        var artwork = Path.Combine(folder, "Artwork"); Directory.CreateDirectory(artwork);
+        await File.WriteAllTextAsync(Path.Combine(artwork, "readme.txt"), "Shared metadata");
+        var manifest = """
+            {"Options":[{"Name":"Color","Include":["common","Artwork"],"SubOptions":[
+            {"Name":"Red","Include":["red"]},{"Name":"Blue","Include":["blue","Artwork"]},
+            {"Name":"Vanilla","Include":["Artwork"]}]}]}
+            """;
+        var path = Path.Combine(folder, "manifest.json"); await File.WriteAllTextAsync(path, manifest);
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with { Profiles = plan.Profiles.Select(profile => profile.Key != "second" ? profile : profile with
+        { Rows = profile.Rows.Select(row => row.Id == A ? row with { Options = [new("Color", true, [new("Vanilla", true)])] } : row).ToArray() }).ToArray() };
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Renamed A");
+        var option = Assert.Single(mod.Options);
+        Assert.Equal(new[] { "Red", "Blue", "Vanilla" }, option.Choices.Select(choice => choice.Name));
+        Assert.Empty(option.Choices[2].PatchSetIds);
+        var first = result.Profiles.Single(profile => profile.Name == "First").Entries.Single(entry => entry.ModId == mod.Id);
+        var second = result.Profiles.Single(profile => profile.Name == "Second").Entries.Single(entry => entry.ModId == mod.Id);
+        var prefix = wrapped ? "Pack/" : "";
+        Assert.Equal(new[] { prefix + "common", prefix + "blue" }, PatchSelection.Select(mod, first with { Enabled = true }).Select(set => set.Folder));
+        Assert.Equal(prefix + "common", Assert.Single(PatchSelection.Select(mod, second)).Folder);
+        Assert.Equal(2, Assert.Single(second.Options).ChoiceIndex);
+        Assert.Equal(manifest, await File.ReadAllTextAsync(path));
+    }
+
+    [Fact]
+    public async Task HeaderFolderContainingPatchesRemainsAnActualSelectableOption()
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var folder = Path.Combine(root, "mods", "b"); var header = Path.Combine(folder, "Header"); Directory.CreateDirectory(header);
+        foreach (var file in Directory.GetFiles(folder)) File.Move(file, Path.Combine(header, Path.GetFileName(file)));
+        await File.WriteAllTextAsync(Path.Combine(folder, "manifest.json"), """{"Options":[{"Name":"Header","Include":["Header"]}]}""");
+        await new ArsenalImporter(f.Store, f.Contents).ImportAsync(await ArsenalReader.ReadAsync(root));
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
+        Assert.Equal(mod.PatchSets.Single().Id, Assert.Single(Assert.Single(mod.Options).PatchSetIds));
+    }
+
+    [Theory]
+    [InlineData("../Header")]
+    [InlineData("/Header")]
+    [InlineData("C:\\Header")]
+    public async Task IncludeNormalizationStillRejectsUnsafePaths(string include)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var folder = Path.Combine(root, "mods", "b");
+        await File.WriteAllTextAsync(Path.Combine(folder, "manifest.json"), JsonSerializer.Serialize(new
+        { Options = new[] { new { Name = "Header", Include = new[] { include } } } }));
+        var plan = await ArsenalReader.ReadAsync(root);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan));
+        Assert.Contains("Unsafe manifest Include", error.Message);
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+    }
+
+    [Fact]
+    public async Task MissingIncludesIdentifyTheModAndRollBackTheImport()
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "mods", "b", "manifest.json");
+        var manifest = """{"Options":[{"Name":"Optional","Include":["MissingPatchFolder"]}]}""";
+        await File.WriteAllTextAsync(path, manifest);
+        var plan = await ArsenalReader.ReadAsync(root);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan));
+        Assert.Contains("B", error.Message);
+        Assert.Contains("MissingPatchFolder", error.Message);
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+        Assert.Empty(Directory.EnumerateDirectories(Path.Combine(f.App, "library")));
+        Assert.Equal(manifest, await File.ReadAllTextAsync(path));
+    }
+
     [Fact]
     public async Task FailedCopyOrOptionConversionRemovesStagedModsWithoutChangingLibrary()
     {

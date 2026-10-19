@@ -21,7 +21,10 @@ public sealed class ArsenalImporter(ILibraryStore store, IModContentStore conten
             {
                 ct.ThrowIfCancellationRequested();
                 progress?.Report(new(mapping.Count + 1, plan.Mods.Count, record.Name));
-                var imported = await ArsenalContent.ImportAsync(contents, record, ct).ConfigureAwait(false);
+                Mod imported;
+                try { imported = await ArsenalContent.ImportAsync(contents, record, ct).ConfigureAwait(false); }
+                catch (Exception ex) when (ex is InvalidDataException or System.Text.Json.JsonException)
+                { throw new InvalidDataException($"Could not import Arsenal mod '{record.Name}' ({record.Directory}): {ex.Message}", ex); }
                 created.Add(imported.Id);
                 imported = imported with
                 {
