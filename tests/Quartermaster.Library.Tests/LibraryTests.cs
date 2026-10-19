@@ -12,6 +12,21 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Fact]
+    public async Task InvalidStoredModMetadataPreservesTheModNameInTheReportedError()
+    {
+        using var f = new Fixture();
+        var mod = await f.Library.ImportAsync(f.Source("Problem armor"));
+        var path = Path.Combine(f.App, "library.json");
+        var document = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        document["mods"]![0]!["patchSets"] = new System.Text.Json.Nodes.JsonArray();
+        await File.WriteAllTextAsync(path, document.ToJsonString());
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => f.Store.LoadAsync());
+        Assert.Contains(mod.Name, error.Message);
+        Assert.Contains(mod.Id.ToString(), error.Message);
+        Assert.Contains("Invalid mod metadata", error.Message);
+    }
+
+    [Fact]
     public async Task ManagerExclusionsApplyToNewMetadataWithoutChangingSavedRequirements()
     {
         using var f = new Fixture(); var mod = await f.Library.ImportAsync(f.Source("Mod"));

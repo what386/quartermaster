@@ -89,6 +89,7 @@ public sealed class AppUpdates : ViewModelBase, IDisposable
                 var progress = services.Operations.CreateProgress<SelfUpdateProgress>(value => value.Phase switch
                 {
                     SelfUpdatePhase.Downloading => Localizer.Interpolate($"Downloading app update · {value.Bytes / 1024 / 1024} MB"),
+                    SelfUpdatePhase.Synchronizing => Localizer.Text("Synchronizing app update"),
                     SelfUpdatePhase.Verifying => Localizer.Text("Verifying app update"),
                     SelfUpdatePhase.Extracting => Localizer.Text("Preparing app update"),
                     _ => Localizer.Text("Restarting Quartermaster"),

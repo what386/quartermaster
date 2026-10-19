@@ -32,9 +32,9 @@ public sealed class OperationState : ViewModelBase
         DismissErrorCommand = new(DismissErrorNotification);
     }
 
-    public AsyncCommand CreateCommand(string label, Func<CancellationToken, Task> action, Func<bool>? allowed = null)
+    public AsyncCommand CreateCommand(string label, Func<CancellationToken, Task> action, Func<bool>? allowed = null, string? modName = null)
     {
-        var command = new AsyncCommand(() => RunAsync(label, action), () => CanInteract && (allowed?.Invoke() ?? true), ReportError);
+        var command = new AsyncCommand(() => RunAsync(label, action, modName: modName), () => CanInteract && (allowed?.Invoke() ?? true), ReportError);
         PropertyChanged += (_, e) =>
         {
             // Silent edits still serialize execution, but must not flash disabled button styles.
@@ -43,7 +43,7 @@ public sealed class OperationState : ViewModelBase
         return command;
     }
 
-    public async Task RunAsync(string label, Func<CancellationToken, Task> action, bool showProgress = true)
+    public async Task RunAsync(string label, Func<CancellationToken, Task> action, bool showProgress = true, string? modName = null)
     {
         if (IsBusy) return;
         using var source = new CancellationTokenSource();
@@ -55,7 +55,9 @@ public sealed class OperationState : ViewModelBase
         try
         {
             if (log is not null) await log(label, "started", null, CancellationToken.None);
-            await action(source.Token); Message = Localizer.Interpolate($"{Localizer.Text(label)} complete");
+            if (modName is null) await action(source.Token);
+            else await ModOperation.RunAsync(modName, () => action(source.Token));
+            Message = Localizer.Interpolate($"{Localizer.Text(label)} complete");
         }
         catch (OperationCanceledException) when (source.IsCancellationRequested) { Message = Localizer.Text("Operation cancelled"); }
         catch (Exception ex) { ReportError(ex); }

@@ -46,23 +46,29 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                         await JsonSerializer.SerializeAsync(metadata, document, JsonFiles.Options, ct).ConfigureAwait(false);
                     foreach (var mod in mods)
                     {
-                        var directory = contents.GetModDirectory(mod.Id);
-                        var patches = mod.PatchSets.SelectMany(set => set.Files).ToDictionary(file => file.RelativePath, StringComparer.Ordinal);
-                        var seen = new HashSet<string>(StringComparer.Ordinal);
-                        foreach (var path in ManagedPaths.Enumerate(directory))
+                        try
                         {
-                            ct.ThrowIfCancellationRequested();
-                            var name = Path.GetRelativePath(directory, path).Replace('\\', '/');
-                            if (patches.TryGetValue(name, out var file))
+                            var directory = contents.GetModDirectory(mod.Id);
+                            var patches = mod.PatchSets.SelectMany(set => set.Files).ToDictionary(file => file.RelativePath, StringComparer.Ordinal);
+                            var seen = new HashSet<string>(StringComparer.Ordinal);
+                            foreach (var path in ManagedPaths.Enumerate(directory))
                             {
-                                await FileIntegrity.VerifyAsync(path, file.Size, file.Sha256, ct).ConfigureAwait(false);
-                                seen.Add(name);
+                                ct.ThrowIfCancellationRequested();
+                                var name = Path.GetRelativePath(directory, path).Replace('\\', '/');
+                                if (patches.TryGetValue(name, out var file))
+                                {
+                                    await FileIntegrity.VerifyAsync(path, file.Size, file.Sha256, ct).ConfigureAwait(false);
+                                    seen.Add(name);
+                                }
+                                await using var input = File.OpenRead(path);
+                                await using var entry = zip.CreateEntry($"mods/{mod.Id:N}/{name}", CompressionLevel.Optimal).Open();
+                                await input.CopyToAsync(entry, ct).ConfigureAwait(false);
                             }
-                            await using var input = File.OpenRead(path);
-                            await using var entry = zip.CreateEntry($"mods/{mod.Id:N}/{name}", CompressionLevel.Optimal).Open();
-                            await input.CopyToAsync(entry, ct).ConfigureAwait(false);
+                            if (seen.Count != patches.Count) throw new IOException("Mod files are missing from library storage.");
                         }
-                        if (seen.Count != patches.Count) throw new IOException("Mod files are missing from library storage.");
+                        catch (IOException ex)
+                        { throw new IOException($"Could not export mod '{mod.Name}' in profile '{profile.Name}': {ex.Message}", ex); }
+
                     }
                 }
                 await output.FlushAsync(ct).ConfigureAwait(false); output.Flush(true);
@@ -187,7 +193,7 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
             return importedProfile;
         }
         catch (Exception ex) when (ex is JsonException or ArgumentException or InvalidOperationException or NullReferenceException)
-        { throw new InvalidDataException("Invalid profile archive.", ex); }
+        { throw new InvalidDataException($"Invalid profile archive: {ex.Message}", ex); }
         finally
         {
             foreach (var id in created) await contents.DeleteAsync(id, CancellationToken.None).ConfigureAwait(false);

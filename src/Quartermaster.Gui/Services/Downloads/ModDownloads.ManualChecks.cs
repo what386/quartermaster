@@ -61,19 +61,19 @@ public sealed class ManualCheckRow
             if (ConfirmationJob is not { } job) return;
             await services.Providers.ConfirmManualUpdateAsync(job.Id, ct);
             await services.Session.ReloadAsync(ct); done();
-        }, () => CanConfirm);
+        }, () => CanConfirm, modName: mod.Name);
         SetPageCommand = services.Operations.CreateCommand("Setting mod page", async ct =>
         {
             var link = await services.Dialogs.RequestTextAsync(Localizer.Text("Mod page"), Localizer.Text("Page link (HTTPS)"), Localizer.Text("Save"), ModLinks.PageFor(mod));
             if (link is null) return;
             await services.Library.SetPageLinkAsync(mod.Id, link, ct);
             await services.Session.ReloadAsync(ct);
-        });
+        }, modName: mod.Name);
         OpenCommand = services.Operations.CreateCommand("Checking mod manually", async ct =>
         {
             var job = await QueueAsync(ct);
             if (job is not null) services.Providers.OpenDownloadPage(job.Id);
-        });
+        }, modName: mod.Name);
         AttachCommand = services.Operations.CreateCommand("Attaching mod update", async ct =>
         {
             var path = await services.Dialogs.PickModZipAsync();
@@ -82,14 +82,14 @@ public sealed class ManualCheckRow
             if (job is null) return;
             await services.Providers.AttachZipAsync(job.Id, path, ct);
             await services.Session.ReloadAsync(ct); done();
-        });
+        }, modName: mod.Name);
         DoneCommand = services.Operations.CreateCommand("Finishing manual check", async ct =>
         {
             foreach (var job in services.Providers.State.Jobs.Where(job => job.File.Provider == "manual" && job.ReplacesModId == mod.Id
                 && job.Status is DownloadStatus.Waiting or DownloadStatus.Failed or DownloadStatus.Cancelled or DownloadStatus.NeedsConfirmation).ToArray())
                 await services.Providers.RemoveAsync(job.Id, ct);
             done();
-        });
+        }, modName: mod.Name);
     }
     private async Task<DownloadJob?> QueueAsync(CancellationToken ct)
     {

@@ -9,6 +9,8 @@ public sealed record SelectedPatch(Guid SourceId, Guid PatchSetId, string Archiv
     IReadOnlyList<PatchFile> Files, IReadOnlyList<ResourceKey> Resources)
 {
     public string? SelectionHash { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? SourceName { get; init; }
 }
 
 /// <summary>An ordered selection prepared by a caller. Core does not interpret the selection identity.</summary>

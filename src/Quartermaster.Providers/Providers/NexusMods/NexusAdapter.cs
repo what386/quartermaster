@@ -16,10 +16,10 @@ public sealed class NexusAdapter(NexusClient client) : IModProvider
     {
         var link = NexusLink.Parse(value);
         var mod = await client.GetModAsync(link.ModId, ct);
-        if (!mod.Available) throw new InvalidOperationException("This Nexus mod is unavailable.");
+        if (!mod.Available) throw new InvalidOperationException($"Nexus mod '{mod.Name}' ({link.ModId}) is unavailable.");
         var files = await client.GetFilesAsync(link.ModId, ct);
         var available = files.Files.Where(file => file.IsAvailable && (link.FileId is null || file.Id == link.FileId)).Select(file => Map(link.ModId, file)).ToArray();
-        if (available.Length == 0) throw new InvalidOperationException("This mod has no available files.");
+        if (available.Length == 0) throw new InvalidOperationException($"Nexus mod '{mod.Name}' ({link.ModId}) has no available files.");
         return new(link.ModId.ToString(), mod.Name, mod.Summary, mod.Version, link.Page, available);
     }
     public Task<IReadOnlyList<SearchResult>> SearchAsync(string query, int offset = 0, CancellationToken ct = default) => client.SearchAsync(query, offset, ct);

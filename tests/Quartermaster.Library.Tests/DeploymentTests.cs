@@ -131,7 +131,8 @@ public class DeploymentTests
         var health = await service.InspectAsync(f.Game);
         Assert.Equal(ModDeploymentStatus.Deployed, DeploymentTracking.ForMod(mod.Id, DeploymentPlanner.Create(ProfilePatches.Resolve(state, profile.Id)), ledger, health.Files));
         service = new(new DeploymentService(new FileDeploymentStorage(f.App, f.Contents), new FakeRepair(1)));
-        await Assert.ThrowsAsync<InvalidDataException>(() => service.DeployAsync(state, profile.Id, f.Game, new(Repatch: true)));
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.DeployAsync(state, profile.Id, f.Game, new(Repatch: true)));
+        Assert.Contains(mod.Name, error.Message);
         Assert.Equal(ledger.Signature, (await service.InspectAsync(f.Game)).Ledger.Signature);
     }
 

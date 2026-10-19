@@ -11,6 +11,8 @@ public sealed record PlannedPatch(Guid SourceId, Guid PatchSetId, string Archive
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? SelectionHash { get; init; }
+    [JsonIgnore]
+    public string? SourceName { get; init; }
 }
 public sealed record DeploymentPlan(Guid SelectionId, string Signature, IReadOnlyList<PlannedPatch> Patches)
 {
@@ -48,7 +50,7 @@ public static class DeploymentPlanner
         {
             var slot = nextSlots.GetValueOrDefault(patch.Archive);
             nextSlots[patch.Archive] = checked(slot + 1);
-            patches.Add(new(patch.SourceId, patch.PatchSetId, patch.Archive.ToLowerInvariant(), slot, patch.Files.ToArray()) { SelectionHash = patch.SelectionHash });
+            patches.Add(new(patch.SourceId, patch.PatchSetId, patch.Archive.ToLowerInvariant(), slot, patch.Files.ToArray()) { SelectionHash = patch.SelectionHash, SourceName = patch.SourceName });
         }
         var signature = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
         { request.SelectionId, Patches = patches })))).ToLowerInvariant();

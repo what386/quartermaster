@@ -34,7 +34,7 @@ public sealed class JsonLibraryStore : ILibraryStore
         }
         try { StateValidation.Validate(state); }
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NullReferenceException)
-        { throw new InvalidDataException("Invalid library state.", ex); }
+        { throw new InvalidDataException($"Invalid library state: {ex.Message}", ex); }
         var mods = new List<Mod>();
         foreach (var mod in state.Mods)
             mods.Add(await ManifestReader.CorrectLegacyIncludesAsync(Root, mod, cancellationToken).ConfigureAwait(false));

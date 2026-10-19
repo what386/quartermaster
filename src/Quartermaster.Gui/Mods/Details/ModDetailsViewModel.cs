@@ -37,13 +37,13 @@ public sealed class ModDetailsViewModel : ViewModelBase
             await SavePageAsync(ct);
             await services.Downloads.ResolveDependenciesAsync(this.mod.Id, ct);
             RefreshRelationships();
-        }, () => CanResolveDependencies);
+        }, () => CanResolveDependencies, modName: mod.Name);
         GetDependenciesCommand = services.Operations.CreateCommand("Getting dependencies", async ct =>
         {
             await SavePageAsync(ct);
             await services.Downloads.GetDependenciesAsync(this.mod.Id, ct, profileId);
             RefreshRelationships();
-        }, () => HasDependencyAction);
+        }, () => HasDependencyAction, modName: mod.Name);
     }
     private async Task SavePageAsync(CancellationToken ct)
     {
@@ -67,7 +67,7 @@ public sealed class ModDetailsViewModel : ViewModelBase
         {
             await SavePageAsync(ct);
             saved = true;
-        }, showProgress: false);
+        }, showProgress: false, modName: mod.Name);
         return saved;
     }
     public string Name => mod.Name;

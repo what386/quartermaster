@@ -46,7 +46,7 @@ public static class ProfileEditor
     }
     public static Profile Add(Profile profile, Mod mod)
     {
-        if (profile.Entries.Any(e => e.ModId == mod.Id)) throw new ArgumentException("Mod is already in the profile.");
+        if (profile.Entries.Any(e => e.ModId == mod.Id)) throw new ArgumentException($"Mod '{mod.Name}' is already in profile '{profile.Name}'.");
         return Organize(profile with { Entries = [.. profile.Entries, new(mod.Id, true, [])] });
     }
     public static Profile Remove(Profile profile, Guid modId) => profile with
@@ -61,7 +61,7 @@ public static class ProfileEditor
     {
         var selected = modIds?.ToHashSet() ?? [];
         if (selected.Any(id => profile.Entries.All(entry => entry.ModId != id)))
-            throw new KeyNotFoundException("Mod is not in the profile.");
+            throw new KeyNotFoundException($"Mods are not in profile '{profile.Name}': {string.Join(", ", selected.Where(id => profile.Entries.All(entry => entry.ModId != id)))}");
         var group = new ProfileGroup(Guid.NewGuid(), Name(name));
         return Organize(profile with
         {
@@ -95,7 +95,7 @@ public static class ProfileEditor
     public static Profile SetGroup(Profile profile, Guid modId, Guid? groupId)
     {
         RequireGroup(profile, groupId);
-        if (profile.Entries.All(entry => entry.ModId != modId)) throw new KeyNotFoundException("Mod is not in the profile.");
+        if (profile.Entries.All(entry => entry.ModId != modId)) throw new KeyNotFoundException($"Mod {modId} is not in profile '{profile.Name}'.");
         var entry = profile.Entries.Single(entry => entry.ModId == modId);
         if (entry.GroupId == groupId) return profile;
         return Organize(profile with { Entries = [.. profile.Entries.Where(item => item.ModId != modId), entry with { GroupId = groupId }] });
@@ -106,7 +106,7 @@ public static class ProfileEditor
         RequireGroup(profile, groupId);
         if (boundary < 0 || boundary > profile.Entries.Count) throw new ArgumentOutOfRangeException(nameof(boundary));
         var selected = modIds.ToHashSet();
-        if (selected.Any(id => profile.Entries.All(entry => entry.ModId != id))) throw new KeyNotFoundException("Mod is not in the profile.");
+        if (selected.Any(id => profile.Entries.All(entry => entry.ModId != id))) throw new KeyNotFoundException($"Mods are not in profile '{profile.Name}': {string.Join(", ", selected.Where(id => profile.Entries.All(entry => entry.ModId != id)))}");
         if (selected.Count == 0) return profile;
         var moving = profile.Entries.Where(entry => selected.Contains(entry.ModId)).Select(entry => entry with { GroupId = groupId }).ToArray();
         var insertion = boundary - profile.Entries.Take(boundary).Count(entry => selected.Contains(entry.ModId));
@@ -122,7 +122,7 @@ public static class ProfileEditor
         if (index < 0 || index >= profile.Entries.Count) throw new ArgumentOutOfRangeException(nameof(index));
         var entries = profile.Entries.ToList();
         var old = entries.FindIndex(e => e.ModId == modId);
-        if (old < 0) throw new KeyNotFoundException("Mod is not in the profile.");
+        if (old < 0) throw new KeyNotFoundException($"Mod {modId} is not in profile '{profile.Name}'.");
         var entry = entries[old] with { GroupId = groupId }; entries.RemoveAt(old); entries.Insert(index, entry);
         return Organize(profile with { Entries = entries.ToArray() });
     }
@@ -148,7 +148,7 @@ public static class ProfileEditor
     };
     private static Profile Change(Profile profile, Guid modId, Func<ProfileEntry, ProfileEntry> change)
     {
-        if (profile.Entries.All(e => e.ModId != modId)) throw new KeyNotFoundException("Mod is not in the profile.");
+        if (profile.Entries.All(e => e.ModId != modId)) throw new KeyNotFoundException($"Mod {modId} is not in profile '{profile.Name}'.");
         return profile with { Entries = profile.Entries.Select(e => e.ModId == modId ? change(e) : e).ToArray() };
     }
     private static string Name(string name) => !string.IsNullOrWhiteSpace(name) ? name.Trim() : throw new ArgumentException("A name is required.");
@@ -163,7 +163,7 @@ public static class PatchSelection
 {
     public static string? OptionsHash(Mod mod, ProfileEntry entry)
     {
-        if (entry.ModId != mod.Id) throw new ArgumentException("Entry belongs to another mod.");
+        if (entry.ModId != mod.Id) throw new ArgumentException($"Entry belongs to another mod; expected {mod.Name} ({mod.Id}), received {entry.ModId}.");
         if (mod.Options.Count == 0) return null;
         var selections = entry.Options.ToDictionary(option => option.OptionId);
         var normalized = mod.Options.OrderBy(option => option.Id)
@@ -173,11 +173,11 @@ public static class PatchSelection
     }
     public static IReadOnlyList<PatchSet> Select(Mod mod, ProfileEntry entry)
     {
-        if (entry.ModId != mod.Id) throw new ArgumentException("Entry belongs to another mod.");
+        if (entry.ModId != mod.Id) throw new ArgumentException($"Entry belongs to another mod; expected {mod.Name} ({mod.Id}), received {entry.ModId}.");
         if (!entry.Enabled) return [];
         var selections = entry.Options.ToDictionary(o => o.OptionId);
         if (selections.Keys.Any(id => mod.Options.All(o => o.Id != id)))
-            throw new ArgumentException("Selection refers to an unknown option.");
+            throw new ArgumentException($"Mod '{mod.Name}': selection refers to an unknown option.");
         var assigned = mod.Options.SelectMany(o => o.PatchSetIds.Concat(o.Choices.SelectMany(c => c.PatchSetIds))).ToHashSet();
         var selected = new List<Guid>();
         var seen = new HashSet<Guid>();
@@ -190,11 +190,11 @@ public static class PatchSelection
             foreach (var id in option.PatchSetIds) Add(id);
             if (option.Choices.Count == 0) continue;
             if (selection.ChoiceIndex < 0 || selection.ChoiceIndex >= option.Choices.Count)
-                throw new ArgumentException($"Invalid choice for option {option.Name}.");
+                throw new ArgumentException($"Mod '{mod.Name}': invalid choice for option {option.Name}.");
             foreach (var id in option.Choices[selection.ChoiceIndex].PatchSetIds) Add(id);
         }
         if (selected.Any(id => mod.PatchSets.All(p => p.Id != id)))
-            throw new ArgumentException("Option refers to an unknown patch set.");
+            throw new ArgumentException($"Mod '{mod.Name}': option refers to an unknown patch set.");
         var sets = mod.PatchSets.ToDictionary(p => p.Id);
         return selected.Select(id => sets[id]).ToArray();
     }

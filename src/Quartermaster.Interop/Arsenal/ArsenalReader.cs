@@ -56,14 +56,20 @@ public static class ArsenalReader
                     });
                     continue;
                 }
-                if (!seen.Add(id)) throw new InvalidDataException($"Duplicate mod in Arsenal profile: {key}");
+                if (!seen.Add(id)) throw new InvalidDataException($"Duplicate Arsenal mod '{Text(mod, "label") ?? id}' in profile '{key}'.");
                 // Older Arsenal profiles contain complete mod records; newer ones can be UUID-only.
                 if (!records.ContainsKey(id) && Text(mod, "path") is not null) records.Add(id, mod);
                 if (!records.TryGetValue(id, out var metadata)) throw new InvalidDataException($"Arsenal profile references a missing library mod: {id}");
-                var options = mod.TryGetProperty("optionsConfig", out var config) ? ReadOptions(config) :
-                    mod.TryGetProperty("options", out var oldOptions) ? ReadOptions(oldOptions) :
-                    metadata.TryGetProperty("options", out var defaults) ? ReadOptions(defaults) : null;
-                rows.Add(new(id, null, Bool(mod, "enabled", true), options));
+                try
+                {
+                    var options = mod.TryGetProperty("optionsConfig", out var config) ? ReadOptions(config) :
+                        mod.TryGetProperty("options", out var oldOptions) ? ReadOptions(oldOptions) :
+                        metadata.TryGetProperty("options", out var defaults) ? ReadOptions(defaults) : null;
+                    rows.Add(new(id, null, Bool(mod, "enabled", true), options));
+                }
+                catch (Exception ex) when (ex is InvalidDataException or ArgumentException or InvalidOperationException)
+                { throw new InvalidDataException($"Invalid options for Arsenal mod '{Text(metadata, "label") ?? id}' in profile '{key}': {ex.Message}", ex); }
+
                 required.Add(id);
             }
             var image = Text(profile, "imagePath");
@@ -77,14 +83,22 @@ public static class ArsenalReader
         {
             ct.ThrowIfCancellationRequested();
             var mod = records[id];
-            var path = ResolveModDirectory(directory, Required(mod, "path"));
-            if (!Directory.Exists(path)) throw new DirectoryNotFoundException($"Arsenal mod files were not found: {Text(mod, "label") ?? id} ({path})");
-            var addedAt = DateTimeOffset.TryParse(Text(mod, "addedAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var added) ? added : (DateTimeOffset?)null;
-            imports.Add(new(id, Text(mod, "label") ?? Path.GetFileName(path), path, Text(mod, "description") ?? "", addedAt, ReadSource(mod))
+            try
             {
-                Tags = mod.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
-                ? ModTags.Normalize(tags.EnumerateArray().Select(tag => tag.GetString() ?? "")) : []
-            });
+                var path = ResolveModDirectory(directory, Required(mod, "path"));
+                if (!Directory.Exists(path)) throw new DirectoryNotFoundException($"Arsenal mod files were not found: {Text(mod, "label") ?? id} ({path})");
+                var addedAt = DateTimeOffset.TryParse(Text(mod, "addedAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var added) ? added : (DateTimeOffset?)null;
+                imports.Add(new(id, Text(mod, "label") ?? Path.GetFileName(path), path, Text(mod, "description") ?? "", addedAt, ReadSource(mod))
+                {
+                    Tags = mod.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array
+                    ? ModTags.Normalize(tags.EnumerateArray().Select(tag => tag.GetString() ?? "")) : []
+                });
+            }
+            catch (InvalidDataException ex)
+            { throw new InvalidDataException($"Invalid Arsenal mod '{Text(mod, "label") ?? id}': {ex.Message}", ex); }
+            catch (ArgumentException ex)
+            { throw new InvalidDataException($"Invalid Arsenal mod '{Text(mod, "label") ?? id}': {ex.Message}", ex); }
+
         }
         return new(directory, Text(root, "selectedProfile"), imports, profiles);
     }

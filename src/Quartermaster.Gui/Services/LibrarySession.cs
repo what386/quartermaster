@@ -97,7 +97,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         var options = await dialogs.ConfirmModImportAsync(source);
         if (options is null) return;
         var page = ModLinks.ValidatePage(options.PageLink);
-        await Task.Run(() => library.ImportAsync(source, cancellationToken: ct, profileId: profileId, pageLink: page), ct);
+        await ModOperation.RunAsync(source, () => Task.Run(() => library.ImportAsync(source, cancellationToken: ct, profileId: profileId, pageLink: page), ct));
     }
     public async Task ImportProfileAsync(string source, CancellationToken ct)
     {
@@ -194,16 +194,19 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
                 var warnings = new List<string>();
                 foreach (var patch in request.Patches)
                 {
-                    var payloads = new Dictionary<PatchFileKind, ReadOnlyMemory<byte>>();
-                    foreach (var file in patch.Files) payloads[file.Kind] = await contents.ReadVerifiedAsync(patch.SourceId, file, ct);
-                    var input = new PatchSetData(payloads[PatchFileKind.Main],
-                        payloads.TryGetValue(PatchFileKind.GpuResources, out var gpu) ? gpu : (ReadOnlyMemory<byte>?)null,
-                        payloads.TryGetValue(PatchFileKind.Stream, out var stream) ? stream : (ReadOnlyMemory<byte>?)null);
-                    var result = adapter.RepairSet(input, ct);
-                    warnings.AddRange(result.Warnings);
-                    if (result.RemovedUnits > 0) throw new InvalidDataException(Localizer.Text("Repatching would remove missing units. Use an updated mod."));
-                    if (!input.Main.Span.SequenceEqual(result.Output.Main.Span) || !SameCompanion(input.Gpu, result.Output.Gpu) ||
-                        !SameCompanion(input.Stream, result.Output.Stream)) changed.Add(patch.SourceId);
+                    await ModOperation.RunAsync(State.Mods.FirstOrDefault(mod => mod.Id == patch.SourceId)?.Name ?? patch.SourceId.ToString(), async () =>
+                    {
+                        var payloads = new Dictionary<PatchFileKind, ReadOnlyMemory<byte>>();
+                        foreach (var file in patch.Files) payloads[file.Kind] = await contents.ReadVerifiedAsync(patch.SourceId, file, ct);
+                        var input = new PatchSetData(payloads[PatchFileKind.Main],
+                            payloads.TryGetValue(PatchFileKind.GpuResources, out var gpu) ? gpu : (ReadOnlyMemory<byte>?)null,
+                            payloads.TryGetValue(PatchFileKind.Stream, out var stream) ? stream : (ReadOnlyMemory<byte>?)null);
+                        var result = adapter.RepairSet(input, ct);
+                        warnings.AddRange(result.Warnings);
+                        if (result.RemovedUnits > 0) throw new InvalidDataException(Localizer.Text("Repatching would remove missing units. Use an updated mod."));
+                        if (!input.Main.Span.SequenceEqual(result.Output.Main.Span) || !SameCompanion(input.Gpu, result.Output.Gpu) ||
+                            !SameCompanion(input.Stream, result.Output.Stream)) changed.Add(patch.SourceId);
+                    });
                 }
                 return (Changed: changed, Warnings: warnings);
             }, ct);
@@ -303,7 +306,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
         if (!Path.IsPathRooted(relative) && relative != ".." && !relative.StartsWith(".." + Path.DirectorySeparatorChar))
             throw new ArgumentException(Localizer.Text("Export outside the game directory."));
         SetRepatchWarnings([]);
-        var warnings = await Task.Run(() => contents.ExportRepatchedAsync(mod, destination, new RepatcherAdapter(GameArchives.Open(game, ct), RepatchOptions), ct), ct);
+        var warnings = await ModOperation.RunAsync(mod.Name, () => Task.Run(() => contents.ExportRepatchedAsync(mod, destination, new RepatcherAdapter(GameArchives.Open(game, ct), RepatchOptions), ct), ct));
         SetRepatchWarnings(warnings);
     }
     public async Task PurgeAsync(CancellationToken ct)

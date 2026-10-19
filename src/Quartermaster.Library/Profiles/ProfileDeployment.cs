@@ -21,7 +21,7 @@ public static class ProfilePatches
         var patches = ProfileEditor.InDeploymentOrder(profile).Where(e => e.Enabled)
             .SelectMany(e => PatchSelection.Select(mods[e.ModId], e).Select(p =>
                 new SelectedPatch(e.ModId, p.Id, p.Archive, p.Files.ToArray(), p.Resources.ToArray())
-                { SelectionHash = PatchSelection.OptionsHash(mods[e.ModId], e) })).ToArray();
+                { SelectionHash = PatchSelection.OptionsHash(mods[e.ModId], e), SourceName = mods[e.ModId].Name })).ToArray();
         return new(profile.Id, patches) { SelectionName = profile.Name };
     }
 }

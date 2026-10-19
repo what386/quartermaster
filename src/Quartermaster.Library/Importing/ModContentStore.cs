@@ -143,6 +143,10 @@ public sealed class ModContentStore : IModContentStore
             File.Move(temporary, destination, overwrite: true);
             return warnings.Distinct().ToArray();
         }
+        catch (InvalidDataException ex)
+        { throw new InvalidDataException($"Could not repatch mod '{mod.Name}': {ex.Message}", ex); }
+        catch (IOException ex)
+        { throw new IOException($"Could not export mod '{mod.Name}': {ex.Message}", ex); }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
@@ -241,6 +245,10 @@ public sealed class ModContentStore : IModContentStore
             Directory.Move(temporary, GetModDirectory(id));
             return mod;
         }
+        catch (InvalidDataException ex)
+        { throw new InvalidDataException($"Could not import mod '{name ?? Path.GetFileName(source)}' ({source}): {ex.Message}", ex); }
+        catch (IOException ex)
+        { throw new IOException($"Could not import mod '{name ?? Path.GetFileName(source)}' ({source}): {ex.Message}", ex); }
         finally { if (Directory.Exists(temporary)) Directory.Delete(temporary, recursive: true); }
     }
     public Task DeleteAsync(Guid modId, CancellationToken cancellationToken = default)

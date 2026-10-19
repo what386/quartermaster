@@ -29,6 +29,10 @@ public class SelfUpdateTests
         public HttpStatusCode Status { get; set; } = HttpStatusCode.OK;
         public List<ProcessStartInfo> Starts { get; } = [];
         public Func<ProcessStartInfo, int>? Launcher { get; set; }
+        public string? ZsyncTool { get; set; }
+        public byte[] Control { get; set; } = Encoding.UTF8.GetBytes("control file");
+        public HttpStatusCode ControlStatus { get; set; } = HttpStatusCode.OK;
+        public List<Uri> Requests { get; } = [];
         public HttpClient Api { get; }
         public HttpClient Downloads { get; }
         public Fixture(string current = "0.4.0", string rid = "win-x64", Func<SelfUpdateOptions, SelfUpdateOptions>? configure = null)
@@ -63,14 +67,19 @@ public class SelfUpdateTests
                     }))
                 };
             }));
-            Downloads = new(new Handler(request => new(HttpStatusCode.OK)
-            { Content = new ByteArrayContent(request.RequestUri!.AbsolutePath.EndsWith("SHA256SUMS.txt") ? Encoding.UTF8.GetBytes(Checksums) : Package) }));
+            Downloads = new(new Handler(request =>
+            {
+                Requests.Add(request.RequestUri!);
+                var control = request.RequestUri!.AbsolutePath.EndsWith(".zsync");
+                return new(control ? ControlStatus : HttpStatusCode.OK)
+                { Content = new ByteArrayContent(control ? Control : request.RequestUri.AbsolutePath.EndsWith("SHA256SUMS.txt") ? Encoding.UTF8.GetBytes(Checksums) : Package) };
+            }));
         }
         public Uri Url(string name) => new($"https://github.com/{Options.Repository}/releases/download/{Latest}/{name}");
         public AppRelease Release() => new(Latest, new($"https://github.com/{Options.Repository}/releases/tag/{Latest}"), "Notes", null,
             new(Options.AssetName, Url(Options.AssetName), Package.Length), new("SHA256SUMS.txt", Url("SHA256SUMS.txt"), Encoding.UTF8.GetByteCount(Checksums)));
         public SelfUpdateManager Manager(SelfUpdateOptions? options = null) => new(options ?? Options, Api, Downloads, info =>
-        { Starts.Add(info); return Launcher?.Invoke(info) ?? 12345; });
+        { Starts.Add(info); return Launcher?.Invoke(info) ?? 12345; }) { FindZsync = () => ZsyncTool };
         public void SetArchive(params (string Name, string Contents, int Attributes)[] extra)
         {
             Package = Archive([(Options.ExecutableName, "new application", 0), ("winupdater/" + Options.UpdaterName, "new helper", 0), .. extra]);
@@ -221,6 +230,114 @@ public class SelfUpdateTests
             Assert.True((File.GetUnixFileMode(executable) & UnixFileMode.UserExecute) != 0);
         }
         Assert.Equal("keep me", File.ReadAllText(unrelated));
+    }
+
+    private static void SetImage(Fixture f)
+    {
+        var image = new byte[64];
+        new byte[] { 0x7f, (byte)'E', (byte)'L', (byte)'F', 2, 1 }.CopyTo(image, 0);
+        image[8] = (byte)'A'; image[9] = (byte)'I'; image[10] = 2; image[18] = 62;
+        f.Package = image;
+        f.Checksums = Hash(image) + "  " + f.Options.AssetName + "\n" + Hash(f.Control) + "  " + f.Options.AssetName + ".zsync\n";
+    }
+    [System.Runtime.Versioning.SupportedOSPlatform("linux")]
+    private static string FakeZsync(Fixture f, string body)
+    {
+        var tool = Path.Combine(f.Root, "fake zsync");
+        File.WriteAllText(tool, "#!/bin/sh\n" + body);
+        File.SetUnixFileMode(tool, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        f.ZsyncTool = tool;
+        return tool;
+    }
+
+    [Fact]
+    public async Task AppImageZsyncUsesInstalledSeedAndVerifiesStagedResult()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var f = new Fixture(rid: "linux-x64", configure: o => o with { AppImageFileName = "My ü image.AppImage" });
+        SetImage(f);
+        File.WriteAllBytes(Path.Combine(f.Root, "image"), f.Package);
+        FakeZsync(f, """
+            printf '%s\0' "$@" > "$(dirname "$0")/args"
+            cp "$(dirname "$0")/image" "$4"
+            """);
+        var phases = new List<SelfUpdatePhase>();
+        using var manager = f.Manager();
+        using var update = await manager.PrepareAsync(f.Release(), new Progress(p => phases.Add(p.Phase)));
+        Assert.Equal(f.Package, File.ReadAllBytes(Path.Combine(update.StagedDirectory, f.Options.ExecutableName)));
+        var args = Encoding.UTF8.GetString(File.ReadAllBytes(Path.Combine(f.Root, "args"))).Split('\0', StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(new[] { "-i", Path.Combine(f.Options.InstallDirectory, f.Options.ExecutableName), "-o",
+            Path.Combine(update.Directory, "release.AppImage"), "-u", f.Url(f.Options.AssetName + ".zsync").AbsoluteUri,
+            Path.Combine(update.Directory, f.Options.AssetName + ".zsync") }, args);
+        Assert.Contains(SelfUpdatePhase.Synchronizing, phases); Assert.Contains(SelfUpdatePhase.Verifying, phases);
+        Assert.DoesNotContain(f.Url(f.Options.AssetName), f.Requests);
+        f.AssertUnchanged();
+    }
+
+    [Theory]
+    [InlineData("exit")]
+    [InlineData("checksum")]
+    [InlineData("size")]
+    [InlineData("missing")]
+    [InlineData("descriptor")]
+    [InlineData("http")]
+    [InlineData("spawn")]
+    public async Task ZsyncFailuresStopTheUpdateWithoutDirectDownload(string failure)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var f = new Fixture(rid: "linux-x64", configure: o => o with { AppImageFileName = "Quartermaster.AppImage" });
+        SetImage(f);
+        File.WriteAllBytes(Path.Combine(f.Root, "image"), failure == "checksum" ? new byte[64] : failure == "size" ? new byte[65] : f.Package);
+        FakeZsync(f, failure == "exit" ? "echo synchronization-failed >&2; exit 9\n" : failure == "missing" ? "exit 0\n" : "cp \"$(dirname \"$0\")/image\" \"$4\"\n");
+        if (failure == "descriptor") f.Control = [1];
+        if (failure == "http") f.ControlStatus = HttpStatusCode.NotFound;
+        if (failure == "spawn") File.Delete(f.ZsyncTool!);
+        using var manager = f.Manager();
+        var error = await Assert.ThrowsAnyAsync<Exception>(() => manager.PrepareAsync(f.Release()));
+        if (failure == "exit") Assert.Contains("synchronization-failed", error.Message);
+        Assert.DoesNotContain(f.Url(f.Options.AssetName), f.Requests);
+        f.AssertUnchanged(); f.AssertNoStaging();
+    }
+
+    [Fact]
+    public async Task CancellingZsyncTerminatesTheChildBeforeRemovingStaging()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var f = new Fixture(rid: "linux-x64", configure: o => o with { AppImageFileName = "Quartermaster.AppImage" });
+        SetImage(f);
+        FakeZsync(f, "echo $$ > \"$(dirname \"$0\")/pid\"\nexec /bin/sleep 60\n");
+        using var manager = f.Manager(); using var cancel = new CancellationTokenSource();
+        var pending = manager.PrepareAsync(f.Release(), ct: cancel.Token);
+        var pid = Path.Combine(f.Root, "pid");
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (!File.Exists(pid)) await Task.Delay(10, deadline.Token);
+        var child = Process.GetProcessById(int.Parse(await File.ReadAllTextAsync(pid)));
+        using (child)
+        {
+            cancel.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => pending);
+            Assert.True(child.HasExited);
+        }
+        Assert.DoesNotContain(f.Url(f.Options.AssetName), f.Requests);
+        f.AssertUnchanged(); f.AssertNoStaging();
+    }
+
+    [Fact]
+    public void ZsyncDiscoveryPrefersZsync2AndIgnoresNonExecutableFiles()
+    {
+        if (!OperatingSystem.IsLinux()) return;
+        using var f = new Fixture();
+        var first = Path.Combine(f.Root, "first"); var second = Path.Combine(f.Root, "second");
+        Directory.CreateDirectory(first); Directory.CreateDirectory(second);
+        var classic = Path.Combine(first, "zsync"); var modern = Path.Combine(second, "zsync2");
+        File.WriteAllText(classic, ""); File.WriteAllText(modern, "");
+        File.SetUnixFileMode(classic, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        File.SetUnixFileMode(modern, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        var path = first + Path.PathSeparator + second;
+        Assert.Equal(modern, ZsyncDownload.FindExecutable(path));
+        File.SetUnixFileMode(modern, UnixFileMode.UserRead);
+        Assert.Equal(classic, ZsyncDownload.FindExecutable(path));
+        Assert.Null(ZsyncDownload.FindExecutable(null));
     }
 
     [Fact]

@@ -30,8 +30,8 @@ public sealed class ProviderManager(
     public async Task<DownloadJob> QueueManualUpdateAsync(Guid modId, CancellationToken ct = default)
     {
         var mod = (await library.LoadAsync(ct)).Mods.Single(mod => mod.Id == modId);
-        if (IsTracked(mod)) throw new InvalidOperationException("This mod has provider tracking. Use Check updates instead.");
-        var page = ModLinks.PageFor(mod) ?? throw new InvalidOperationException("Set this mod's page link before checking it manually.");
+        if (IsTracked(mod)) throw new InvalidOperationException($"Mod '{mod.Name}' has provider tracking. Use Check updates instead.");
+        var page = ModLinks.PageFor(mod) ?? throw new InvalidOperationException($"Set the page link for mod '{mod.Name}' before checking it manually.");
         var file = new ProviderFile(ManualDownloads.ProviderId, modId.ToString(), "manual-update", mod.Name,
             mod.ImportedFileName ?? mod.Name + ".zip", null, new Uri(page))
         { PageLink = new Uri(page) };
@@ -137,17 +137,17 @@ public sealed class ProviderManager(
             || file.DownloadPage.Scheme != "https"
             || file.DownloadPage.UserInfo.Length != 0
         )
-            throw new ArgumentException("Download pages must be public HTTPS links.");
+            throw new ArgumentException($"The download page for '{file.Name}' must be a public HTTPS link.");
         if (file.Provider == NexusAdapter.ProviderId)
         {
             var page = NexusLink.Parse(file.DownloadPage.AbsoluteUri);
             if (page.ModId.ToString() != file.ModId || page.FileId?.ToString() != file.FileId)
-                throw new ArgumentException("Download page belongs to another Nexus file.");
+                throw new ArgumentException($"The download page for '{file.Name}' belongs to another Nexus file.");
             file = file with { DownloadPage = page.Page };
         }
         if (!file.FileName.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
             throw new NotSupportedException(
-                "Only ZIP mods can currently be imported. Choose a ZIP file from the provider."
+                $"Mod '{file.Name}' uses unsupported file '{file.FileName}'. Only ZIP mods can currently be imported. Choose a ZIP file from the provider."
             );
         await gate.WaitAsync(ct);
         DownloadJob job;
@@ -273,7 +273,7 @@ public sealed class ProviderManager(
             var job = State.Jobs.Single(j => j.Id == id);
             if (job.Status is DownloadStatus.Complete or DownloadStatus.Importing)
                 throw new InvalidOperationException(
-                    "This download is already complete or being imported."
+                    $"The download for '{job.File.Name}' is already complete or being imported."
                 );
             Start(job, archive: archive, ct: ct);
             task = workers[id].Task;
@@ -310,10 +310,10 @@ public sealed class ProviderManager(
     {
         var job = State.Jobs.Single(job => job.Id == id);
         if (job.File.Provider != ManualDownloads.ProviderId || job.Status != DownloadStatus.NeedsConfirmation || job.ConfirmationFile is not { } candidate)
-            throw new InvalidOperationException("This download is not awaiting confirmation.");
+            throw new InvalidOperationException($"The download for '{job.File.Name}' is not awaiting confirmation.");
         var file = new FileInfo(candidate.Path);
         if (!file.Exists || file.Length != candidate.Size || file.LastWriteTimeUtc != candidate.LastWrite)
-            throw new InvalidOperationException("The ZIP changed after the warning. Retry the download check before importing.");
+            throw new InvalidOperationException($"The ZIP for '{job.File.Name}' changed after the warning. Retry the download check before importing.");
         await AttachZipAsync(id, candidate.Path, ct);
     }
 
@@ -364,13 +364,13 @@ public sealed class ProviderManager(
                 && mod.Sources.Any(s => s.Provider == c.Provider && s.FileId != c.AvailableFileId)
             )
             ?? throw new InvalidOperationException(
-                "No update is available for this mod. Check for updates again."
+                $"No update is available for mod '{mod.Name}'. Check for updates again."
             );
         var source = mod.Sources.Single(s => s.Provider == check.Provider);
         var update = await GetProvider(source.Provider).CheckUpdateAsync(source, ct);
         if (update is not { Status: UpdateStatus.Available, File: { } file })
             throw new InvalidOperationException(
-                "The update is no longer available. Check for updates again."
+                $"The update for mod '{mod.Name}' is no longer available. Check for updates again."
             );
         if (dependencies is not null) file = file with { Dependencies = dependencies };
         if (file.Provider == NexusAdapter.ProviderId && file.Dependencies is null)
@@ -521,7 +521,7 @@ public sealed class ProviderManager(
         }
         catch (Exception ex)
         {
-            await SetStatusAsync(job.Id, DownloadStatus.Failed, ex.Message);
+            await SetStatusAsync(job.Id, DownloadStatus.Failed, $"{job.File.Name} ({job.File.FileName}): {ex.Message}");
             DownloadFailed?.Invoke(State.Jobs.Single(j => j.Id == job.Id));
             LibraryChanged?.Invoke(this, EventArgs.Empty);
         }
@@ -542,7 +542,7 @@ public sealed class ProviderManager(
                 preserveImporting
                 && State.Jobs.Any(job => job.Id == id && job.Status == DownloadStatus.Importing)
             )
-                throw new InvalidOperationException("This download is already being imported.");
+                throw new InvalidOperationException($"The download for '{State.Jobs.Single(job => job.Id == id).File.Name}' is already being imported.");
             if (!workers.Remove(id, out worker))
                 return;
             worker.Cancellation.Cancel();

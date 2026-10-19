@@ -157,7 +157,8 @@ public class ProfileArchiveTests
         var profile = ProfileEditor.Add(ProfileEditor.Create("Loadout"), mod); await f.Library.SaveProfileAsync(profile);
         var destination = Path.Combine(f.Root, "existing.zip"); await File.WriteAllBytesAsync(destination, [1, 2, 3]);
         await File.WriteAllBytesAsync(f.Contents.GetFilePath(mod.Id, mod.PatchSets[0].Files[0]), [0]);
-        await Assert.ThrowsAsync<IOException>(() => new ProfileArchives(f.Store, f.Contents).ExportAsync(profile.Id, destination));
+        var error = await Assert.ThrowsAsync<IOException>(() => new ProfileArchives(f.Store, f.Contents).ExportAsync(profile.Id, destination));
+        Assert.Contains(mod.Name, error.Message); Assert.Contains(profile.Name, error.Message);
         Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(destination));
         Assert.Empty(Directory.GetFiles(f.Root, "*.tmp"));
         await Assert.ThrowsAsync<ArgumentException>(() => new ProfileArchives(f.Store, f.Contents).ExportAsync(profile.Id, Path.Combine(f.App, "profile.zip")));
