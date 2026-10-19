@@ -29,6 +29,17 @@ cp "$app_dir/quartermaster.desktop" "$app_dir/usr/share/applications/"
 cp "$app_dir/quartermaster.png" "$app_dir/usr/share/icons/hicolor/512x512/apps/"
 ln -s quartermaster.png "$app_dir/.DirIcon"
 # Extraction mode avoids requiring FUSE on build hosts and CI runners.
-APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 "$tool" --no-appstream \
-    --runtime-file "$runtime" "$app_dir" "$output_dir/Quartermaster-linux-x64.AppImage"
+# Remove an earlier control file so a missing generator cannot leave a stale one.
+rm -f -- "$output_dir/Quartermaster-linux-x64.AppImage.zsync"
+# zsyncmake writes its output in the working directory.
+(
+    cd -- "$output_dir"
+    APPIMAGE_EXTRACT_AND_RUN=1 ARCH=x86_64 "$tool" --no-appstream \
+        --updateinformation 'gh-releases-zsync|what386|quartermaster|latest|Quartermaster-linux-x64.AppImage.zsync' \
+        --runtime-file "$runtime" "$app_dir" "$output_dir/Quartermaster-linux-x64.AppImage"
+)
+[[ -s "$output_dir/Quartermaster-linux-x64.AppImage.zsync" ]] || {
+    echo "AppImage packaging did not generate the .zsync update file." >&2
+    exit 1
+}
 chmod +x "$output_dir/Quartermaster-linux-x64.AppImage"

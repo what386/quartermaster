@@ -9,7 +9,7 @@ usage() {
 Usage: scripts/package.sh [OPTIONS]
 
 Build local release artifacts using the settings in .github/workflows/release.yml.
-Defaults to the host platform. Outputs ZIPs, AppImages, installers, and SHA256SUMS.txt in dist/;
+Defaults to the host platform. Outputs ZIPs, AppImages with .zsync files, installers, and SHA256SUMS.txt in dist/;
 unpacked applications and build tools are kept under dist/package/.
 
 Options:
@@ -207,7 +207,8 @@ PY
         appimage_tool="$(bash packaging/linux/install-appimagetool.sh "$work_root/appimage-tools")"
         bash packaging/linux/build-appimage.sh "$publish_dir" "$repo_root/dist" \
             "$appimage_tool" "$work_root/appimage-tools/runtime-x86_64"
-        artifacts+=("$repo_root/dist/Quartermaster-linux-x64.AppImage")
+        artifacts+=("$repo_root/dist/Quartermaster-linux-x64.AppImage"
+            "$repo_root/dist/Quartermaster-linux-x64.AppImage.zsync")
     fi
 
     if [[ "$build_setup" == true ]]; then

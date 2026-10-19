@@ -118,11 +118,13 @@ jobs:
           tool="$(bash packaging/linux/install-appimagetool.sh "$RUNNER_TEMP/appimage-tools")"
           bash packaging/linux/build-appimage.sh publish dist "$tool" "$RUNNER_TEMP/appimage-tools/runtime-x86_64"
 
-      - name: Upload AppImage
+      - name: Upload AppImage and update file
         uses: actions/upload-artifact@v7
         with:
           name: Quartermaster-linux-x64-AppImage
-          path: dist/Quartermaster-linux-x64.AppImage
+          path: |
+            dist/Quartermaster-linux-x64.AppImage
+            dist/Quartermaster-linux-x64.AppImage.zsync
           if-no-files-found: error
 
   installer:
@@ -184,6 +186,7 @@ jobs:
           set -- \
             Quartermaster-linux-x64-bundled.zip \
             Quartermaster-linux-x64.AppImage \
+            Quartermaster-linux-x64.AppImage.zsync \
             Quartermaster-win-x64-bundled.zip \
             Quartermaster-win-x64-setup.exe
           for asset in "$@"; do

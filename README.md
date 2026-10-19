@@ -189,7 +189,8 @@ To test release packaging locally:
 ```
 
 This uses the CI release settings: Release, self-contained, single-file, and
-ReadyToRun. ZIPs, the Linux AppImage, and `SHA256SUMS.txt` are written to `dist/`,
+ReadyToRun. ZIPs, the Linux AppImage with its `.zsync` update file, and
+`SHA256SUMS.txt` are written to `dist/`,
 with unpacked apps under `dist/package/<runtime>/publish/`. Linux AppImages must
 be built on Linux; `curl` and `sha256sum` are required. The pinned AppImage tool
 and runtime are downloaded and verified automatically, and building requires
@@ -198,6 +199,13 @@ the native updater, and produce the Inno Setup installer. On Windows, run from
 Git Bash with CMake, Visual Studio C++ build tools, Python 3, and PowerShell 7
 installed. The pinned Inno Setup compiler is downloaded automatically, or you
 can supply `--inno-compiler FILE`.
+
+AppImages embed update information for the latest GitHub release so external
+AppImage update tools can discover the accompanying `.zsync` file. Release
+uploads and checksums include both files. For in-app AppImage updates, Quartermaster
+uses `zsync2` or `zsync` from `PATH` when installed, otherwise it downloads the full
+AppImage. A failed synchronization stops the update; both download methods verify
+the release SHA-256 before installation.
 
 For cross-building Windows portable packages, use `--runtime win-x64
 --updater-toolchain FILE --skip-installer` with a Windows x64 CMake toolchain.
