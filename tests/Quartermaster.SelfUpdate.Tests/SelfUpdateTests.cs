@@ -79,7 +79,8 @@ public class SelfUpdateTests
         public AppRelease Release() => new(Latest, new($"https://github.com/{Options.Repository}/releases/tag/{Latest}"), "Notes", null,
             new(Options.AssetName, Url(Options.AssetName), Package.Length), new("SHA256SUMS.txt", Url("SHA256SUMS.txt"), Encoding.UTF8.GetByteCount(Checksums)));
         public SelfUpdateManager Manager(SelfUpdateOptions? options = null) => new(options ?? Options, Api, Downloads, info =>
-        { Starts.Add(info); return Launcher?.Invoke(info) ?? 12345; }) { FindZsync = () => ZsyncTool };
+        { Starts.Add(info); return Launcher?.Invoke(info) ?? 12345; })
+        { FindZsync = () => ZsyncTool };
         public void SetArchive(params (string Name, string Contents, int Attributes)[] extra)
         {
             Package = Archive([(Options.ExecutableName, "new application", 0), ("winupdater/" + Options.UpdaterName, "new helper", 0), .. extra]);

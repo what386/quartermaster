@@ -184,8 +184,11 @@ public sealed class ArsenalTests
             : """{"Version":1,"Options":[{"Name":"Header","Include":["Header"]}]}""";
         var path = Path.Combine(folder, "manifest.json"); await File.WriteAllTextAsync(path, manifest);
         var plan = await ArsenalReader.ReadAsync(root);
-        plan = plan with { Profiles = plan.Profiles.Select(profile => profile with
-        { Rows = profile.Rows.Select(row => row.Id == B ? row with { Options = [new("Header", true, [])] } : row).ToArray() }).ToArray() };
+        plan = plan with
+        {
+            Profiles = plan.Profiles.Select(profile => profile with
+            { Rows = profile.Rows.Select(row => row.Id == B ? row with { Options = [new("Header", true, [])] } : row).ToArray() }).ToArray()
+        };
         var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
         var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
         Assert.Empty(Assert.Single(mod.Options).PatchSetIds);
@@ -240,8 +243,11 @@ public sealed class ArsenalTests
             """;
         var path = Path.Combine(folder, "manifest.json"); await File.WriteAllTextAsync(path, manifest);
         var plan = await ArsenalReader.ReadAsync(root);
-        plan = plan with { Profiles = plan.Profiles.Select(profile => profile.Key != "second" ? profile : profile with
-        { Rows = profile.Rows.Select(row => row.Id == A ? row with { Options = [new("Color", true, [new("Vanilla", true)])] } : row).ToArray() }).ToArray() };
+        plan = plan with
+        {
+            Profiles = plan.Profiles.Select(profile => profile.Key != "second" ? profile : profile with
+            { Rows = profile.Rows.Select(row => row.Id == A ? row with { Options = [new("Color", true, [new("Vanilla", true)])] } : row).ToArray() }).ToArray()
+        };
         var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
         var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Renamed A");
         var option = Assert.Single(mod.Options);

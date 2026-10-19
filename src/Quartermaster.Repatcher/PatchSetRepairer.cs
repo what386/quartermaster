@@ -101,8 +101,12 @@ public sealed partial class Repatcher
                 (!before.Data.Span.SequenceEqual(after.Data.Span) || !before.Gpu.Span.SequenceEqual(after.Gpu.Span) || !before.Stream.Span.SequenceEqual(after.Stream.Span)));
             return new(repair.Status, output, repairedCount, repair.RemovedUnits)
             {
-                Warnings = warnings, Units = outcomes, Equipment = safety.DetectedNames, ArmorAudits = safety.AuditArmor(PatchDocument.Read(output)),
-                Audit = audit, Changed = !Same(input, output)
+                Warnings = warnings,
+                Units = outcomes,
+                Equipment = safety.DetectedNames,
+                ArmorAudits = safety.AuditArmor(PatchDocument.Read(output)),
+                Audit = audit,
+                Changed = !Same(input, output)
             };
         }
         catch (Exception ex) when (ex is InvalidDataException or EndOfStreamException or OverflowException)

@@ -44,8 +44,10 @@ internal sealed class EquipmentSafety
                 var frequencies = candidates.SelectMany(e => e.Hits).GroupBy(id => id).ToDictionary(g => g.Key, g => g.Count());
                 var scores = candidates.Select(c => new
                 {
-                    c.Equipment, Count = c.Hits.Length,
-                    Unique = c.Hits.Count(id => frequencies[id] == 1), Rare = c.Hits.Count(id => frequencies[id] <= 4),
+                    c.Equipment,
+                    Count = c.Hits.Length,
+                    Unique = c.Hits.Count(id => frequencies[id] == 1),
+                    Rare = c.Hits.Count(id => frequencies[id] <= 4),
                     Score = c.Hits.Sum(id => frequencies[id] switch { 1 => 100, 2 => 60, <= 4 => 30, <= 8 => 15, <= 16 => 5, _ => 1 })
                 }).OrderByDescending(c => c.Score).ThenByDescending(c => c.Unique).ThenByDescending(c => c.Rare)
                     .ThenByDescending(c => c.Count).ThenBy(c => c.Equipment.Name, StringComparer.Ordinal).ThenBy(c => c.Equipment.Hash, StringComparer.Ordinal).ToArray();

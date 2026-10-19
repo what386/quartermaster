@@ -65,9 +65,12 @@ public sealed class PatchDocument
                 ct.ThrowIfCancellationRequested();
                 rows.Add(resource.Record with
                 {
-                    DataOffset = (ulong)main.Position, DataSize = checked((uint)resource.Data.Length),
-                    GpuOffset = Append(gpu, resource.Gpu, 64), GpuSize = checked((uint)resource.Gpu.Length),
-                    StreamOffset = Append(stream, resource.Stream, 64), StreamSize = checked((uint)resource.Stream.Length),
+                    DataOffset = (ulong)main.Position,
+                    DataSize = checked((uint)resource.Data.Length),
+                    GpuOffset = Append(gpu, resource.Gpu, 64),
+                    GpuSize = checked((uint)resource.Gpu.Length),
+                    StreamOffset = Append(stream, resource.Stream, 64),
+                    StreamSize = checked((uint)resource.Stream.Length),
                     EntryIndex = checked((uint)rows.Count + 1)
                 });
                 main.Write(resource.Data.Span);
