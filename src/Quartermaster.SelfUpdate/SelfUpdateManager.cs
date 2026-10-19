@@ -20,6 +20,7 @@ public sealed partial class SelfUpdateManager : IDisposable
     private readonly ReleaseVersion installedVersion;
     private readonly object handoffLock = new();
     private bool handedOff;
+    internal Func<string?> FindZsync { get; init; } = ZsyncDownload.FindExecutable;
     private static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
@@ -205,8 +206,34 @@ public sealed partial class SelfUpdateManager : IDisposable
             )
                 throw new InvalidDataException("Release digest and SHA256SUMS.txt disagree.");
             var archive = Path.Combine(directory, options.UsesAppImage ? "release.AppImage" : "release.zip");
-            await DownloadAsync(release.Package, archive, checksum, progress, ct)
-                .ConfigureAwait(false);
+            var zsync = options.UsesAppImage && OperatingSystem.IsLinux() ? FindZsync() : null;
+            if (zsync is not null)
+            {
+                var controlName = options.AssetName + ".zsync";
+                var controlChecksum = ChecksumFor(Encoding.UTF8.GetString(checksums), controlName);
+                using var response = await downloads.GetAsync(new Uri(release.Package.DownloadUrl.AbsoluteUri + ".zsync"),
+                    HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+                var control = await ReadLimitedAsync(response, 8 * MetadataLimit, ct).ConfigureAwait(false);
+                if (!controlChecksum.Equals(Convert.ToHexString(SHA256.HashData(control)), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("The zsync update file checksum does not match.");
+                var controlPath = Path.Combine(directory, controlName);
+                await File.WriteAllBytesAsync(controlPath, control, ct).ConfigureAwait(false);
+                progress?.Report(new(SelfUpdatePhase.Synchronizing));
+                await ZsyncDownload.RunAsync(zsync, Path.Combine(options.InstallDirectory, options.ExecutableName),
+                    controlPath, new Uri(release.Package.DownloadUrl.AbsoluteUri + ".zsync"), archive, release.Package.Size, ct)
+                    .ConfigureAwait(false);
+            }
+            else
+                await DownloadAsync(release.Package, archive, progress, ct).ConfigureAwait(false);
+            UpdatePaths.RequireRegularFile(archive);
+            progress?.Report(new(SelfUpdatePhase.Verifying, new FileInfo(archive).Length, release.Package.Size));
+            await using (var input = File.OpenRead(archive))
+            {
+                if (input.Length != release.Package.Size || !checksum.Equals(
+                    Convert.ToHexString(await SHA256.HashDataAsync(input, ct).ConfigureAwait(false)), StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("Release download is incomplete or its checksum does not match.");
+            }
             var staged = Path.Combine(directory, "staged");
             if (options.UsesAppImage)
             {
@@ -426,7 +453,6 @@ public sealed partial class SelfUpdateManager : IDisposable
     private async Task DownloadAsync(
         ReleaseAsset asset,
         string destination,
-        string checksum,
         IProgress<SelfUpdateProgress>? progress,
         CancellationToken ct
     )
@@ -444,7 +470,6 @@ public sealed partial class SelfUpdateManager : IDisposable
             65536,
             useAsync: true
         );
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         long total = 0;
         var buffer = new byte[65536];
         int count;
@@ -454,21 +479,9 @@ public sealed partial class SelfUpdateManager : IDisposable
             total += count;
             if (total > asset.Size)
                 throw new InvalidDataException("Release download exceeds its advertised size.");
-            hash.AppendData(buffer, 0, count);
             await output.WriteAsync(buffer.AsMemory(0, count), ct).ConfigureAwait(false);
             progress?.Report(new(SelfUpdatePhase.Downloading, total, asset.Size));
         }
-        progress?.Report(new(SelfUpdatePhase.Verifying, total, asset.Size));
-        if (
-            total != asset.Size
-            || !checksum.Equals(
-                Convert.ToHexString(hash.GetHashAndReset()),
-                StringComparison.OrdinalIgnoreCase
-            )
-        )
-            throw new InvalidDataException(
-                "Release download is incomplete or its checksum does not match."
-            );
     }
 
     public void Dispose()

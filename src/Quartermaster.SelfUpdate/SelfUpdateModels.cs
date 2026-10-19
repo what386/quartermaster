@@ -39,7 +39,7 @@ public sealed record SelfUpdateOptions(string CurrentVersion, string RuntimeIden
 
 public sealed record ReleaseAsset(string Name, Uri DownloadUrl, long Size, string? Sha256 = null);
 public sealed record AppRelease(string Version, Uri Page, string Notes, DateTimeOffset? PublishedAt, ReleaseAsset Package, ReleaseAsset Checksums);
-public enum SelfUpdatePhase { Downloading, Verifying, Extracting, Ready }
+public enum SelfUpdatePhase { Downloading, Verifying, Extracting, Ready, Synchronizing }
 public sealed record SelfUpdateProgress(SelfUpdatePhase Phase, long Bytes = 0, long? TotalBytes = null, string? File = null);
 
 /// <summary>Dispose an abandoned preparation; a launched update retains its staging area and log.</summary>
