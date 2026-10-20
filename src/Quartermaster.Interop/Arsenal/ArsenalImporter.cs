@@ -22,7 +22,9 @@ public sealed class ArsenalImporter(ILibraryStore store, IModContentStore conten
                 ct.ThrowIfCancellationRequested();
                 progress?.Report(new(mapping.Count + 1, plan.Mods.Count, record.Name));
                 Mod imported;
-                try { imported = await ArsenalContent.ImportAsync(contents, record, ct).ConfigureAwait(false); }
+                var restoreFolderOptions = plan.Profiles.SelectMany(profile => profile.Rows)
+                    .Any(row => row.Id == record.Id && row.GroupName is null && row.Options is { Count: > 0 });
+                try { imported = await ArsenalContent.ImportAsync(contents, record, ct, restoreFolderOptions).ConfigureAwait(false); }
                 catch (FileNotFoundException ex)
                 { throw new FileNotFoundException($"Could not import Arsenal mod '{record.Name}' ({record.Directory}): {ex.Message}", ex.FileName, ex); }
                 catch (DirectoryNotFoundException ex)

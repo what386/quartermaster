@@ -4,15 +4,30 @@ using System.Text.Json.Nodes;
 using Quartermaster.Core.Patching;
 using Quartermaster.Library.Importing;
 using Quartermaster.Library.Mods;
+using Quartermaster.Library.Profiles;
 
 namespace Quartermaster.Interop.Arsenal;
 
 internal static class ArsenalContent
 {
-    public static async Task<Mod> ImportAsync(IModContentStore contents, ArsenalMod mod, CancellationToken ct)
+    public static async Task<Mod> ImportAsync(IModContentStore contents, ArsenalMod mod, CancellationToken ct, bool restoreFolderOptions = false)
     {
         var files = Enumerate(mod.Directory).ToArray();
         var manifests = files.Where(file => Path.GetFileName(file).Equals("manifest.json", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (manifests.Length == 0 && restoreFolderOptions)
+        {
+            var imported = await contents.ImportAsync(mod.Directory, mod.Name, ct).ConfigureAwait(false);
+            // Arsenal profiles can store folder toggles for packs without manifests.
+            // Reconstruct all patch folders, including unselected alternatives, so
+            // they do not become shared content and deploy regardless of selection.
+            var folderOptions = imported.PatchSets.GroupBy(set => set.Folder, StringComparer.Ordinal)
+                .Select(group => new ModOption(Guid.NewGuid(), group.Key == "" ? mod.Name : group.Key.Split('/')[^1], "",
+                    group.Select(set => set.Id).ToArray(), [])).ToArray();
+            // A saved leaf name cannot distinguish identically named folders.
+            // Leave these to the existing selection error and importer rollback.
+            return folderOptions.Select(option => option.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == folderOptions.Length
+                ? imported with { Options = folderOptions } : imported;
+        }
         if (manifests.Length != 1) return await contents.ImportAsync(mod.Directory, mod.Name, ct).ConfigureAwait(false);
         var manifestPath = manifests[0];
         var document = JsonNode.Parse(await File.ReadAllTextAsync(manifestPath, ct).ConfigureAwait(false),
