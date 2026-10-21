@@ -2,6 +2,13 @@
 
 *Generated on 2026-10-21*
 
+## 0.10.2 — 2026-10-21
+
+### Changes
+
+- update localization files
+
+
 ## 0.10.1 — 2026-10-21
 
 ### Changes
