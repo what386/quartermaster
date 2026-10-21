@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Quartermaster.Interop.Arsenal;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
@@ -70,6 +71,56 @@ public sealed class ArsenalTests
         };
         await File.WriteAllTextAsync(Path.Combine(root, "hd2a_data.json"), JsonSerializer.Serialize(data));
         return root;
+    }
+
+    [Theory]
+    [InlineData("optionsConfig", false)]
+    [InlineData("optionsConfig", true)]
+    [InlineData("options", false)]
+    [InlineData("options", true)]
+    [InlineData("library", false)]
+    [InlineData("library", true)]
+    public async Task SavedOptionsAcceptManifestCasingAndPreserveChoices(string location, bool manifestCasing)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "hd2a_data.json");
+        var data = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        var row = data["modsList"]!["second"]!["mods"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)!;
+        row.AsObject().Remove("optionsConfig");
+        var selections = JsonNode.Parse(manifestCasing
+            ? """[{"Name":"Color","Enabled":false,"SubOptions":[{"Name":"Red","Enabled":false},{"Name":"Blue","Enabled":true}]}]"""
+            : """[{"name":"Color","enabled":false,"suboptions":[{"name":"Red","enabled":false},{"name":"Blue","enabled":true}]}]""")!;
+        var target = location == "library" ? data["modsLibrary"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)! : row;
+        target[location == "library" ? "options" : location] = selections;
+        var original = data.ToJsonString();
+        await File.WriteAllTextAsync(path, original);
+        var plan = await ArsenalReader.ReadAsync(root, ["second"]);
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var state = await f.Library.LoadAsync();
+        var mod = state.Mods.Single(mod => mod.Name == "Renamed A");
+        var entry = Assert.Single(Assert.Single(result.Profiles).Entries, entry => entry.ModId == mod.Id);
+        var selection = Assert.Single(entry.Options);
+        Assert.False(selection.Enabled); Assert.Equal(1, selection.ChoiceIndex);
+        Assert.Equal(original, await File.ReadAllTextAsync(path));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SavedOptionsStillRejectMissingOptionAndChoiceNames(bool choice)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "hd2a_data.json");
+        var data = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        var row = data["modsList"]!["second"]!["mods"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)!;
+        row["optionsConfig"] = JsonNode.Parse(choice
+            ? """[{"Name":"Color","SubOptions":[{"Enabled":true}]}]"""
+            : """[{"Enabled":true}]""");
+        await File.WriteAllTextAsync(path, data.ToJsonString());
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => ArsenalReader.ReadAsync(root, ["second"]));
+        Assert.Contains("Renamed A", error.Message); Assert.Contains("second", error.Message);
+        Assert.Contains("missing name", error.Message);
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
     }
 
     [Theory]
