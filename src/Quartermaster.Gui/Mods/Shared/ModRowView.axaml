@@ -17,6 +17,11 @@
       <TextBlock Text="{Binding TagSummary}" IsVisible="{Binding HasTags}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TagSummary}" />
     </StackPanel>
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+      <Border x:Name="LuaIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding UsesLua}"
+              ToolTip.Tip="{loc:Loc 'Contains Lua scripts'}" AutomationProperties.Name="{loc:Loc 'Contains Lua scripts'}">
+        <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/lua.svg"
+                        Foreground="{DynamicResource MutedBrush}" Margin="2" IsHitTestVisible="False" />
+      </Border>
       <Border x:Name="DependencyIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding InstalledAsDependency}"
               ToolTip.Tip="{loc:Loc 'Installed as a dependency'}" AutomationProperties.Name="{loc:Loc 'Installed as a dependency'}">
         <Path Data="M4,3 L10,3 L10,9 L4,9 Z M14,15 L20,15 L20,21 L14,21 Z M7,9 L7,18 L14,18" Stretch="Uniform"

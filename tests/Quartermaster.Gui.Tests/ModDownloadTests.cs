@@ -72,6 +72,60 @@ public sealed class ModDownloadTests
         finally { window.Close(); }
     }
 
+    [AvaloniaFact]
+    public async Task LoadoutUpdateAllTracksSelectedProfileAndIgnoresSearch()
+    {
+        using var api = Api(); using var f = new Fixture(nexusApi: api); await ConfigureAsync(f);
+        foreach (var name in new[] { "Armor", "Cape", "Other mod" })
+            await f.Services.Session.ImportAsync(f.Source(name), CancellationToken.None);
+        foreach (var mod in f.Services.Session.State.Mods)
+            await f.Services.Library.SetSourcesAsync(mod.Id, [new("nexusmods", "123", "10", "1")]);
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        var armor = f.Services.Session.State.Mods.Single(mod => mod.Name == "Armor");
+        var cape = f.Services.Session.State.Mods.Single(mod => mod.Name == "Cape");
+        var loadout = ProfileEditor.Add(ProfileEditor.Add(f.Services.Session.ActiveProfile!, armor), cape);
+        loadout = ProfileEditor.SetEnabled(loadout, cape.Id, false);
+        await f.Services.Session.SaveProfileAsync(loadout, false, CancellationToken.None);
+        var empty = ProfileEditor.Create("Empty");
+        await f.Services.Session.SaveProfileAsync(empty, false, CancellationToken.None);
+        var model = (ProfilesViewModel)Navigate(f, PageKind.Profiles);
+        var window = new MainWindow { DataContext = f.Shell }; window.Show();
+        try
+        {
+            window.CaptureRenderedFrame()?.Dispose();
+            var view = window.GetVisualDescendants().OfType<ProfilesView>().Single();
+            var button = view.FindControl<Button>("UpdateAllButton")!;
+            Assert.False(button.IsVisible);
+            f.Dialogs.ConfirmationAnswers.Enqueue(false);
+            await ((ModsViewModel)Navigate(f, PageKind.Mods)).CheckUpdatesCommand.ExecuteAsync();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            model = (ProfilesViewModel)Navigate(f, PageKind.Profiles);
+            window.CaptureRenderedFrame()?.Dispose();
+            view = window.GetVisualDescendants().OfType<ProfilesView>().Single();
+            button = view.FindControl<Button>("UpdateAllButton")!;
+            Assert.True(button.IsVisible); Assert.True(button.IsEffectivelyEnabled);
+            model.SelectedProfile = model.Profiles.Single(profile => profile.Id == empty.Id);
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(button.IsVisible);
+            model.SelectedProfile = model.Profiles.Single(profile => profile.Id == loadout.Id);
+            model.Search = "Armor";
+            Dispatcher.UIThread.RunJobs();
+            Assert.Single(model.VisibleEntries);
+            Assert.True(button.IsVisible); Assert.True(button.IsEffectivelyEnabled);
+            await Assert.IsType<AsyncCommand>(button.Command).ExecuteAsync();
+            Dispatcher.UIThread.RunJobs();
+            Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
+            Assert.Equal(2, f.Services.Providers.State.Jobs.Count);
+            Assert.Equal(2, f.BrowserRequests.Count);
+            Assert.Contains(f.Services.Providers.State.Jobs, job => job.ReplacesModId == armor.Id);
+            Assert.Contains(f.Services.Providers.State.Jobs, job => job.ReplacesModId == cape.Id);
+            Assert.True(button.IsVisible); Assert.False(button.IsEffectivelyEnabled);
+            await f.Services.Downloads.ApplyUpdatesAsync(CancellationToken.None, [armor.Id, cape.Id]);
+            Assert.Equal(2, f.Services.Providers.State.Jobs.Count);
+        }
+        finally { window.Close(); }
+    }
+
     [AvaloniaTheory]
     [InlineData(false)]
     [InlineData(true)]

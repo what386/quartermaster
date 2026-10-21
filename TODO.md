@@ -1,7 +1,7 @@
 # TODO — quartermaster
 
 @created: 2026-10-03
-@modified: 2026-10-19
+@modified: 2026-10-21
 
 
 ## Tasks

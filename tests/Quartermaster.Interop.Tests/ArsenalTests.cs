@@ -169,6 +169,113 @@ public sealed class ArsenalTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ManifestlessFolderOptionsPreserveProfileSelectionsAndReimport(bool wrapped)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var source = Path.Combine(root, "mods", "b");
+        var name = wrapped ? "VocaloidSamplesSFX v2 Patched" : "B";
+        var original = await File.ReadAllBytesAsync(Path.Combine(source, Fixture.Archive + ".patch_7"));
+        if (wrapped)
+        {
+            var folder = Path.Combine(source, name); Directory.CreateDirectory(folder);
+            foreach (var path in Directory.GetFiles(source)) File.Move(path, Path.Combine(folder, Path.GetFileName(path)));
+        }
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with
+        {
+            Profiles = plan.Profiles.Select(profile => profile with
+            {
+                Rows = profile.Rows.Select(row => row.Id == B ? row with
+                { Options = [new(name, profile.Name == "First", [])] } : row).ToArray()
+            }).ToArray()
+        };
+        var importer = new ArsenalImporter(f.Store, f.Contents);
+        var result = await importer.ImportAsync(plan);
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
+        var option = Assert.Single(mod.Options);
+        Assert.Equal(name, option.Name);
+        Assert.Equal(mod.PatchSets.Select(set => set.Id), option.PatchSetIds);
+        foreach (var profile in result.Profiles)
+        {
+            var entry = profile.Entries.Single(entry => entry.ModId == mod.Id);
+            var enabled = profile.Name == "First";
+            Assert.Equal(enabled, entry.Enabled);
+            Assert.Equal(enabled, Assert.Single(entry.Options).Enabled);
+            Assert.Equal(enabled ? 1 : 0, PatchSelection.Select(mod, entry with { Enabled = true }).Count);
+        }
+        var main = mod.PatchSets.Single().Files.Single(file => file.Kind == Quartermaster.Core.Patching.PatchFileKind.Main);
+        Assert.Equal(original, await File.ReadAllBytesAsync(f.Contents.GetFilePath(mod.Id, main)));
+        Assert.Empty(Directory.GetFiles(source, "manifest.json", SearchOption.AllDirectories));
+        Assert.Empty(Directory.GetFiles(f.Contents.GetModDirectory(mod.Id), "manifest.json", SearchOption.AllDirectories));
+        var repeated = await importer.ImportAsync(plan);
+        Assert.Equal(0, repeated.AddedMods); Assert.Equal(2, repeated.ReusedMods); Assert.Equal(0, repeated.AddedProfiles);
+    }
+
+    [Fact]
+    public async Task ManifestlessUnselectedFoldersRemainDisabledInsteadOfBecomingSharedPatches()
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var source = Path.Combine(root, "mods", "b");
+        var red = Path.Combine(source, "Red"); var blue = Path.Combine(source, "Blue");
+        Directory.CreateDirectory(red); Directory.CreateDirectory(blue);
+        foreach (var path in Directory.GetFiles(source)) File.Move(path, Path.Combine(red, Path.GetFileName(path)));
+        await File.WriteAllBytesAsync(Path.Combine(blue, Fixture.Archive + ".patch_0"), Fixture.Patch(30));
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with
+        {
+            Profiles = plan.Profiles.Select(profile => profile with
+            { Rows = profile.Rows.Select(row => row.Id == B ? row with { Options = [new("Red", true, [])] } : row).ToArray() }).ToArray()
+        };
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "B");
+        Assert.Equal(2, mod.Options.Count);
+        foreach (var profile in result.Profiles)
+        {
+            var entry = profile.Entries.Single(entry => entry.ModId == mod.Id);
+            Assert.Equal("Red", Assert.Single(PatchSelection.Select(mod, entry with { Enabled = true })).Folder);
+            Assert.False(entry.Options.Single(selection => selection.OptionId == mod.Options.Single(option => option.Name == "Blue").Id).Enabled);
+        }
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("ambiguous")]
+    [InlineData("manifest")]
+    [InlineData("choice")]
+    public async Task FolderOptionRestorationRejectsUnmatchedOrAmbiguousConfigurations(string failure)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var source = Path.Combine(root, "mods", "b");
+        var name = "B";
+        if (failure == "missing") name = "Missing folder";
+        if (failure == "manifest") await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), "{\"Options\":[]}");
+        if (failure == "ambiguous")
+        {
+            name = "Same";
+            foreach (var parent in new[] { "First", "Second" })
+            {
+                var folder = Path.Combine(source, parent, name); Directory.CreateDirectory(folder);
+                await File.WriteAllBytesAsync(Path.Combine(folder, Fixture.Archive + ".patch_0"), Fixture.Patch(parent == "First" ? 11UL : 12UL));
+            }
+        }
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with
+        {
+            Profiles = plan.Profiles.Select(profile => profile with
+            {
+                Rows = profile.Rows.Select(row => row.Id == B ? row with
+                { Options = [new(name, true, failure == "choice" ? [new("Unknown choice", true)] : [])] } : row).ToArray()
+            }).ToArray()
+        };
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan));
+        Assert.Contains("B", error.Message);
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+        Assert.Empty(Directory.GetDirectories(Path.Combine(f.App, "library")));
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]

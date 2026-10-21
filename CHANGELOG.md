@@ -1,6 +1,14 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-19*
+*Generated on 2026-10-21*
+
+## 0.10.0 — 2026-10-21
+
+### Changes
+
+- feat: show indicator for mods that use lua scripts
+- fix: Arsenal import on some mods without manifests
+
 
 ## 0.9.0 — 2026-10-19
 

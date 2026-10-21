@@ -2,6 +2,7 @@
   "language": "en",
   "name": "English",
   "strings": {
+    "Contains Lua scripts": "Contains Lua scripts",
     "Mod '{0}': {1}": "Mod '{0}': {1}",
     "Could not check {0}:\n": "Could not check {0}:\n",
     "Could not import {0} ({1}): {2}": "Could not import {0} ({1}): {2}",

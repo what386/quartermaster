@@ -11,6 +11,30 @@ namespace Quartermaster.Library.Tests;
 
 public class LibraryTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LuaDetectionUsesPackedResourcesAndWorksAfterReload(bool lua)
+    {
+        using var f = new Fixture(); var source = f.Source("Script-related name");
+        var path = Directory.GetFiles(source, "*.patch_7").Single();
+        var bytes = await File.ReadAllBytesAsync(path);
+        if (lua)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(80), 0xa14e8dfa2cd117e2);
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(112), 0xa14e8dfa2cd117e2);
+            await File.WriteAllBytesAsync(path, bytes);
+        }
+        // Documentation/source files alone do not turn an ordinary patch into a Lua mod.
+        await File.WriteAllTextAsync(Path.Combine(source, "example.lua"), "-- example source");
+        var mod = await f.Library.ImportAsync(source);
+        Assert.Equal(lua, mod.UsesLua);
+        Assert.Equal(lua, Assert.Single((await f.Store.LoadAsync()).Mods).UsesLua);
+        Assert.DoesNotContain("usesLua", await File.ReadAllTextAsync(Path.Combine(f.App, "library.json")));
+        var mixed = mod with { PatchSets = [mod.PatchSets[0] with { Resources = [] }, mod.PatchSets[0]] };
+        Assert.Equal(lua, mixed.UsesLua);
+    }
+
     [Fact]
     public async Task InvalidStoredModMetadataPreservesTheModNameInTheReportedError()
     {
