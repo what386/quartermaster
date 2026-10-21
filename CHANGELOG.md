@@ -2,6 +2,13 @@
 
 *Generated on 2026-10-21*
 
+## 0.10.1 — 2026-10-21
+
+### Changes
+
+- fix: maybe fix some arsenal import issues
+
+
 ## 0.10.0 — 2026-10-21
 
 ### Changes
