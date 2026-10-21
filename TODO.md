@@ -18,3 +18,10 @@
 - [ ] retarget mods, e.g. switch armor sets for cosmetics
       @created 2026-10-15 21:34
 
+
+## Completed
+
+- [x] fix: maybe fix some arsenal import issues
+      @created 2026-10-21 18:10
+      @completed 2026-10-21 18:10
+
