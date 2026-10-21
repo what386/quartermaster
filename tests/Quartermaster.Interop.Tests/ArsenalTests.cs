@@ -264,8 +264,10 @@ public sealed class ArsenalTests
         plan = plan with
         {
             Profiles = plan.Profiles.Select(profile => profile with
-            { Rows = profile.Rows.Select(row => row.Id == B ? row with
-                { Options = [new(name, true, failure == "choice" ? [new("Unknown choice", true)] : [])] } : row).ToArray() }).ToArray()
+            {
+                Rows = profile.Rows.Select(row => row.Id == B ? row with
+                { Options = [new(name, true, failure == "choice" ? [new("Unknown choice", true)] : [])] } : row).ToArray()
+            }).ToArray()
         };
         var error = await Assert.ThrowsAsync<InvalidDataException>(() => new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan));
         Assert.Contains("B", error.Message);
