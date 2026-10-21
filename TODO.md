@@ -1,7 +1,7 @@
 # TODO — quartermaster
 
 @created: 2026-10-03
-@modified: 2026-10-19
+@modified: 2026-10-21
 
 
 ## Tasks
@@ -17,4 +17,15 @@
 
 - [ ] retarget mods, e.g. switch armor sets for cosmetics
       @created 2026-10-15 21:34
+
+
+## Completed
+
+- [x] feat: show indicator for mods that use lua scripts
+      @created 2026-10-21 00:08
+      @completed 2026-10-21 00:19
+
+- [x] fix: Arsenal import on some mods without manifests
+      @created 2026-10-21 00:08
+      @completed 2026-10-21 00:19
 

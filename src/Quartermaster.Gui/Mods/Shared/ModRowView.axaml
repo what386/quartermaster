@@ -19,8 +19,8 @@
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
       <Border x:Name="LuaIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding UsesLua}"
               ToolTip.Tip="{loc:Loc 'Contains Lua scripts'}" AutomationProperties.Name="{loc:Loc 'Contains Lua scripts'}">
-        <Path Data="M8,5 L2,12 L8,19 M16,5 L22,12 L16,19 M14,3 L10,21" Stretch="Uniform"
-              Stroke="{DynamicResource MutedBrush}" StrokeThickness="1.7" Margin="2" IsHitTestVisible="False" />
+        <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/lua.svg"
+                        Foreground="{DynamicResource MutedBrush}" Margin="2" IsHitTestVisible="False" />
       </Border>
       <Border x:Name="DependencyIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding InstalledAsDependency}"
               ToolTip.Tip="{loc:Loc 'Installed as a dependency'}" AutomationProperties.Name="{loc:Loc 'Installed as a dependency'}">
