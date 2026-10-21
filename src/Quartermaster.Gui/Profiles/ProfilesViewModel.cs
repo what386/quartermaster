@@ -23,6 +23,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
     public bool InstalledAsDependency => Mod.InstalledAsDependency;
+    public bool UsesLua => Mod.UsesLua;
     public AsyncCommand? UpdateCommand { get; private set; }
     public void Update(ProfileModItem value)
     {
@@ -39,6 +40,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
             (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
+            (nameof(UsesLua), UsesLua, value.UsesLua),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(IsLoaded), IsLoaded, value.IsLoaded),
             (nameof(IsUnloaded), IsUnloaded, value.IsUnloaded),
@@ -117,6 +119,8 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public string OptionsTitle => Localizer.Interpolate($"Options: {SelectedModName}");
     public bool HasSelectedMod => SelectedMod is not null;
     public bool HasProfile => SelectedProfile is not null;
+    private Guid[] ProfileModIds => Entries.Select(row => row.Mod.Id).ToArray();
+    public bool HasUpdates => Services.Downloads.AvailableUpdates(ProfileModIds).Count > 0;
     public bool HasConflicts => Conflicts.Count > 0;
     public string ActiveLabel => SelectedProfile?.Id == Session.State.ActiveProfileId ? Localizer.Text("Active profile") : "";
     public ConflictInspectorViewModel CreateConflictInspector(string? search = null) => new(Services, SelectedProfile!.Id, search);
@@ -154,6 +158,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     public AsyncCommand RunCommand { get; }
     public AsyncCommand PurgeCommand { get; }
     public AsyncCommand CheckUpdatesCommand { get; }
+    public AsyncCommand UpdateAllCommand { get; }
     public AsyncCommand ImportModCommand { get; }
     public AsyncCommand GetDependenciesCommand { get; }
     public AsyncCommand OpenModPageCommand { get; }
@@ -172,12 +177,15 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         }, () => SelectedModPage is not null);
         SaveDescriptionCommand = Operations.CreateCommand("Saving profile description", ct => Save(ProfileEditor.SetDescription(SelectedProfile!, DescriptionDraft), ct),
             () => HasProfile && DescriptionDraft.Length <= ProfileEditor.MaxDescriptionLength && DescriptionDraft.Trim() != SelectedProfile!.Description);
-        CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, Entries.Select(row => row.Mod.Id).ToArray()), () => HasProfile);
+        CheckUpdatesCommand = Operations.CreateCommand("Checking profile updates", ct => Services.Downloads.CheckUpdatesAsync(ct, ProfileModIds), () => HasProfile);
+        UpdateAllCommand = Operations.CreateCommand("Updating mods", ct => Services.Downloads.ApplyUpdatesAsync(ct, ProfileModIds),
+            () => HasProfile && Services.Downloads.AvailableUpdates(ProfileModIds).Any(Services.Downloads.CanQueueUpdate));
         ImportModCommand = Operations.CreateCommand("Adding mod", ct => Services.Downloads.AddAsync(ct, SelectedProfile!.Id), () => HasProfile);
         GetDependenciesCommand = Operations.CreateCommand("Getting dependencies",
             ct => Services.Downloads.GetDependenciesAsync(SelectedMod!.Mod.Id, ct, SelectedProfile!.Id),
             () => HasDependencyAction);
-        Services.Downloads.Changed += (_, _) => { foreach (var row in Entries) row.UpdateCommand?.Refresh(); };
+        Services.Downloads.Changed += (_, _) =>
+        { foreach (var row in Entries) row.UpdateCommand?.Refresh(); Notify(nameof(HasUpdates)); UpdateAllCommand.Refresh(); };
         AddGroupCommand = Operations.CreateCommand("Adding group", AddGroupAsync, () => HasProfile);
         MakeActiveCommand = Operations.CreateCommand("Selecting active profile", ct => Session.SaveProfileAsync(SelectedProfile!, true, ct), () => HasProfile);
         AddCommand = Operations.CreateCommand("Adding mod to profile", ct => Services.Downloads.AddLibraryModsToProfileAsync([ModToAdd!.Id], SelectedProfile!.Id, ct), () => HasProfile && ModToAdd is not null);
@@ -275,7 +283,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         Conflicts = report.Resources.Select(c => Localizer.Interpolate($"{c.Archive} · {c.Resource.Id:x16}/{c.Resource.Type:x16} · {mods[c.WinningSourceId].Name} wins")).ToArray();
         ArchiveSummary = $"{ModPresentation.Count(report.Archives.Count, "shared archive")} · {ModPresentation.Count(Conflicts.Count, "overlapping resource")}";
         Notify(nameof(Conflicts)); Notify(nameof(HasConflicts)); Notify(nameof(ArchiveSummary));
-        Notify(nameof(HasProfile)); Notify(nameof(ActiveLabel));
+        Notify(nameof(HasProfile)); Notify(nameof(ActiveLabel)); Notify(nameof(HasUpdates));
         RefreshCommands();
     }
     private ModDeploymentState DeploymentStateFor(Mod mod, ProfileEntry entry)
@@ -302,6 +310,6 @@ public sealed partial class ProfilesViewModel : SessionViewModel
     {
         if (Operations.IsBusy && !Operations.IsProgressVisible) return;
         foreach (var command in new[] { MakeActiveCommand, AddCommand, RemoveCommand,
-            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, ImportModCommand, GetDependenciesCommand, OpenModPageCommand, SaveDescriptionCommand }) command.Refresh();
+            ToggleCommand, ApplyOptionsCommand, DeployCommand, RunCommand, PurgeCommand, AddGroupCommand, CheckUpdatesCommand, UpdateAllCommand, ImportModCommand, GetDependenciesCommand, OpenModPageCommand, SaveDescriptionCommand }) command.Refresh();
     }
 }

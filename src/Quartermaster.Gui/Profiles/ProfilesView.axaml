@@ -17,7 +17,7 @@
     <DataTemplate DataType="{x:Type vm:ProfileGroupItem}"><vm:ProfileGroupView /></DataTemplate>
   </UserControl.DataTemplates>
   <Grid Background="Transparent" RowDefinitions="Auto,Auto,Auto,*" IsEnabled="{Binding !Operations.IsProgressVisible}" IsHitTestVisible="{Binding Operations.CanInteract}">
-    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
+    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,8">
       <TextBlock x:Name="ProfileTitle" Text="{Binding SelectedProfile.Name}" Classes="pageTitle" MaxWidth="260" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedProfile.Name}" VerticalAlignment="Center" Margin="0,0,16,0" />
       <TextBox Grid.Column="1" Text="{Binding Search, Mode=TwoWay}" PlaceholderText="{loc:Loc 'Search mods in this profile…'}" Margin="0,0,8,0" />
       <Button Grid.Column="2" Content="{loc:Loc 'Add mod'}" IsEnabled="{Binding HasProfile}" Margin="0,0,8,0">
@@ -32,9 +32,10 @@
         </StackPanel></Flyout></Button.Flyout>
       </Button>
       <Button Grid.Column="3" Content="{loc:Loc 'Check updates'}" Command="{Binding CheckUpdatesCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="4" Content="{loc:Loc 'Purge'}" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="5" x:Name="DeployButton" Content="{loc:Loc 'Deploy'}" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
-      <Button Grid.Column="6" Content="{loc:Loc '▶  Run'}" Command="{Binding RunCommand}" />
+      <Button Grid.Column="4" x:Name="UpdateAllButton" Content="{loc:Loc 'Update all'}" Command="{Binding UpdateAllCommand}" IsVisible="{Binding HasUpdates}" Margin="0,0,8,0" />
+      <Button Grid.Column="5" Content="{loc:Loc 'Purge'}" Classes="danger" Command="{Binding PurgeCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="6" x:Name="DeployButton" Content="{loc:Loc 'Deploy'}" Classes="primary" Command="{Binding DeployCommand}" Margin="0,0,8,0" />
+      <Button Grid.Column="7" Content="{loc:Loc '▶  Run'}" Command="{Binding RunCommand}" />
     </Grid>
     <StackPanel Grid.Row="1" Spacing="6" Margin="0,0,0,8" IsVisible="{Binding HasProfile}">
       <TextBlock Text="{Binding SelectedProfile.Description}" IsVisible="{Binding HasDescription}" TextWrapping="Wrap" MaxHeight="64" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding SelectedProfile.Description}" Classes="muted" />

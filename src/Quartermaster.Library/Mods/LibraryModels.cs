@@ -9,6 +9,11 @@ public sealed record Mod(Guid Id, string Name, string Description, string? Versi
     DateTimeOffset ImportedAt, IReadOnlyList<PatchSet> PatchSets, IReadOnlyList<ModOption> Options,
     IReadOnlyList<SourceReference> Sources)
 {
+    // Stingray resource type hash for "lua"; scripts are usually packed in patches.
+    private const ulong LuaResourceType = 0xa14e8dfa2cd117e2;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesLua => PatchSets.Any(set => set.Resources.Any(resource => resource.Type == LuaResourceType));
+
     // Distinguish a checked, empty requirement list from an older import with no metadata.
     public bool DependenciesKnown { get; init; }
     public IReadOnlyList<ModDependency> Dependencies { get; init; } = [];
