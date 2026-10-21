@@ -18,3 +18,10 @@
 - [ ] retarget mods, e.g. switch armor sets for cosmetics
       @created 2026-10-15 21:34
 
+
+## Completed
+
+- [x] update localization files
+      @created 2026-10-21 20:57
+      @completed 2026-10-21 20:57
+
