@@ -135,7 +135,11 @@ public static class ArsenalReader
         if (options.ValueKind != JsonValueKind.Array) throw new InvalidDataException("Invalid Arsenal option selections.");
         return options.EnumerateArray().Select(option => new ArsenalOptionSelection(Name(option), Enabled(option, true),
             Property(option, "suboptions") is { ValueKind: JsonValueKind.Array } choices
-                ? choices.EnumerateArray().Select(choice => new ArsenalChoiceSelection(Name(choice), Enabled(choice, false))).ToArray() : [])).ToArray();
+                ? choices.EnumerateArray()
+                    // Arsenal can save an empty label for an unused choice (for example "< >").
+                    // Only explicitly disabled entries are safe to discard without a name.
+                    .Where(choice => Property(choice, "enabled").ValueKind != JsonValueKind.False || !string.IsNullOrWhiteSpace(NameText(choice)))
+                    .Select(choice => new ArsenalChoiceSelection(Name(choice), Enabled(choice, false))).ToArray() : [])).ToArray();
 
         // Saved selections can retain the manifest's Name/SubOptions casing.
         static JsonElement Property(JsonElement item, string name)
@@ -145,13 +149,14 @@ public static class ArsenalReader
                     if (property.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) return property.Value;
             return default;
         }
-        static string Name(JsonElement item)
+        static string? NameText(JsonElement item)
         {
             var name = Property(item, "name");
-            var text = name.ValueKind switch
+            return name.ValueKind switch
             { JsonValueKind.String => name.GetString(), JsonValueKind.Number => name.GetRawText(), _ => null };
-            return text is { Length: > 0 } ? text : throw new InvalidDataException("Arsenal data is missing name.");
         }
+        static string Name(JsonElement item) => NameText(item) is { } text && !string.IsNullOrWhiteSpace(text)
+            ? text : throw new InvalidDataException("Arsenal data is missing name.");
         static bool Enabled(JsonElement item, bool fallback) => Property(item, "enabled") is { ValueKind: JsonValueKind.True or JsonValueKind.False } enabled
             ? enabled.GetBoolean() : fallback;
     }
