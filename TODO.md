@@ -18,10 +18,3 @@
 - [ ] retarget mods, e.g. switch armor sets for cosmetics
       @created 2026-10-15 21:34
 
-
-## Completed
-
-- [x] fix: disabled choices with empty names no longer fail imports for Arsenal
-      @created 2026-10-22 03:47
-      @completed 2026-10-22 03:47
-

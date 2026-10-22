@@ -1,6 +1,13 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-21*
+*Generated on 2026-10-22*
+
+## 0.10.3 — 2026-10-22
+
+### Changes
+
+- fix: disabled choices with empty names no longer fail imports for Arsenal
+
 
 ## 0.10.2 — 2026-10-21
 
