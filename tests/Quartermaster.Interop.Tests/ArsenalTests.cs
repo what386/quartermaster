@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Quartermaster.Interop.Arsenal;
 using Quartermaster.Library.Mods;
 using Quartermaster.Library.Profiles;
@@ -70,6 +71,96 @@ public sealed class ArsenalTests
         };
         await File.WriteAllTextAsync(Path.Combine(root, "hd2a_data.json"), JsonSerializer.Serialize(data));
         return root;
+    }
+
+    [Theory]
+    [InlineData("optionsConfig", false)]
+    [InlineData("optionsConfig", true)]
+    [InlineData("options", false)]
+    [InlineData("options", true)]
+    [InlineData("library", false)]
+    [InlineData("library", true)]
+    public async Task SavedOptionsAcceptManifestCasingAndPreserveChoices(string location, bool manifestCasing)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "hd2a_data.json");
+        var data = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        var row = data["modsList"]!["second"]!["mods"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)!;
+        row.AsObject().Remove("optionsConfig");
+        var selections = JsonNode.Parse(manifestCasing
+            ? """[{"Name":"Color","Enabled":false,"SubOptions":[{"Name":"Red","Enabled":false},{"Name":"Blue","Enabled":true}]}]"""
+            : """[{"name":"Color","enabled":false,"suboptions":[{"name":"Red","enabled":false},{"name":"Blue","enabled":true}]}]""")!;
+        var target = location == "library" ? data["modsLibrary"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)! : row;
+        target[location == "library" ? "options" : location] = selections;
+        var original = data.ToJsonString();
+        await File.WriteAllTextAsync(path, original);
+        var plan = await ArsenalReader.ReadAsync(root, ["second"]);
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var state = await f.Library.LoadAsync();
+        var mod = state.Mods.Single(mod => mod.Name == "Renamed A");
+        var entry = Assert.Single(Assert.Single(result.Profiles).Entries, entry => entry.ModId == mod.Id);
+        var selection = Assert.Single(entry.Options);
+        Assert.False(selection.Enabled); Assert.Equal(1, selection.ChoiceIndex);
+        Assert.Equal(original, await File.ReadAllTextAsync(path));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task SavedOptionsStillRejectMissingOptionAndChoiceNames(bool choice)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "hd2a_data.json");
+        var data = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        var row = data["modsList"]!["second"]!["mods"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)!;
+        row["optionsConfig"] = JsonNode.Parse(choice
+            ? """[{"Name":"Color","SubOptions":[{"Enabled":true}]}]"""
+            : """[{"Enabled":true}]""");
+        await File.WriteAllTextAsync(path, data.ToJsonString());
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => ArsenalReader.ReadAsync(root, ["second"]));
+        Assert.Contains("Renamed A", error.Message); Assert.Contains("second", error.Message);
+        Assert.Contains("missing name", error.Message);
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+    }
+
+    [Theory]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    [InlineData(" ", false)]
+    [InlineData("", true)]
+    [InlineData(null, true)]
+    [InlineData(" ", true)]
+    public async Task NamelessChoicesAreIgnoredOnlyWhenExplicitlyDisabled(string? name, bool enabled)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var path = Path.Combine(root, "hd2a_data.json");
+        var data = JsonNode.Parse(await File.ReadAllTextAsync(path))!;
+        var row = data["modsList"]!["second"]!["mods"]!.AsArray().Single(item => item!["uuid"]!.GetValue<string>() == A)!;
+        var choices = new JsonArray(
+            new JsonObject { ["name"] = "Red", ["enabled"] = false },
+            new JsonObject { ["name"] = name, ["enabled"] = enabled },
+            new JsonObject { ["name"] = "Blue", ["enabled"] = true });
+        row["optionsConfig"] = new JsonArray(new JsonObject { ["name"] = "Color", ["enabled"] = true, ["suboptions"] = choices });
+        var original = data.ToJsonString();
+        await File.WriteAllTextAsync(path, original);
+        if (enabled)
+        {
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => ArsenalReader.ReadAsync(root, ["second"]));
+            Assert.Contains("Renamed A", error.Message); Assert.Contains("second", error.Message);
+            Assert.Contains("missing name", error.Message);
+            Assert.Empty((await f.Library.LoadAsync()).Mods);
+        }
+        else
+        {
+            var plan = await ArsenalReader.ReadAsync(root, ["second"]);
+            var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+            var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Renamed A");
+            var entry = Assert.Single(Assert.Single(result.Profiles).Entries, entry => entry.ModId == mod.Id);
+            var selection = Assert.Single(entry.Options);
+            Assert.True(selection.Enabled); Assert.Equal(1, selection.ChoiceIndex);
+            Assert.Equal(new[] { "common", "blue" }, PatchSelection.Select(mod, entry).Select(set => set.Folder));
+        }
+        Assert.Equal(original, await File.ReadAllTextAsync(path));
     }
 
     [Theory]
@@ -307,6 +398,45 @@ public sealed class ArsenalTests
         }
         Assert.Equal(manifest, await File.ReadAllTextAsync(path));
         if (!empty) Assert.Equal("Presentation only", await File.ReadAllTextAsync(Path.Combine(f.Contents.GetModDirectory(mod.Id), "Header", "readme.txt")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BlankVanillaIncludesDoNotSelectOtherVariants(bool wrapped)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var folder = Path.Combine(root, "mods", "a");
+        if (wrapped)
+        {
+            var entries = Directory.GetFileSystemEntries(folder);
+            var nested = Path.Combine(folder, "Pack"); Directory.CreateDirectory(nested);
+            foreach (var entry in entries)
+                if (Directory.Exists(entry)) Directory.Move(entry, Path.Combine(nested, Path.GetFileName(entry)));
+                else File.Move(entry, Path.Combine(nested, Path.GetFileName(entry)));
+            folder = nested;
+        }
+        var manifest = """
+            {"Options":[{"Name":"Color","Include":["common"],"SubOptions":[
+            {"Name":"Vanilla","Include":[""]},{"Name":"Red","Include":["red"]},{"Name":"Blue","Include":["blue"]}]}]}
+            """;
+        var path = Path.Combine(folder, "manifest.json"); await File.WriteAllTextAsync(path, manifest);
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with
+        {
+            Profiles = plan.Profiles.Select(profile => profile.Key != "second" ? profile : profile with
+            { Rows = profile.Rows.Select(row => row.Id == A ? row with { Options = [new("Color", true, [new("Vanilla", true)])] } : row).ToArray() }).ToArray()
+        };
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var mod = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Renamed A");
+        var prefix = wrapped ? "Pack/" : "";
+        var vanilla = result.Profiles.Single(profile => profile.Name == "Second").Entries.Single(entry => entry.ModId == mod.Id);
+        var blue = result.Profiles.Single(profile => profile.Name == "First").Entries.Single(entry => entry.ModId == mod.Id);
+        Assert.Empty(mod.Options[0].Choices[0].PatchSetIds);
+        Assert.Equal(prefix + "common", Assert.Single(PatchSelection.Select(mod, vanilla)).Folder);
+        Assert.Equal(new[] { prefix + "common", prefix + "blue" }, PatchSelection.Select(mod, blue with { Enabled = true }).Select(set => set.Folder));
+        Assert.Equal(3, mod.PatchSets.Count);
+        Assert.Equal(manifest, await File.ReadAllTextAsync(path));
     }
 
     [Fact]

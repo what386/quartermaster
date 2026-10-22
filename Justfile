@@ -37,6 +37,7 @@ package runtime:
     dotnet publish "src/Quartermaster.Gui/Quartermaster.Gui.csproj" --configuration Release --runtime {{runtime}} --self-contained true --output "dist/{{runtime}}"
 
 prepare version:
+    python3 scripts/check-localizations.py
     scripts/release/prepare.sh {{version}}
 
 promote:

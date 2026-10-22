@@ -112,8 +112,16 @@ internal static class ArsenalContent
         {
             if (includes[i] is not JsonValue value || !value.TryGetValue<string>(out var raw)) continue;
             var folder = raw.Replace('\\', '/').TrimEnd('/');
+            // Arsenal normalizes blank includes to no-op choices, commonly named Vanilla.
+            // Passing them to the library would recursively select every patch variant.
+            if (folder == "")
+            {
+                includes.RemoveAt(i--);
+                changed = true;
+                continue;
+            }
             // Leave unsafe paths and invalid values to the strict library parser.
-            if (folder == "" || !PatchValidation.IsRelativePath(folder)) continue;
+            if (!PatchValidation.IsRelativePath(folder)) continue;
             if (patchFolders.Any(path => Matches(path, folder, StringComparison.Ordinal))) continue;
             var candidates = patchFolders.Where(path => Matches(path, folder, StringComparison.OrdinalIgnoreCase))
                 .Select(path => path[..folder.Length]).Distinct(StringComparer.Ordinal).ToArray();
