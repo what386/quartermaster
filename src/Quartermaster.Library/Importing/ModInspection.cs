@@ -26,23 +26,36 @@ internal static class ManifestReader
         var manifest = await JsonFiles.ReadAsync<Manifest>(ManagedPaths.Resolve(root, manifests[0]), ct).ConfigureAwait(false);
         if (manifest.Version != 1) throw new InvalidDataException("Unsupported manifest version.");
         var baseFolder = Path.GetDirectoryName(manifests[0])?.Replace('\\', '/') ?? "";
+        string ResolvePrefix(string raw)
+        {
+            var folder = raw.Replace('\\', '/').TrimEnd('/');
+            if (folder != "" && !PatchValidation.IsRelativePath(folder)) throw new InvalidDataException("Unsafe manifest Include path.");
+            var prefix = baseFolder == "" ? folder : folder == "" ? baseFolder : baseFolder + "/" + folder;
+            if (sets.Any(set => Matches(set.Folder, prefix, StringComparison.Ordinal))) return prefix;
+            var candidates = sets.Where(set => Matches(set.Folder, prefix, StringComparison.OrdinalIgnoreCase))
+                .Select(set => set.Folder[..prefix.Length]).Distinct(StringComparer.Ordinal).ToArray();
+            return candidates.Length switch
+            {
+                1 => candidates[0],
+                > 1 => throw new InvalidDataException($"Ambiguous manifest Include casing: {raw}"),
+                _ => throw new InvalidDataException($"Manifest Include matches no patch sets: {raw}")
+            };
+        }
+        static bool Matches(string folder, string prefix, StringComparison comparison) =>
+            prefix == "" || folder.Equals(prefix, comparison) || folder.StartsWith(prefix + "/", comparison);
         IReadOnlyList<Guid> Resolve(IReadOnlyList<string>? folders, IReadOnlyList<string>? choiceFolders = null)
         {
             var ids = new HashSet<Guid>();
             var ordered = new List<Guid>();
             foreach (var raw in folders ?? [])
             {
-                var folder = raw.Replace('\\', '/').TrimEnd('/');
-                if (folder != "" && !PatchValidation.IsRelativePath(folder)) throw new InvalidDataException("Unsafe manifest Include path.");
-                var prefix = baseFolder == "" ? folder : folder == "" ? baseFolder : baseFolder + "/" + folder;
-                var matches = sets.Where(s => prefix == "" || s.Folder == prefix || s.Folder.StartsWith(prefix + "/", StringComparison.Ordinal)).ToArray();
-                if (matches.Length == 0) throw new InvalidDataException($"Manifest Include matches no patch sets: {raw}");
+                var prefix = ResolvePrefix(raw);
+                var matches = sets.Where(set => Matches(set.Folder, prefix, StringComparison.Ordinal)).ToArray();
                 // A parent Include covers shared content, while descendant choice folders
                 // belong exclusively to the selected SubOption. An exact repeated Include
                 // remains shared (some manifests deliberately reuse common patches).
-                var branches = (choiceFolders ?? []).Select(path => path.Replace('\\', '/').TrimEnd('/'))
-                    .Where(path => folder == "" ? path != "" : path.StartsWith(folder + "/", StringComparison.Ordinal))
-                    .Select(path => baseFolder == "" ? path : baseFolder + "/" + path).ToArray();
+                var branches = (choiceFolders ?? []).Select(ResolvePrefix)
+                    .Where(path => prefix == "" ? path != "" : path.StartsWith(prefix + "/", StringComparison.Ordinal)).ToArray();
                 foreach (var set in matches)
                     if (!branches.Any(branch => set.Folder == branch || set.Folder.StartsWith(branch + "/", StringComparison.Ordinal)) && ids.Add(set.Id))
                         ordered.Add(set.Id);

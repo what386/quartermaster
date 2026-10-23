@@ -1,6 +1,13 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-22*
+*Generated on 2026-10-23*
+
+## 0.10.4 — 2026-10-23
+
+### Changes
+
+- allow case insensitivity for zip imports
+
 
 ## 0.10.3 — 2026-10-22
 

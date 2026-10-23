@@ -147,6 +147,71 @@ public class LibraryTests
         Assert.Empty(PatchSelection.Select(mod, entry with { Options = [new(option.Id, false)] }));
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task ManifestIncludesResolveUniqueCasingAndKeepChoicesSeparate(bool zip, bool wrapped)
+    {
+        using var f = new Fixture();
+        var prefix = wrapped ? "Variants/Pack" : "Variants";
+        f.Source(prefix + "/Mods/Hiveguard/Head", 1);
+        f.Source(prefix + "/Mods/Hiveguard/NoLockon", 2);
+        f.Source(prefix + "/Mods/Hiveguard/Shared", 3);
+        var root = Path.Combine(f.Root, "Variants");
+        var manifestPath = Path.Combine(f.Root, prefix, "manifest.json");
+        var manifest = """
+            {"Version":1,"Options":[{"Name":"Hive Guard","Include":["MODS\\HIVEGUARD"],"SubOptions":[
+              {"Name":"Head","Include":["Mods\\HiveGuard\\Head"]},
+              {"Name":"Disable","Include":["Mods/hiveguard/NOLOCKON"]}]}]}
+            """;
+        await File.WriteAllTextAsync(manifestPath, manifest);
+        var mod = await f.Library.ImportAsync(zip ? f.Zip(root) : root);
+        var option = Assert.Single(mod.Options);
+        var head = new ProfileEntry(mod.Id, true, [new(option.Id, true, 0)]);
+        var disable = head with { Options = [new(option.Id, true, 1)] };
+        var baseFolder = wrapped ? "Pack/" : "";
+        Assert.Equal(baseFolder + "Mods/Hiveguard/Shared", Assert.Single(mod.PatchSets, set => option.PatchSetIds.Contains(set.Id)).Folder);
+        Assert.Equal(new[] { baseFolder + "Mods/Hiveguard/Head", baseFolder + "Mods/Hiveguard/Shared" },
+            PatchSelection.Select(mod, head).Select(set => set.Folder).Order(StringComparer.Ordinal));
+        Assert.Equal(new[] { baseFolder + "Mods/Hiveguard/NoLockon", baseFolder + "Mods/Hiveguard/Shared" },
+            PatchSelection.Select(mod, disable).Select(set => set.Folder).Order(StringComparer.Ordinal));
+        Assert.Equal(manifest, await File.ReadAllTextAsync(manifestPath));
+        Assert.Equal(manifest, await File.ReadAllTextAsync(Path.Combine(f.Contents.GetModDirectory(mod.Id), baseFolder, "manifest.json")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ManifestIncludesPreferExactCasingAndRejectAmbiguousFallbacks(bool exact)
+    {
+        using var f = new Fixture();
+        var path = Path.Combine(f.Root, "casing.zip");
+        using (var archive = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Create))
+        {
+            foreach (var folder in new[] { "Mods/Hiveguard/Head", "Mods/HiveGuard/Other" })
+            {
+                await using var stream = archive.CreateEntry(folder + "/" + Fixture.Archive + ".patch_0").Open();
+                await stream.WriteAsync(Fixture.Patch());
+            }
+            await using var writer = new StreamWriter(archive.CreateEntry("manifest.json").Open());
+            await writer.WriteAsync(JsonSerializer.Serialize(new { Options = new[] { new { Name = "Hive Guard", Include = new[] { exact ? "Mods/Hiveguard" : "mods/hiveguard" } } } }));
+        }
+        if (exact)
+        {
+            var mod = await f.Library.ImportAsync(path);
+            var ids = Assert.Single(mod.Options).PatchSetIds;
+            Assert.Equal("Mods/Hiveguard/Head", Assert.Single(mod.PatchSets, set => ids.Contains(set.Id)).Folder);
+        }
+        else
+        {
+            var error = await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(path));
+            Assert.Contains("Ambiguous manifest Include casing: mods/hiveguard", error.Message);
+            Assert.Empty((await f.Library.LoadAsync()).Mods);
+        }
+    }
+
     [Fact]
     public async Task ExistingRecursiveIncludesAreCorrectedWithoutChangingSavedOptionSelections()
     {
