@@ -17,6 +17,11 @@
       <TextBlock Text="{Binding TagSummary}" IsVisible="{Binding HasTags}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TagSummary}" />
     </StackPanel>
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+      <Border x:Name="FileModIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding IsFileBased}"
+              ToolTip.Tip="{loc:Loc 'File mod — merged into game configs'}" AutomationProperties.Name="{loc:Loc 'File mod'}">
+        <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/file-mod.svg"
+                        Foreground="{DynamicResource MutedBrush}" Margin="2" IsHitTestVisible="False" />
+      </Border>
       <Border x:Name="LuaIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding UsesLua}"
               ToolTip.Tip="{loc:Loc 'Contains Lua scripts'}" AutomationProperties.Name="{loc:Loc 'Contains Lua scripts'}">
         <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/lua.svg"

@@ -3,8 +3,15 @@ using Quartermaster.Library.Profiles;
 
 namespace Quartermaster.Library.Mods;
 
+public enum ModContentKind { ArchivePatch, FileMod, FileModInstaller }
 public sealed record PatchSet(Guid Id, string Archive, int OriginalSlot, string Folder,
-    IReadOnlyList<PatchFile> Files, IReadOnlyList<ResourceKey> Resources);
+    IReadOnlyList<PatchFile> Files, IReadOnlyList<ResourceKey> Resources)
+{
+    public ModContentKind ContentKind { get; init; }
+    public int? FileModPayloadIndex { get; init; }
+    public string? FileModTarget { get; init; }
+    public string? FileModVariantName { get; init; }
+}
 public sealed record Mod(Guid Id, string Name, string Description, string? Version, Guid? ManifestId,
     DateTimeOffset ImportedAt, IReadOnlyList<PatchSet> PatchSets, IReadOnlyList<ModOption> Options,
     IReadOnlyList<SourceReference> Sources)
@@ -12,7 +19,12 @@ public sealed record Mod(Guid Id, string Name, string Description, string? Versi
     // Stingray resource type hash for "lua"; scripts are usually packed in patches.
     private const ulong LuaResourceType = 0xa14e8dfa2cd117e2;
     [System.Text.Json.Serialization.JsonIgnore]
-    public bool UsesLua => PatchSets.Any(set => set.Resources.Any(resource => resource.Type == LuaResourceType));
+    public bool UsesLua => PatchSets.Any(set => set.ContentKind == ModContentKind.ArchivePatch && set.Resources.Any(resource => resource.Type == LuaResourceType));
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsFileBased => PatchSets.Any(set => set.ContentKind == ModContentKind.FileMod);
+    public int FileDetectionVersion { get; init; }
+    public bool IsInstallerOption(ModOption option) => option.Choices.Count == 0 && option.PatchSetIds.Count > 0 &&
+        option.PatchSetIds.All(id => PatchSets.Any(set => set.Id == id && set.ContentKind == ModContentKind.FileModInstaller));
 
     // Distinguish a checked, empty requirement list from an older import with no metadata.
     public bool DependenciesKnown { get; init; }
@@ -89,6 +101,7 @@ public static class ModIdentity
             Folder = string.Join('/', set.Folder.Split('/', StringSplitOptions.RemoveEmptyEntries).Skip(prefix)),
             Archive = set.Archive.ToLowerInvariant(),
             set.OriginalSlot,
+            set.FileModPayloadIndex,
             Files = set.Files.OrderBy(file => file.Kind).Select(file => new { file.Kind, file.Size, Hash = file.Sha256.ToUpperInvariant() })
         }));
         return global::System.Text.Json.JsonSerializer.Serialize(new

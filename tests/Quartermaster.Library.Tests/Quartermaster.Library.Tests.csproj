@@ -8,5 +8,6 @@
     <PackageReference Include="xunit" Version="2.9.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" PrivateAssets="all" />
     <ProjectReference Include="../../src/Quartermaster.Library/Quartermaster.Library.csproj" />
+    <Compile Include="../Quartermaster.FileMerger.Tests/Fixture.cs" Link="Fixtures/FileModFixture.cs" />
   </ItemGroup>
 </Project>

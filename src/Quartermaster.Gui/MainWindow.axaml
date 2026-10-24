@@ -72,11 +72,14 @@
         </Grid>
       </Border>
       <Border Grid.Column="1" Padding="12" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*">
+        <Grid RowDefinitions="Auto,Auto,*">
           <Expander x:Name="RepatchWarnings" Header="{loc:Loc 'Repatch warnings'}" IsVisible="{Binding Session.HasRepatchWarnings}" Margin="0,0,0,8">
             <ScrollViewer MaxHeight="180"><TextBlock Text="{Binding Session.RepatchWarnings}" TextWrapping="Wrap" /></ScrollViewer>
           </Expander>
-          <ContentControl Grid.Row="1" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
+          <Expander Grid.Row="1" x:Name="FileModWarnings" Header="{loc:Loc 'File mod merge results'}" IsVisible="{Binding Session.HasFileModWarnings}" Margin="0,0,0,8">
+            <ScrollViewer MaxHeight="180"><TextBlock Text="{Binding Session.FileModWarnings}" TextWrapping="Wrap" /></ScrollViewer>
+          </Expander>
+          <ContentControl Grid.Row="2" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
         </Grid>
       </Border>
     </Grid>

@@ -19,7 +19,7 @@ public static class ProfilePatches
         StateValidation.Validate(state with { Profiles = [.. state.Profiles.Where(p => p.Id != profile.Id), profile] });
         var mods = state.Mods.ToDictionary(m => m.Id);
         var patches = ProfileEditor.InDeploymentOrder(profile).Where(e => e.Enabled)
-            .SelectMany(e => PatchSelection.Select(mods[e.ModId], e).Select(p =>
+            .SelectMany(e => PatchSelection.Select(mods[e.ModId], e).Where(set => set.ContentKind == ModContentKind.ArchivePatch).Select(p =>
                 new SelectedPatch(e.ModId, p.Id, p.Archive, p.Files.ToArray(), p.Resources.ToArray())
                 { SelectionHash = PatchSelection.OptionsHash(mods[e.ModId], e), SourceName = mods[e.ModId].Name })).ToArray();
         return new(profile.Id, patches) { SelectionName = profile.Name };

@@ -26,6 +26,7 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
             (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(UsesLua), UsesLua, value.UsesLua),
+            (nameof(IsFileBased), IsFileBased, value.IsFileBased),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(HasOptions), HasOptions, value.HasOptions),
@@ -53,11 +54,12 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
     public bool IsUnloaded => false;
     public bool HasDeploymentWarning => false;
     public string? DeploymentDescription => null;
-    public bool HasOptions => Mod.Options.Count > 0;
+    public bool HasOptions => Mod.Options.Any(option => !Mod.IsInstallerOption(option));
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
     public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public bool UsesLua => Mod.UsesLua;
+    public bool IsFileBased => Mod.IsFileBased;
     public bool HasToggle => false;
     public bool IsEnabled => false;
     public Avalonia.Layout.HorizontalAlignment KnobAlignment => Avalonia.Layout.HorizontalAlignment.Left;
@@ -68,6 +70,7 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
 public interface IModRow
 {
     bool UsesLua { get; }
+    bool IsFileBased { get; }
     bool HasUpdate { get; }
     string? UpdateDescription { get; }
     AsyncCommand? UpdateCommand { get; }

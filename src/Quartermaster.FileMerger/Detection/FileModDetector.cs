@@ -70,6 +70,16 @@ public sealed class FileModDetector
         return new(mods.ToArray(), installers.Distinct(StringComparer.Ordinal).ToArray());
     }
 
+    /// <summary>Detects an already verified stored file without reopening it from disk.</summary>
+    public FileModDetection DetectFile(string filename, ReadOnlyMemory<byte> content, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (content.Length > limits.MaxFileBytes) throw new InvalidDataException("File mod exceeds detection size limits.");
+        var mods = new List<FileMod>(); var installers = new List<string>();
+        Inspect(content.ToArray(), filename, filename, mods, installers, ct);
+        return new(mods.ToArray(), installers.ToArray());
+    }
+
     private static bool IsConfig(string path) => Path.GetFileName(path).StartsWith("generated_", StringComparison.Ordinal) && path.EndsWith(".dl_bin", StringComparison.Ordinal);
     private static bool IsPatch(string path)
     {

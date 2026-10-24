@@ -581,6 +581,19 @@
     "Calculating storage…": "Calculating storage…",
     "Available to reclaim": "Available to reclaim",
     "Storage overview unavailable. Refresh to try again.": "Storage overview unavailable. Refresh to try again.",
-    "Disk usage": "Disk usage"
+    "Disk usage": "Disk usage",
+    "File mod": "File mod",
+    "File mod — merged into game configs": "File mod — merged into game configs",
+    "File mod merge results": "File mod merge results",
+    "File mod conflicts": "File mod conflicts",
+    "Apply merge": "Apply merge",
+    "\n\nApply this file-mod merge using the loadout priority?": "\n\nApply this file-mod merge using the loadout priority?",
+    "File mods are incomplete or have changed outside Quartermaster. Purge or redeploy before running the game.": "File mods are incomplete or have changed outside Quartermaster. Purge or redeploy before running the game.",
+    "The selected file mods or their options are not deployed. Deploy the selected loadout before running the game.": "The selected file mods or their options are not deployed. Deploy the selected loadout before running the game.",
+    "File-based mod: merged into game configs when you deploy. Choose variants in Mod options. Disable and deploy, or purge, to restore the original configs. No Lua installer or launch-and-exit step is needed.": "File-based mod: merged into game configs when you deploy. Choose variants in Mod options. Disable and deploy, or purge, to restore the original configs. No Lua installer or launch-and-exit step is needed.",
+    "Remove all mod patches and restore file-mod game configs? Imported originals and profiles will remain.": "Remove all mod patches and restore file-mod game configs? Imported originals and profiles will remain.",
+    "Import mod files": "Import mod files",
+    "Mod files": "Mod files",
+    "File mods are merged on Deploy. No installer or launch-and-exit step is needed. Disable and deploy again, or purge, to restore the original configs.": "File mods are merged on Deploy. No installer or launch-and-exit step is needed. Disable and deploy again, or purge, to restore the original configs."
   }
 }

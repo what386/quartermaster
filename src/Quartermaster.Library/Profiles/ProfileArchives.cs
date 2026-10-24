@@ -49,7 +49,7 @@ public sealed class ProfileArchives(ILibraryStore store, ModContentStore content
                         try
                         {
                             var directory = contents.GetModDirectory(mod.Id);
-                            var patches = mod.PatchSets.SelectMany(set => set.Files).ToDictionary(file => file.RelativePath, StringComparer.Ordinal);
+                            var patches = mod.PatchSets.SelectMany(set => set.Files).DistinctBy(file => file.RelativePath).ToDictionary(file => file.RelativePath, StringComparer.Ordinal);
                             var seen = new HashSet<string>(StringComparer.Ordinal);
                             foreach (var path in ManagedPaths.Enumerate(directory))
                             {

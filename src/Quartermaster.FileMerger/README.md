@@ -1,8 +1,9 @@
 # Quartermaster.FileMerger
 
 .NET 10 helpers for detecting, merging, applying, and restoring HELLDIVERS 2
-settings-file mods. This project is not connected to the GUI, mod library, or
-current deployment service. It never executes a mod's Lua, installer, or executable.
+settings-file mods. The mod library uses these helpers through `ProfileFileMods`;
+the GUI routes detected file payloads through them during deployment. The engine
+never executes a mod's Lua, installer, or executable.
 
 Source is grouped by responsibility:
 

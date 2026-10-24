@@ -24,6 +24,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public bool HasWarnings => WarningDescription.Length > 0;
     public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public bool UsesLua => Mod.UsesLua;
+    public bool IsFileBased => Mod.IsFileBased;
     public AsyncCommand? UpdateCommand { get; private set; }
     public void Update(ProfileModItem value)
     {
@@ -41,6 +42,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
             (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(UsesLua), UsesLua, value.UsesLua),
+            (nameof(IsFileBased), IsFileBased, value.IsFileBased),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(IsLoaded), IsLoaded, value.IsLoaded),
             (nameof(IsUnloaded), IsUnloaded, value.IsUnloaded),
@@ -86,7 +88,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
         _ => Entry.Enabled ? Localizer.Text("Enabled but not deployed as configured. Deploy this profile to apply changes.") :
             Localizer.Text("Disabled but still deployed. Redeploy or purge to unload.")
     };
-    public bool HasOptions => Mod.Options.Count > 0;
+    public bool HasOptions => Mod.Options.Any(option => !Mod.IsInstallerOption(option));
     public bool HasToggle => true;
     public bool IsGrouped => Entry.GroupId is not null;
     public bool IsEnabled => Entry.Enabled;
@@ -214,7 +216,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         }, () => HasProfile && Session.GameDirectory != "");
         PurgeCommand = Operations.CreateCommand("Purging patches", async ct =>
         {
-            if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Purge patches"), Localizer.Text("Remove all mod patch files from the selected game folder? Imported originals and profiles will remain."), "Purge"))
+            if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Purge patches"), Localizer.Text("Remove all mod patches and restore file-mod game configs? Imported originals and profiles will remain."), "Purge"))
                 await Session.PurgeAsync(ct);
         }, () => Session.GameDirectory != "");
         Operations.PropertyChanged += (_, e) =>
@@ -291,12 +293,22 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         if (Session.Inspection is not { Ledger.Status: DeploymentStatus.Complete } inspection)
             return ModDeploymentState.Unknown;
         var owned = inspection.Ledger.Files.Where(file => file.SourceId == mod.Id).ToArray();
+        var selectedSets = PatchSelection.Select(mod, entry);
+        if (mod.IsFileBased)
+        {
+            var fileLoaded = Session.FileModHealth.AppliedModIds.Contains(mod.Id);
+            if (!entry.Enabled) return fileLoaded || owned.Length > 0 ? ModDeploymentState.Warning : ModDeploymentState.Unloaded;
+            var fileSelected = selectedSets.Any(set => set.ContentKind == ModContentKind.FileMod);
+            if (fileSelected && (!Session.FileModSelectionMatches(SelectedProfile!) || !fileLoaded)) return ModDeploymentState.Warning;
+            if (!selectedSets.Any(set => set.ContentKind == ModContentKind.ArchivePatch))
+                return fileSelected ? ModDeploymentState.Loaded : ModDeploymentState.Unloaded;
+        }
         var health = inspection.Files.ToDictionary(file => file.Name, file => file.Status);
         var anyLoaded = owned.Any(file => health.TryGetValue(file.Name, out var status) && status != ManagedFileStatus.Missing);
         if (!entry.Enabled) return anyLoaded ? ModDeploymentState.Warning : ModDeploymentState.Unloaded;
         if (!anyLoaded) return ModDeploymentState.Warning;
         // Match the selected variants and original hashes; repatched files have their own deployed hashes.
-        var expected = PatchSelection.Select(mod, entry).SelectMany(set => set.Files.Select(file => (set.Id, File: file)))
+        var expected = selectedSets.Where(set => set.ContentKind == ModContentKind.ArchivePatch).SelectMany(set => set.Files.Select(file => (set.Id, File: file)))
             .ToDictionary(item => (item.Id, item.File.Kind), item => item.File);
         var optionsHash = PatchSelection.OptionsHash(mod, entry);
         return owned.Count(file => !file.GeneratedByRepair) == expected.Count && owned.All(file =>

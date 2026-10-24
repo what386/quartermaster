@@ -82,8 +82,8 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 
     public Task<string?> SaveModZipAsync(string suggestedName) => SaveZipAsync(Localizer.Text("Export repatched mod"), suggestedName);
     public Task<string?> SaveProfileZipAsync(string suggestedName) => SaveZipAsync(Localizer.Text("Export profile"), suggestedName);
-    public Task<string?> PickModZipAsync() => PickZipAsync(Localizer.Text("Import mod ZIP"));
-    public Task<IReadOnlyList<string>> PickModZipsAsync() => PickZipsAsync(Localizer.Text("Import mod ZIP"), allowMultiple: true);
+    public async Task<string?> PickModZipAsync() => (await PickZipsAsync(Localizer.Text("Import mod files"), allowMultiple: false, includeFileMods: true)).FirstOrDefault();
+    public Task<IReadOnlyList<string>> PickModZipsAsync() => PickZipsAsync(Localizer.Text("Import mod files"), allowMultiple: true, includeFileMods: true);
     public Task<string?> PickProfileZipAsync() => PickZipAsync(Localizer.Text("Import profile ZIP"));
     private async Task<string?> SaveZipAsync(string title, string suggestedName)
     {
@@ -99,13 +99,15 @@ public sealed class DialogService(Func<MainWindow> owner) : IDialogService
     }
     private async Task<string?> PickZipAsync(string title)
         => (await PickZipsAsync(title, allowMultiple: false)).FirstOrDefault();
-    private async Task<IReadOnlyList<string>> PickZipsAsync(string title, bool allowMultiple)
+    private async Task<IReadOnlyList<string>> PickZipsAsync(string title, bool allowMultiple, bool includeFileMods = false)
     {
         var files = await owner().StorageProvider.OpenFilePickerAsync(new()
         {
             Title = title,
             AllowMultiple = allowMultiple,
-            FileTypeFilter = [new FilePickerFileType(Localizer.Text("ZIP archives")) { Patterns = ["*.zip"] }]
+            FileTypeFilter = includeFileMods
+                ? [new FilePickerFileType(Localizer.Text("Mod files")) { Patterns = ["*.zip", "*.dl_bin", "*.stream"] }]
+                : [new FilePickerFileType(Localizer.Text("ZIP archives")) { Patterns = ["*.zip"] }]
         });
         return files.Select(file => file.TryGetLocalPath()).OfType<string>().ToArray();
     }

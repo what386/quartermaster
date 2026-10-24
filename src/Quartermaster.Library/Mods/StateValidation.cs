@@ -27,7 +27,7 @@ public static class StateValidation
                     throw new ArgumentException("Invalid provider reference.");
                 foreach (var set in mod.PatchSets)
                 {
-                    if (!IsArchive(set.Archive) || set.OriginalSlot < 0 || (set.Folder != "" && !IsRelativePath(set.Folder)))
+                    if (!IsArchive(set.Archive) || set.OriginalSlot < 0 || !Enum.IsDefined(set.ContentKind) || set.FileModPayloadIndex is < 0 || (set.Folder != "" && !IsRelativePath(set.Folder)))
                         throw new ArgumentException("Invalid patch-set metadata.");
                     ValidateFiles(set.Files);
                 }

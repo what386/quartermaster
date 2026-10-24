@@ -45,7 +45,8 @@ public partial class MainWindow
         var files = e.DataTransfer.TryGetFiles()?.ToArray();
         if (files is null || files.Length == 0) return [];
         var paths = files.Select(file => file.TryGetLocalPath()).ToArray();
-        if (paths.Any(path => path is null || (!Directory.Exists(path) && !Path.GetExtension(path).Equals(".zip", StringComparison.OrdinalIgnoreCase)))) return [];
+        if (paths.Any(path => path is null || (!Directory.Exists(path) &&
+            !new[] { ".zip", ".dl_bin", ".stream" }.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase)))) return [];
         return paths.OfType<string>().Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal).ToArray();
     }
     private async void ImportDroppedMods(object? sender, DragEventArgs e)

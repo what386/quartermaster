@@ -32,7 +32,7 @@ public static class ConfigMerger
         {
             var winner = inputs[^1].Mod;
             var skipped = inputs.Take(inputs.Count - 1).Select(input => new SkippedFileMod(target, input.Mod.Name,
-                $"A config changes its layout or length; only the highest-priority mod '{winner.Name}' can be installed for this file.")).ToArray();
+                $"A config changes its layout or length; only the highest-priority mod '{winner.Name}' can be installed for this file.") { Source = input.Mod.Source }).ToArray();
             return new(target, winner.Content.ToArray(), [], skipped);
         }
         var output = original.Bytes.ToArray();

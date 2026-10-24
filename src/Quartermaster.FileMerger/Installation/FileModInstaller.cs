@@ -6,6 +6,8 @@ public sealed record PlannedFileWrite(string Target, string ExpectedCurrentSha25
     ReadOnlyMemory<byte> Content, bool Restore);
 public sealed record FileMergePlan(string GameDirectory, string? StateRevision, IReadOnlyList<PlannedFileWrite> Files,
     IReadOnlyList<MergeConflict> Conflicts, IReadOnlyList<SkippedFileMod> Skipped);
+public sealed record InstalledConfigStatus(string Target, bool Matches);
+public sealed record FileInstallInspection(bool Complete, IReadOnlyList<InstalledConfigStatus> Files);
 
 /// <summary>Plans, applies and restores generated config files. State and content-addressed original backups are
 /// kept outside the game directory. Prepare is read-only with respect to the game; apply revalidates its snapshot.</summary>
@@ -13,6 +15,21 @@ public sealed class FileModInstaller
 {
     private readonly string stateDirectory;
     public FileModInstaller(string stateDirectory) => this.stateDirectory = Path.GetFullPath(stateDirectory);
+
+    public async Task<FileInstallInspection> InspectAsync(string gameDirectory, CancellationToken ct = default)
+    {
+        var game = GameRoot(gameDirectory); var home = StateRoot(game);
+        await using var lease = Lock(home);
+        var (state, _) = await ReadState(home, game, ct).ConfigureAwait(false);
+        if (state is null) return new(true, []);
+        var files = new List<InstalledConfigStatus>();
+        foreach (var file in state.Files)
+        {
+            var path = TargetPath(game, file.Target);
+            files.Add(new(file.Target, File.Exists(path) && FileModPaths.Hash(await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false)) == file.AppliedSha256));
+        }
+        return new(state.Complete, files.ToArray());
+    }
     private sealed record InstalledFile(string Target, string OriginalSha256, string AppliedSha256, string PreviousSha256);
     private sealed record InstallState(int Version, string GameDirectory, bool Complete, InstalledFile[] Files);
     private static readonly JsonSerializerOptions Json = new() { WriteIndented = true };

@@ -92,15 +92,18 @@ public sealed class ModContentStore : IModContentStore
             throw new ArgumentException("Export outside the library storage directory.");
         ManagedPaths.CheckLink(destination);
         var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
-        var patchFiles = mod.PatchSets.SelectMany(p => p.Files).ToDictionary(f => f.RelativePath, StringComparer.Ordinal);
+        var patchFiles = mod.PatchSets.Where(set => set.ContentKind == ModContentKind.ArchivePatch).SelectMany(p => p.Files).ToDictionary(f => f.RelativePath, StringComparer.Ordinal);
+        var fileModFiles = mod.PatchSets.Where(set => set.ContentKind != ModContentKind.ArchivePatch).SelectMany(set => set.Files).DistinctBy(file => file.RelativePath).ToArray();
         var warnings = new List<string>();
         try
         {
+            foreach (var file in fileModFiles)
+                await FileIntegrity.VerifyAsync(GetFilePath(mod.Id, file), file.Size, file.Sha256, ct).ConfigureAwait(false);
             await using (var output = new FileStream(temporary, FileMode.CreateNew, FileAccess.Write, FileShare.None))
             {
                 using (var zip = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true))
                 {
-                    foreach (var patch in mod.PatchSets)
+                    foreach (var patch in mod.PatchSets.Where(set => set.ContentKind == ModContentKind.ArchivePatch))
                     {
                         ct.ThrowIfCancellationRequested();
                         var payloads = new Dictionary<PatchFileKind, ReadOnlyMemory<byte>>();
@@ -208,7 +211,12 @@ public sealed class ModContentStore : IModContentStore
                     await Copy(input, relative, entry.Length).ConfigureAwait(false);
                 }
             }
-            else throw new ArgumentException("Import source must be a directory or ZIP file.");
+            else if (Path.GetFileName(source).StartsWith("generated_", StringComparison.Ordinal) && source.EndsWith(".dl_bin", StringComparison.Ordinal) || source.EndsWith(".stream", StringComparison.OrdinalIgnoreCase))
+            {
+                await using var input = File.OpenRead(source);
+                await Copy(input, Path.GetFileName(source), input.Length).ConfigureAwait(false);
+            }
+            else throw new ArgumentException("Import source must be a directory, ZIP, generated config or file-mod stream.");
             var files = names.Order(StringComparer.Ordinal).ToArray();
             var groups = new Dictionary<(string Folder, string Archive, int Slot), List<(string Path, PatchFileKind Kind)>>();
             foreach (var file in files)
@@ -234,12 +242,15 @@ public sealed class ModContentStore : IModContentStore
                 sets.Add(new(Guid.NewGuid(), key.Archive, key.Slot, key.Folder, stored.ToArray(),
                     await PatchInspector.InspectAsync(ManagedPaths.Resolve(temporary, main.Path), cancellationToken).ConfigureAwait(false)));
             }
-            if (sets.Count == 0) throw new InvalidDataException("Import contains no main patch files.");
+            for (var index = 0; index < sets.Count; index++)
+                sets[index] = await FileModMetadata.ClassifyAsync(temporary, sets[index], cancellationToken).ConfigureAwait(false);
+            sets.AddRange(await FileModMetadata.LooseSetsAsync(temporary, files, sets, cancellationToken).ConfigureAwait(false));
+            if (sets.Count == 0) throw new InvalidDataException("Import contains no main patch files or supported file-mod payloads.");
             var (manifest, options) = await ManifestReader.ReadAsync(temporary, files, sets, cancellationToken).ConfigureAwait(false);
             var displayName = name ?? manifest?.Name ?? (Directory.Exists(source) ? new DirectoryInfo(source).Name : Path.GetFileNameWithoutExtension(source));
             var mod = new Mod(id, displayName.Trim(), manifest?.Description ?? "", manifest?.ModVersion,
-                Guid.TryParse(manifest?.Guid, out var manifestId) ? manifestId : null, DateTimeOffset.UtcNow, sets.ToArray(), options, [])
-            { ImportedFileName = Directory.Exists(source) ? null : Path.GetFileName(source), Tags = ModTags.Normalize(manifest?.Tags ?? []) };
+                Guid.TryParse(manifest?.Guid, out var manifestId) ? manifestId : null, DateTimeOffset.UtcNow, sets.ToArray(), options.Count > 0 ? options : FileModMetadata.InferOptions(sets), [])
+            { FileDetectionVersion = FileModMetadata.Version, ImportedFileName = Directory.Exists(source) ? null : Path.GetFileName(source), Tags = ModTags.Normalize(manifest?.Tags ?? []) };
             StateValidation.Validate(LibraryState.Empty with { Mods = [mod] });
             cancellationToken.ThrowIfCancellationRequested();
             Directory.Move(temporary, GetModDirectory(id));
