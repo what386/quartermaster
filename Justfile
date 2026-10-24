@@ -13,7 +13,7 @@ restore:
     dotnet restore "Quartermaster.slnx" --locked-mode
 
 refresh-repatcher-data *args:
-    python3 scripts/refresh-repatcher-data.py {{args}}
+    python3 scripts/dev/refresh-repatcher-data.py {{args}}
 
 lint:
     dotnet format "Quartermaster.slnx" --verify-no-changes
@@ -37,7 +37,7 @@ package *args:
     scripts/package.sh {{args}}
 
 prepare version:
-    python3 scripts/check-localizations.py
+    python3 scripts/dev/check-localizations.py
     scripts/release/prepare.sh {{version}}
 
 promote:

@@ -180,7 +180,7 @@ repair; recreate the index after game updates. Buffers are limited to .NET array
 sizes.
 
 Equipment assets are embedded at build time. Refresh them with
-`python3 scripts/refresh-repatcher-data.py`; see the
+`python3 scripts/dev/refresh-repatcher-data.py`; see the
 [data maintenance notes](../src/Quartermaster.Repatcher/Data/README.md) for revision
 pinning, provenance, schema validation, and preview commands.
 
