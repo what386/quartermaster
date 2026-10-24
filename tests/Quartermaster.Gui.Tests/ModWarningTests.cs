@@ -113,7 +113,7 @@ public class ModWarningTests
                 .Single(view => ReferenceEquals(view.DataContext, row));
             var icon = view.FindControl<Border>("ModWarning")!;
             Assert.True(icon.IsVisible);
-            Assert.Equal(row.WarningDescription, ToolTip.GetTip(icon));
+            Assert.Equal(row.WarningDescription, Assert.IsType<TextBlock>(ToolTip.GetTip(icon)).Text);
             ToolTip.SetShowDelay(icon, 0);
             window.MouseMove(icon.TranslatePoint(new Point(1, 1), window)!.Value);
             Dispatcher.UIThread.RunJobs();
@@ -130,7 +130,7 @@ public class ModWarningTests
             Assert.Contains("Clashes with Winner", f.Dialogs.Confirmations.Last().Message);
             await model.MoveModAsync(first.Id, winner.Id, true);
             Assert.Contains("First wins", row.WarningDescription);
-            Assert.Equal(row.WarningDescription, ToolTip.GetTip(icon));
+            Assert.Equal(row.WarningDescription, Assert.IsType<TextBlock>(ToolTip.GetTip(icon)).Text);
             await f.Services.Session.SaveProfileAsync(
                 ProfileEditor.SetEnabled(model.SelectedProfile!, winner.Id, false),
                 false,

@@ -6,7 +6,8 @@ namespace Quartermaster.Gui.Mods;
 
 internal static class ModWarnings
 {
-    public static IReadOnlyDictionary<Guid, string> ForProfile(LibraryState state, Profile? profile, ConflictReport? report = null)
+    public static IReadOnlyDictionary<Guid, string> ForProfile(LibraryState state, Profile? profile, ConflictReport? report = null,
+        IReadOnlyDictionary<Guid, string>? diagnostics = null)
     {
         if (profile is null) return new Dictionary<Guid, string>();
         var warnings = profile.Entries.ToDictionary(entry => entry.ModId, _ => new List<string>());
@@ -33,14 +34,18 @@ internal static class ModWarnings
                 .GroupBy(conflict => (conflict.Archive, conflict.WinningSourceId, Others: string.Join(", ", conflict.SourceIds.Where(other => other != id).Select(other => mods[other].Name).Order()))))
                 warnings[id].Add(Localizer.Interpolate($"Clashes with {clashes.Key.Others} in {clashes.Key.Archive} ({ModPresentation.Count(clashes.Count(), "overlapping resource")}); {mods[clashes.Key.WinningSourceId].Name} wins."));
         }
+        foreach (var (id, message) in diagnostics ?? new Dictionary<Guid, string>())
+            if (enabled.Contains(id) && warnings.TryGetValue(id, out var messages) && message.Length > 0) messages.Add(message);
         return warnings.ToDictionary(pair => pair.Key, pair => string.Join("\n", pair.Value.Distinct()));
     }
 
-    public static string ForLibraryMod(LibraryState state, Mod mod, IReadOnlyDictionary<Guid, string> profileWarnings)
+    public static string ForLibraryMod(LibraryState state, Mod mod, IReadOnlyDictionary<Guid, string> profileWarnings,
+        IReadOnlyDictionary<Guid, string>? diagnostics = null)
     {
         var missing = mod.Dependencies.Where(dependency => dependency.CanInstall && !state.Mods.Any(installed => !installed.Superseded && ModDependencyMatching.Matches(installed, dependency)))
             .Select(dependency => Localizer.Interpolate($"Requires {dependency.Name} (missing from your library)."));
-        return string.Join("\n", missing.Prepend(profileWarnings.GetValueOrDefault(mod.Id, "")).Where(text => text.Length > 0).Distinct());
+        return string.Join("\n", missing.Prepend(profileWarnings.GetValueOrDefault(mod.Id, ""))
+            .Prepend(diagnostics?.GetValueOrDefault(mod.Id, "") ?? "").Where(text => text.Length > 0).Distinct());
     }
 
     private static bool IsBingusSharedLoader(Mod mod)

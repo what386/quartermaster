@@ -594,6 +594,23 @@
     "Remove all mod patches and restore file-mod game configs? Imported originals and profiles will remain.": "Remove all mod patches and restore file-mod game configs? Imported originals and profiles will remain.",
     "Import mod files": "Import mod files",
     "Mod files": "Mod files",
-    "File mods are merged on Deploy. No installer or launch-and-exit step is needed. Disable and deploy again, or purge, to restore the original configs.": "File mods are merged on Deploy. No installer or launch-and-exit step is needed. Disable and deploy again, or purge, to restore the original configs."
+    "File mods are merged on Deploy. No installer or launch-and-exit step is needed. Disable and deploy again, or purge, to restore the original configs.": "File mods are merged on Deploy. No installer or launch-and-exit step is needed. Disable and deploy again, or purge, to restore the original configs.",
+    "Review file-mod merge": "Review file-mod merge",
+    "These results follow the current loadout priority. Check the winning and skipped mods before applying.": "These results follow the current loadout priority. Check the winning and skipped mods before applying.",
+    "To change a winner, cancel and reorder the loadout.": "To change a winner, cancel and reorder the loadout.",
+    "Whole-file replacement": "Whole-file replacement",
+    "Conflicting values": "Conflicting values",
+    "Applied mod": "Applied mod",
+    "Winning mod": "Winning mod",
+    "Skipped mods": "Skipped mods",
+    "Overridden mods": "Overridden mods",
+    "Only the applied mod is installed for this file. The skipped mods cannot be combined with its file layout.": "Only the applied mod is installed for this file. The skipped mods cannot be combined with its file layout.",
+    "{0} conflicting values. Other changes from these mods are kept.": "{0} conflicting values. Other changes from these mods are kept.",
+    "Highest-priority mod": "Highest-priority mod",
+    "Could not deploy {0}: {1}": "Could not deploy {0}: {1}",
+    "Could not merge {0}: {1}": "Could not merge {0}: {1}",
+    "Overlapping config edits": "Overlapping config edits",
+    "These mods edit the same parts of this config file. The winning mod replaces overlapping edits from the overridden mods. Other edits are kept.": "These mods edit the same parts of this config file. The winning mod replaces overlapping edits from the overridden mods. Other edits are kept.",
+    "To avoid losing edits, cancel and disable a conflicting mod or choose different options. Reordering only changes which mod wins.": "To avoid losing edits, cancel and disable a conflicting mod or choose different options. Reordering only changes which mod wins."
   }
 }

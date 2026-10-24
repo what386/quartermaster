@@ -58,7 +58,8 @@ public class DeploymentServiceTests
         var service = new DeploymentService(storage);
         var ledger = await service.DeployAsync(old, "game");
         var replacement = Create(4, storage); storage.FailNextPublish = true;
-        await Assert.ThrowsAsync<IOException>(() => service.DeployAsync(replacement, "game"));
+        var failure = await Assert.ThrowsAsync<IOException>(() => service.DeployAsync(replacement, "game"));
+        Assert.Equal(replacement.Patches[0].SourceId, failure.Data["Quartermaster.ModId"]);
         Assert.Equal(DeploymentStatus.Deploying, storage.Ledger!.Status);
         Assert.NotEqual(ledger.Signature, storage.Ledger.Signature);
         Assert.True((await service.InspectAsync("game")).NeedsPurge);

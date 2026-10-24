@@ -11,7 +11,7 @@ namespace Quartermaster.Gui.Profiles;
 
 public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
-public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "") : ViewModelBase, IModRow, IProfileListItem
+public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "", string ErrorDescription = "") : ViewModelBase, IModRow, IProfileListItem
 {
     public Mod Mod { get; private set; } = Mod;
     public ProfileEntry Entry { get; private set; } = Entry;
@@ -22,6 +22,20 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public ModDeploymentState DeploymentState { get; private set; } = DeploymentState;
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
+    public string ErrorDescription { get; private set; } = ErrorDescription;
+    public bool HasErrors => ErrorDescription.Length > 0;
+    public void UpdateDiagnostics(string warnings, string errors)
+    {
+        var changes = new (string Name, object? Before, object? After)[]
+        {
+            (nameof(WarningDescription), WarningDescription, warnings),
+            (nameof(ErrorDescription), ErrorDescription, errors),
+            (nameof(HasWarnings), HasWarnings, warnings.Length > 0),
+            (nameof(HasErrors), HasErrors, errors.Length > 0),
+        };
+        WarningDescription = warnings; ErrorDescription = errors;
+        NotifyChanges(changes);
+    }
     public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public bool UsesLua => Mod.UsesLua;
     public bool IsFileBased => Mod.IsFileBased;
@@ -40,6 +54,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
+            (nameof(HasErrors), HasErrors, value.HasErrors),
+            (nameof(ErrorDescription), ErrorDescription, value.ErrorDescription),
             (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(UsesLua), UsesLua, value.UsesLua),
             (nameof(IsFileBased), IsFileBased, value.IsFileBased),
@@ -59,6 +75,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
         };
         Mod = value.Mod; Entry = value.Entry; Index = value.Index;
         WarningDescription = value.WarningDescription;
+        ErrorDescription = value.ErrorDescription;
         HasConflict = value.HasConflict; IconPath = value.IconPath; DeploymentState = value.DeploymentState;
         // Update commands act on the mod ID, so retain them while an update remains available.
         if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
@@ -240,11 +257,21 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         if (moved.Entries.SequenceEqual(entries)) return Task.CompletedTask;
         return Operations.RunAsync("Reordering mods", ct => Save(moved, ct), showProgress: false);
     }
+    private Guid? lastActiveProfileId;
+    protected override void RefreshModDiagnostics()
+    {
+        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, diagnostics: Session.GetModWarnings(SelectedProfile));
+        var errors = Session.GetModErrors(SelectedProfile);
+        foreach (var row in Entries) row.UpdateDiagnostics(warnings.GetValueOrDefault(row.Mod.Id, ""), errors.GetValueOrDefault(row.Mod.Id, ""));
+    }
     protected override void Refresh()
     {
         Profiles = Session.State.Profiles.ToArray(); Notify(nameof(Profiles));
-        // Session refreshes also replace mod metadata, so rebuild once even if the profile is unchanged.
-        Set(ref profile, Session.ActiveProfile ?? Profiles.FirstOrDefault(), nameof(SelectedProfile));
+        // Background diagnostics should retain the viewed loadout. Deliberate active-profile changes still select it.
+        var selected = lastActiveProfileId == Session.State.ActiveProfileId && profile is not null
+            ? Profiles.FirstOrDefault(candidate => candidate.Id == profile.Id) : null;
+        lastActiveProfileId = Session.State.ActiveProfileId;
+        Set(ref profile, selected ?? Session.ActiveProfile ?? Profiles.FirstOrDefault(), nameof(SelectedProfile));
         RebuildEntries();
     }
     private void RebuildEntries()
@@ -261,14 +288,15 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         var mods = Session.State.Mods.ToDictionary(m => m.Id);
         var report = SelectedProfile is null ? new ConflictReport([], []) : ConflictAnalyzer.Analyze(ProfilePatches.Resolve(Session.State, SelectedProfile));
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
-        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, report);
+        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, report, Session.GetModWarnings(SelectedProfile));
+        var errors = Session.GetModErrors(SelectedProfile);
         var rows = SelectedProfile?.Entries.Select((e, index) =>
         {
             // Recycled controls retain their appearance during silent edits; RunAsync still prevents concurrent saves.
             var row = new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !Entries.Single(row => row.Mod.Id == e.ModId).IsEnabled), ct)),
                 () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e),
-                warnings.GetValueOrDefault(e.ModId, ""));
+                warnings.GetValueOrDefault(e.ModId, ""), errors.GetValueOrDefault(e.ModId, ""));
             row.SetUpdate(Services.Downloads.CreateUpdateCommand(mods[e.ModId]), Services.Downloads.UpdateDescription(mods[e.ModId]));
             if (existing.TryGetValue(e.ModId, out var current)) { current.Update(row); return current; }
             return row;

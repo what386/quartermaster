@@ -218,8 +218,11 @@ before any restoration writes. Interrupted journals require restore before a new
 plan is prepared.
 
 Targets are restricted to existing `data/game/generated_<name>.dl_bin` files and
-normalized to lowercase. Symlinks cannot redirect source, state, backup, or target
-paths. External changes, stale plans, and corrupt backups prevent overwrite.
+normalized to lowercase. Caller-selected game and state roots are resolved to
+physical directories, allowing installation aliases and linked app-data parents.
+Installation identities use the resolved game root; aliases share journals and
+backups. Links within managed config, journal, and backup paths remain rejected.
+External changes, stale plans, and corrupt backups prevent overwrite.
 After a game update, new stock may replace the old baseline only when every
 incoming package explicitly recognizes its fingerprint. Raw candidates cannot
 authorize that adoption. Restore never puts old stock over an updated game file.
@@ -259,7 +262,48 @@ set IDs, payload indexes, options, and effective order. Receipts and installed-f
 health drive deployment outlines, launch warnings, and storage protection.
 
 `LibrarySession` prepares the config merge before repatching or publication and
-presents grouped conflicts/skipped replacements for review. It writes a pending
+presents a structured review grouped by target file. Each group separates the
+final winning mod from overridden or skipped mods. Conflict attribution must use
+the final writer for each cell, including when three or more mods change it;
+earlier edits equal to the final value do not conflict. Layout replacements
+identify both the applied mod and every skipped source.
+
+`LibrarySession` also queues merge previews when enabled mods, saved options,
+priority, or loadout order change, and when the game/library is reloaded. Checks
+run on workers after a 200 ms debounce. Superseded checks are cancelled, drained,
+and guarded by a generation before publishing results on the UI thread. The active
+profile is checked first; diagnostics are scoped to each profile's game path and
+selection signature. `ModDiagnosticsChanged` updates row diagnostics without
+rebuilding option editors or discarding unsaved choices. Background failures
+populate error tooltips without raising an operation error toast or prompting for
+merge approval.
+
+Previews do not write configs, backups, or deployment receipts. They use the
+planner's state lock and may create its lock directory/file. Inspection, Apply,
+Purge, and shutdown cancel and drain previews before accessing that state. Apply
+always prepares a fresh plan; a successful preview cannot authorize a stale write.
+Decoded payload detections are cached by source path and hash, with at most eight
+entries of 4 MiB each. Every plan still verifies source bytes and rechecks stock
+compatibility. Unchanged diagnostic selections are reused between UI refreshes.
+
+Receipts persist diagnostics by library mod ID. Loadout and library rows expose
+confirmed merge conflicts and skipped file mods through the red error icon and
+wrapped tooltip, falling back
+to matching deployment receipts while a preview is pending. Selection signatures
+prevent showing stale winners after options or order change. Repatch diagnostics use the
+same warning system. Failed deployments expose a separate red error icon and
+tooltip, attributed by structured mod ID or file-mod source when available.
+Installation-wide failures apply to all enabled entries. Errors are scoped to the
+attempted game, loadout, options, and source hashes, and clear on a successful
+retry. Confirmed overlaps are errors even when priority chooses an output: edits
+from overridden mods will be lost. Missing dependencies and repatch preservation
+diagnostics remain warnings. Conflict messages name the config file and list the
+applied, overridden, or skipped mods on separate lines, with blank lines between
+sections. Messages describe loss of overlapping edits or whole-file replacement;
+no binary-cell counts are presented as named settings. The merger does not yet
+map those cells to setting names. Apply still allows an explicitly reviewed merge.
+
+It writes a pending
 receipt, deploys ordinary archive sets, applies configs, and completes the receipt.
 `ProfilePatches` excludes recognized payloads and helpers from the archive request.
 Purge restores verified configs before removing archive patches.

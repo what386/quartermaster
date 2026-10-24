@@ -114,6 +114,9 @@ Only existing `data/game/generated_<name>.dl_bin` targets can be written. Target
 names are normalized to lowercase to avoid aliases on Windows. Unexpected
 managed-file contents, corrupt backups, stale plans, and symlinks fail before
 publication. Restore never overwrites a newer game file with an old backup.
+Caller-selected game and state roots may use directory symlinks or junctions;
+they are resolved before deriving installation identities or managed paths.
+Links within managed config, journal, and backup paths remain rejected.
 After a game update, a new package can adopt the new stock file only if all incoming
 packages explicitly recognize its fingerprint. Raw configs cannot authorize that
 adoption. An interrupted journal requires restore before a new plan is prepared.

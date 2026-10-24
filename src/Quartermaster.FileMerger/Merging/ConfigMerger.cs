@@ -25,18 +25,24 @@ public static class ConfigMerger
                     throw new InvalidDataException("Needs a new version: this config's game hash differs from the stock file.");
                 inputs.Add((mod, document, Compatible(original, document)));
             }
-            catch (InvalidDataException ex) { throw new InvalidDataException($"File mod '{mod.Name}' ({mod.Source}, {target}): {ex.Message}", ex); }
+            catch (InvalidDataException ex)
+            {
+                var failure = new InvalidDataException($"File mod '{mod.Name}' ({mod.Source}, {target}): {ex.Message}", ex);
+                failure.Data["Quartermaster.FileModSource"] = mod.Source;
+                throw failure;
+            }
         }
         if (inputs.Count == 0) return new(target, stock.ToArray(), [], []);
         if (inputs.Any(input => !input.Compatible))
         {
             var winner = inputs[^1].Mod;
             var skipped = inputs.Take(inputs.Count - 1).Select(input => new SkippedFileMod(target, input.Mod.Name,
-                $"A config changes its layout or length; only the highest-priority mod '{winner.Name}' can be installed for this file.") { Source = input.Mod.Source }).ToArray();
+                $"A config changes its layout or length; only the highest-priority mod '{winner.Name}' can be installed for this file.")
+                { Source = input.Mod.Source, WinningMod = winner.Name, WinningSource = winner.Source }).ToArray();
             return new(target, winner.Content.ToArray(), [], skipped);
         }
         var output = original.Bytes.ToArray();
-        var owners = new Dictionary<(int Block, int Offset), string>();
+        var writers = new Dictionary<(int Block, int Offset), List<(FileMod Mod, byte[] Value)>>();
         var conflicts = new List<MergeConflict>();
         foreach (var input in inputs)
         {
@@ -52,11 +58,18 @@ public static class ConfigMerger
                     var value = input.Document.Bytes.AsSpan(modified.Data + offset, size);
                     if (before.SequenceEqual(value)) continue;
                     var current = output.AsSpan(baseline.Data + offset, size);
-                    if (owners.TryGetValue((index, offset), out var previous) && !current.SequenceEqual(value))
-                        conflicts.Add(new(target, baseline.Type, index, offset, previous, input.Mod.Name));
-                    value.CopyTo(current); owners[(index, offset)] = input.Mod.Name;
+                    if (!writers.TryGetValue((index, offset), out var history)) writers[(index, offset)] = history = [];
+                    history.Add((input.Mod, value.ToArray()));
+                    value.CopyTo(current);
                 }
             }
+        }
+        foreach (var (cell, history) in writers)
+        {
+            var winner = history[^1];
+            foreach (var previous in history.Take(history.Count - 1).Where(previous => !previous.Value.AsSpan().SequenceEqual(winner.Value)))
+                conflicts.Add(new(target, original.Blocks[cell.Block].Type, cell.Block, cell.Offset, previous.Mod.Name, winner.Mod.Name)
+                { LosingSource = previous.Mod.Source, WinningSource = winner.Mod.Source });
         }
         if (output.AsSpan().SequenceEqual(original.Bytes)) return new(target, stock.ToArray(), conflicts.ToArray(), []);
         ct.ThrowIfCancellationRequested();

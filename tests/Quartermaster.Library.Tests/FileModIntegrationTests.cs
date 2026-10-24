@@ -149,6 +149,30 @@ public sealed class FileModIntegrationTests
         LibraryState awaitState() => new(LibraryState.CurrentSchemaVersion, [mod], [profile], profile.Id);
     }
 
+    [Fact]
+    public async Task CachedPayloadsStillVerifySourcesAndRecheckStockOnEveryPlan()
+    {
+        using var f = new Fixture(); using var config = new ConfigFixture();
+        var mod = await f.Library.ImportAsync(Package(f, config, "Water", 0, 200));
+        var profile = ProfileEditor.Add(ProfileEditor.Create("Water"), mod);
+        await f.Library.SaveProfileAsync(profile, true);
+        var state = await f.Library.LoadAsync(); var data = GameData(config);
+        var service = new ProfileFileMods(f.Contents);
+        var plan = await service.PrepareAsync(state, profile, data, CancellationToken.None);
+        Assert.Single(plan.Plan.Files);
+        var file = mod.PatchSets.Single(set => set.ContentKind == ModContentKind.FileMod).Files[0];
+        var path = f.Contents.GetFilePath(mod.Id, file); var original = await File.ReadAllBytesAsync(path);
+        await File.WriteAllBytesAsync(path, [0]);
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => service.PrepareAsync(state, profile, data, CancellationToken.None));
+        Assert.Contains("Water", error.Message);
+        Assert.Equal(mod.Id, error.Data["Quartermaster.ModId"]);
+        await File.WriteAllBytesAsync(path, original);
+        await File.WriteAllBytesAsync(Path.Combine(config.Game, ConfigFixture.Target), GameConfigCodec.Encrypt(ConfigFixture.Config(firstValue: 900)));
+        error = await Assert.ThrowsAsync<InvalidDataException>(() => service.PrepareAsync(state, profile, data, CancellationToken.None));
+        Assert.Contains("Needs a new version", error.Message);
+        Assert.Equal(mod.Id, error.Data["Quartermaster.ModId"]);
+    }
+
     private sealed class NoArchiveRepair : IPatchRepairer
     {
         public RepairedPatch Repair(ReadOnlyMemory<byte> patch, CancellationToken cancellationToken = default) =>

@@ -104,6 +104,41 @@ public sealed class InstallerTests
     }
 
     [Fact]
+    public async Task LinkedStateRootResolvesBeforeCreatingBackupsAndSharesStateWithItsPhysicalPath()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var f = new Fixture();
+        var physical = Path.Combine(f.Root, "physical-state"); Directory.CreateDirectory(physical);
+        var alias = Path.Combine(f.Root, "state-alias"); Directory.CreateSymbolicLink(alias, physical);
+        var installer = new FileModInstaller(Path.Combine(alias, "filemods"));
+        await installer.ApplyAsync(await installer.PrepareAsync(f.Game, [f.Mod("Water", 0, 200)]));
+        await new FileModInstaller(Path.Combine(physical, "filemods")).RestoreAsync(f.Game);
+        Assert.Equal(f.Stock, await File.ReadAllBytesAsync(Path.Combine(f.Game, Fixture.Target)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task LinkedGameRootsAndAncestorsShareStateAndCanRestore(bool ancestor)
+    {
+        if (OperatingSystem.IsWindows()) return;
+        using var f = new Fixture(); var installer = new FileModInstaller(f.State);
+        var link = Path.Combine(f.Root, "game-alias");
+        Directory.CreateSymbolicLink(link, ancestor ? f.Root : f.Game);
+        var alias = ancestor ? Path.Combine(link, "game") : link;
+        // Purging a linked installation with no file-mod journal is a valid no-op.
+        await installer.RestoreAsync(alias);
+        await installer.ApplyAsync(await installer.PrepareAsync(alias, [f.Mod("Water", 0, 200)]));
+        Assert.True(Assert.Single((await installer.InspectAsync(f.Game)).Files).Matches);
+        var plan = await installer.PrepareAsync(f.Game, [f.Mod("Water", 0, 300)]);
+        Assert.NotNull(plan.StateRevision);
+        await installer.ApplyAsync(plan);
+        await installer.RestoreAsync(alias);
+        Assert.Equal(f.Stock, await File.ReadAllBytesAsync(Path.Combine(f.Game, Fixture.Target)));
+        Assert.Single(Directory.GetDirectories(f.State));
+    }
+
+    [Fact]
     public async Task UnsafeTargetsAndLinksCannotRedirectWrites()
     {
         using var f = new Fixture(); var installer = new FileModInstaller(f.State);
@@ -114,6 +149,6 @@ public sealed class InstallerTests
         await Assert.ThrowsAsync<IOException>(() => installer.PrepareAsync(f.Game, [f.Mod("Water", 0, 200)]));
         Assert.Equal(f.Stock, await File.ReadAllBytesAsync(outside));
         var link = Path.Combine(f.Root, "linked-game"); Directory.CreateSymbolicLink(link, f.Game);
-        await Assert.ThrowsAsync<IOException>(() => installer.PrepareAsync(link, []));
+        await Assert.ThrowsAsync<IOException>(() => installer.PrepareAsync(link, [f.Mod("Water", 0, 200)]));
     }
 }

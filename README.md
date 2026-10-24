@@ -80,8 +80,13 @@ File mods have a document icon in Library and loadouts. Supported settings-file
 packages are merged into game configs when you deploy; their Lua installers are
 not deployed. Select package variants in **Mod options**, then arrange the loadout
 using your profile's priority direction. Conflicting values and incompatible
-whole-file replacements are shown for review before deployment, with results
-available under **File mod merge results**.
+whole-file replacements are shown for review before deployment, with each file's
+winning and overridden or skipped mods listed separately. Results remain in the
+affected mods' error tooltips. These tooltips name the config file, list which
+mod's edits are applied and which are overridden or skipped, and update in the
+background as you toggle mods, change options, or reorder the loadout. Confirmed
+conflicts use a red error icon because some edits will be lost. It also identifies
+mods that cannot be merged or could not be deployed. Game files change only when you apply the loadout or purge.
 
 You can also import standalone `generated_*.dl_bin` files, file-mod `.stream`
 bundles, or folders containing variants. Disable a file mod and deploy again, or

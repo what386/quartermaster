@@ -125,9 +125,17 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                         }
                     }
                     catch (InvalidDataException ex)
-                    { throw new InvalidDataException($"Could not prepare mod '{patch.SourceName ?? patch.SourceId.ToString()}' (archive {patch.Archive}): {ex.Message}", ex); }
+                    {
+                        var failure = new InvalidDataException($"Could not prepare mod '{patch.SourceName ?? patch.SourceId.ToString()}' (archive {patch.Archive}): {ex.Message}", ex);
+                        failure.Data["Quartermaster.ModId"] = patch.SourceId;
+                        throw failure;
+                    }
                     catch (IOException ex)
-                    { throw new IOException($"Could not prepare mod '{patch.SourceName ?? patch.SourceId.ToString()}' (archive {patch.Archive}): {ex.Message}", ex); }
+                    {
+                        var failure = new IOException($"Could not prepare mod '{patch.SourceName ?? patch.SourceId.ToString()}' (archive {patch.Archive}): {ex.Message}", ex);
+                        failure.Data["Quartermaster.ModId"] = patch.SourceId;
+                        throw failure;
+                    }
 
                 }
             }
@@ -148,7 +156,11 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                     ct.ThrowIfCancellationRequested();
                     try { await workspace.PublishAsync(file.Name, operationId, ct).ConfigureAwait(false); }
                     catch (IOException ex)
-                    { throw new IOException($"Could not deploy mod '{plan.Patches.First(patch => patch.SourceId == file.SourceId).SourceName ?? file.SourceId.ToString()}' ({file.Name}): {ex.Message}", ex); }
+                    {
+                        var failure = new IOException($"Could not deploy mod '{plan.Patches.First(patch => patch.SourceId == file.SourceId).SourceName ?? file.SourceId.ToString()}' ({file.Name}): {ex.Message}", ex);
+                        failure.Data["Quartermaster.ModId"] = file.SourceId;
+                        throw failure;
+                    }
                 }
             }
             current = 0;
@@ -161,7 +173,11 @@ public sealed class DeploymentService(IDeploymentStorage storage, IPatchRepairer
                     ct.ThrowIfCancellationRequested();
                     try { await workspace.VerifyAsync(DeploymentArea.Target, file, ct).ConfigureAwait(false); }
                     catch (IOException ex)
-                    { throw new IOException($"Could not verify deployed mod '{plan.Patches.First(patch => patch.SourceId == file.SourceId).SourceName ?? file.SourceId.ToString()}' ({file.Name}): {ex.Message}", ex); }
+                    {
+                        var failure = new IOException($"Could not verify deployed mod '{plan.Patches.First(patch => patch.SourceId == file.SourceId).SourceName ?? file.SourceId.ToString()}' ({file.Name}): {ex.Message}", ex);
+                        failure.Data["Quartermaster.ModId"] = file.SourceId;
+                        throw failure;
+                    }
                 }
             }
             ct.ThrowIfCancellationRequested();

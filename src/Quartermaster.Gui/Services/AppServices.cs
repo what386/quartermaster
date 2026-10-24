@@ -67,7 +67,7 @@ public sealed class AppServices : IAsyncDisposable
         AppUpdates = new(this, appUpdateManager, shutdownForUpdate ?? (() =>
             throw new InvalidOperationException(Localizer.Text("Application shutdown was not configured."))));
     }
-    public async ValueTask DisposeAsync() { IsDisposed = true; lifetime.Cancel(); AppUpdates.Dispose(); await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
+    public async ValueTask DisposeAsync() { IsDisposed = true; lifetime.Cancel(); AppUpdates.Dispose(); await Session.DisposeAsync().ConfigureAwait(false); await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
     public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")
         ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster");
 }

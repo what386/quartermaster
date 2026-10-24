@@ -38,6 +38,12 @@ internal sealed class FakeDialogs : IDialogService
     public Task<Quartermaster.Providers.Clients.ProviderFile?> ChooseModFileAsync(Quartermaster.Providers.Clients.ProviderMod mod)
     { ModFilePrompts++; return Task.FromResult(CancelModFile ? null : ModFile ?? mod.Files.FirstOrDefault(file => file.IsPrimary) ?? mod.Files.FirstOrDefault()); }
     public List<Quartermaster.Gui.Mods.DependencyReviewViewModel> DependencyReviews { get; } = [];
+    public List<Quartermaster.Gui.Mods.FileMergeReviewViewModel> FileMergeReviews { get; } = [];
+    public Task<bool> ReviewFileMergeAsync(Quartermaster.Gui.Mods.FileMergeReviewViewModel model, CancellationToken ct = default)
+    {
+        FileMergeReviews.Add(model);
+        return Task.FromResult(ConfirmationAnswers.TryDequeue(out var answer) ? answer : Confirm);
+    }
     public Func<Quartermaster.Gui.Mods.DependencyReviewViewModel, Task<bool>>? DependencyReviewHandler { get; set; }
     public async Task<bool> ReviewDependenciesAsync(Quartermaster.Gui.Mods.DependencyReviewViewModel model, CancellationToken ct = default)
     {

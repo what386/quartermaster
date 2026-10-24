@@ -5,7 +5,7 @@ using System.Collections.ObjectModel;
 
 namespace Quartermaster.Gui.Mods;
 
-public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null, string WarningDescription = "") : ViewModelBase, IModRow
+public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? IconPath = null, string WarningDescription = "", string ErrorDescription = "") : ViewModelBase, IModRow
 {
     public Mod Mod { get; private set; } = Mod;
     public int Index { get; private set; } = Index;
@@ -24,6 +24,8 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
             (nameof(Monogram), Monogram, value.Monogram),
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
+            (nameof(HasErrors), HasErrors, value.HasErrors),
+            (nameof(ErrorDescription), ErrorDescription, value.ErrorDescription),
             (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(UsesLua), UsesLua, value.UsesLua),
             (nameof(IsFileBased), IsFileBased, value.IsFileBased),
@@ -34,6 +36,7 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
             (nameof(UpdateDescription), UpdateDescription, value.UpdateDescription),
         };
         WarningDescription = value.WarningDescription;
+        ErrorDescription = value.ErrorDescription;
         Mod = value.Mod; Index = value.Index; HasConflict = value.HasConflict; IconPath = value.IconPath;
         if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
         UpdateDescription = value.UpdateDescription;
@@ -57,6 +60,20 @@ public sealed class ModListItem(Mod Mod, int Index, bool HasConflict, string? Ic
     public bool HasOptions => Mod.Options.Any(option => !Mod.IsInstallerOption(option));
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
+    public string ErrorDescription { get; private set; } = ErrorDescription;
+    public bool HasErrors => ErrorDescription.Length > 0;
+    public void UpdateDiagnostics(string warnings, string errors)
+    {
+        var changes = new (string Name, object? Before, object? After)[]
+        {
+            (nameof(WarningDescription), WarningDescription, warnings),
+            (nameof(ErrorDescription), ErrorDescription, errors),
+            (nameof(HasWarnings), HasWarnings, warnings.Length > 0),
+            (nameof(HasErrors), HasErrors, errors.Length > 0),
+        };
+        WarningDescription = warnings; ErrorDescription = errors;
+        NotifyChanges(changes);
+    }
     public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public bool UsesLua => Mod.UsesLua;
     public bool IsFileBased => Mod.IsFileBased;
@@ -84,6 +101,8 @@ public interface IModRow
     string? IconPath { get; }
     bool HasConflict { get; }
     bool HasWarnings { get; }
+    bool HasErrors { get; }
+    string ErrorDescription { get; }
     bool InstalledAsDependency { get; }
     string WarningDescription { get; }
     bool HasToggle { get; }
@@ -205,16 +224,25 @@ public sealed class ModsViewModel : SessionViewModel
         Notify(nameof(Details)); Notify(nameof(HasSelection)); Notify(nameof(HasSingleSelection)); Notify(nameof(HasDependencyAction)); Notify(nameof(DependencyActionLabel));
         RemoveCommand.Refresh(); ExportRepatchedCommand.Refresh(); GetDependenciesCommand.Refresh();
     }
+    protected override void RefreshModDiagnostics()
+    {
+        var diagnostics = Session.GetModWarnings();
+        var warnings = ModWarnings.ForProfile(Session.State, Session.ActiveProfile, diagnostics: diagnostics);
+        var errors = Session.GetModErrors();
+        foreach (var row in Mods) row.UpdateDiagnostics(ModWarnings.ForLibraryMod(Session.State, row.Mod, warnings, diagnostics), errors.GetValueOrDefault(row.Mod.Id, ""));
+    }
     protected override void Refresh()
     {
         var ids = SelectedMods.Select(item => item.Mod.Id).ToHashSet();
         var report = Session.ActiveProfile is { } active ? Quartermaster.Core.Deployment.ConflictAnalyzer.Analyze(
             Quartermaster.Library.Profiles.ProfilePatches.Resolve(Session.State, active)) : null;
         var collisions = report?.Resources.SelectMany(c => c.SourceIds).ToHashSet() ?? [];
-        var warnings = ModWarnings.ForProfile(Session.State, Session.ActiveProfile, report);
+        var diagnostics = Session.GetModWarnings();
+        var errors = Session.GetModErrors();
+        var warnings = ModWarnings.ForProfile(Session.State, Session.ActiveProfile, report, diagnostics);
         var existing = Mods.ToDictionary(row => row.Mod.Id);
         var rows = Session.State.Mods.Where(m => ModTags.Matches(m, Search))
-            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m), ModWarnings.ForLibraryMod(Session.State, m, warnings))
+            .OrderBy(m => m.Name, StringComparer.OrdinalIgnoreCase).Select((m, index) => new ModListItem(m, index, collisions.Contains(m.Id), Session.GetIconPath(m), ModWarnings.ForLibraryMod(Session.State, m, warnings, diagnostics), errors.GetValueOrDefault(m.Id, ""))
             { UpdateCommand = Services.Downloads.CreateUpdateCommand(m), UpdateDescription = Services.Downloads.UpdateDescription(m) }).ToArray();
         var desired = rows.Select(row =>
         {

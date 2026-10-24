@@ -60,6 +60,27 @@ public sealed class MergerTests
     }
 
     [Theory]
+    [InlineData(400u, 2)]
+    [InlineData(200u, 1)]
+    public void ConflictReportsUseFinalWinnerAndExcludeEditsMatchingItsValue(uint finalValue, int count)
+    {
+        using var f = new Fixture();
+        var first = f.Mod("First", 0, 200) with { Source = "first" };
+        var middle = f.Mod("Middle", 0, 300) with { Source = "middle" };
+        var last = f.Mod("Last", 0, finalValue) with { Source = "last" };
+        var result = ConfigMerger.Merge(Fixture.Target, f.Stock, [first, middle, last]);
+        Assert.Equal(count, result.Conflicts.Count);
+        Assert.All(result.Conflicts, conflict =>
+        {
+            Assert.Equal("Last", conflict.WinningMod);
+            Assert.Equal("last", conflict.WinningSource);
+            Assert.NotNull(conflict.LosingSource);
+        });
+        Assert.Equal(finalValue, BinaryPrimitives.ReadUInt32LittleEndian(GameConfigCodec.Decrypt(result.Content).AsSpan(28)));
+        Assert.Contains(result.Conflicts, conflict => conflict.LosingSource == "middle");
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public void LayoutChangingModsAreExclusiveAndReportEverySkippedMod(bool structuralWins)
@@ -73,6 +94,8 @@ public sealed class MergerTests
         Assert.Equal(winner.Content.ToArray(), result.Content);
         Assert.Equal(structuralWins ? "Water" : "Jump pack", Assert.Single(result.Skipped).Name);
         Assert.Contains(winner.Name, result.Skipped[0].Reason);
+        Assert.Equal(winner.Name, result.Skipped[0].WinningMod);
+        Assert.Equal(winner.Source, result.Skipped[0].WinningSource);
     }
 
     [Fact]

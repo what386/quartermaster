@@ -14,7 +14,7 @@ public sealed record FileInstallInspection(bool Complete, IReadOnlyList<Installe
 public sealed class FileModInstaller
 {
     private readonly string stateDirectory;
-    public FileModInstaller(string stateDirectory) => this.stateDirectory = Path.GetFullPath(stateDirectory);
+    public FileModInstaller(string stateDirectory) => this.stateDirectory = FileModPaths.ResolveRoot(stateDirectory, mustExist: false);
 
     public async Task<FileInstallInspection> InspectAsync(string gameDirectory, CancellationToken ct = default)
     {
@@ -189,7 +189,7 @@ public sealed class FileModInstaller
     private static IOException Changed(string target) => new($"Config '{target}' changed outside Quartermaster or was updated by the game. Refusing to overwrite it with an old file.");
     private static string GameRoot(string path)
     {
-        path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
+        path = FileModPaths.ResolveRoot(path, mustExist: true);
         FileModDetector.RejectLink(path);
         if (!Directory.Exists(path)) throw new DirectoryNotFoundException("Game installation directory does not exist.");
         return path;

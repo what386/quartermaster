@@ -16,6 +16,7 @@ public interface IDialogService
     Task<LocalModImportOptions?> ConfirmModImportAsync(string source);
     Task<ProviderFile?> ChooseModFileAsync(ProviderMod mod);
     Task<bool> ReviewDependenciesAsync(DependencyReviewViewModel model, CancellationToken ct = default);
+    Task<bool> ReviewFileMergeAsync(FileMergeReviewViewModel model, CancellationToken ct = default);
     Task<string?> PickModZipAsync();
     Task<IReadOnlyList<string>> PickModZipsAsync();
     Task<string?> SaveModZipAsync(string suggestedName);
@@ -31,6 +32,12 @@ public interface IDialogService
 
 public sealed class DialogService(Func<MainWindow> owner) : IDialogService
 {
+    public async Task<bool> ReviewFileMergeAsync(FileMergeReviewViewModel model, CancellationToken ct = default)
+    {
+        await owner().WaitForDialogAsync(ct);
+        ct.ThrowIfCancellationRequested();
+        return await owner().ShowDialogAsync<bool>(new FileMergeReviewDialog(model));
+    }
     public Task<GroupColors?> RequestGroupColorsAsync(string? background, string? text) =>
         owner().ShowDialogAsync<GroupColors?>(new GroupColorsDialog(background, text));
     public async Task<string?> PickProfileImageAsync()

@@ -1714,6 +1714,8 @@ public class GuiTests
         await profiles.DeployCommand.ExecuteAsync();
         Assert.False(f.Services.Operations.IsError);
         Assert.Contains("absent from installed game", f.Services.Session.RepatchWarnings);
+        var rows = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage).Entries;
+        Assert.Contains(rows, row => row.HasWarnings && row.WarningDescription.Contains("absent from installed game"));
         Assert.Equal(previous, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
     }
 

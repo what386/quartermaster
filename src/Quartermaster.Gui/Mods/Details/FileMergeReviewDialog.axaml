@@ -1,0 +1,35 @@
+<UserControl xmlns="https://github.com/avaloniaui" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:loc="clr-namespace:Quartermaster.Gui.Localization"
+             xmlns:vm="clr-namespace:Quartermaster.Gui.Mods" x:Class="Quartermaster.Gui.Mods.FileMergeReviewDialog" x:DataType="vm:FileMergeReviewViewModel" Width="560">
+  <StackPanel Spacing="16" Margin="20">
+    <TextBlock Text="{loc:Loc 'Review file-mod merge'}" Classes="sectionTitle" />
+    <TextBlock Text="{loc:Loc 'These results follow the current loadout priority. Check the winning and skipped mods before applying.'}" Classes="muted" TextWrapping="Wrap" />
+    <ScrollViewer MaxHeight="360" HorizontalScrollBarVisibility="Disabled">
+      <ItemsControl x:Name="MergeFiles" ItemsSource="{Binding Groups}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:FileMergeReviewGroup">
+        <StackPanel Spacing="12" Margin="0,0,0,16">
+          <TextBlock Text="{Binding FileName}" FontWeight="SemiBold" ToolTip.Tip="{Binding Target}" TextWrapping="Wrap" />
+          <ItemsControl ItemsSource="{Binding Items}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:FileMergeReviewItem">
+            <Border BorderBrush="{DynamicResource LineBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,12" Margin="0,0,0,12">
+              <StackPanel Spacing="8">
+                <TextBlock Text="{Binding Title}" Classes="muted" FontSize="11" />
+                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+                  <TextBlock Text="{Binding WinnerLabel}" VerticalAlignment="Center" />
+                  <TextBlock Grid.Column="1" Text="{Binding Winner}" FontWeight="SemiBold" Classes="accent" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="1" Text="{Binding OtherLabel}" Classes="muted" />
+                  <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding OtherMods}"><ItemsControl.ItemTemplate><DataTemplate x:DataType="vm:FileMergeParticipant">
+                    <TextBlock Text="{Binding Name}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                  </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+                </Grid>
+                <TextBlock Text="{Binding Summary}" Classes="muted" TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+        </StackPanel>
+      </DataTemplate></ItemsControl.ItemTemplate></ItemsControl>
+    </ScrollViewer>
+    <TextBlock Text="{loc:Loc 'To avoid losing edits, cancel and disable a conflicting mod or choose different options. Reordering only changes which mod wins.'}" Classes="muted" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+      <Button Content="{loc:Loc 'Cancel'}" Click="CancelReview" />
+      <Button x:Name="ApplyMergeButton" Content="{loc:Loc 'Apply merge'}" Classes="primary" Click="AcceptReview" />
+    </StackPanel>
+  </StackPanel>
+</UserControl>

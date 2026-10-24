@@ -12,8 +12,8 @@ using Quartermaster.Library.Importing;
 namespace Quartermaster.Gui.Services;
 
 /// <summary>Shared loaded state. Backend work runs on workers; notifications return to the UI caller.</summary>
-public sealed class LibrarySession(LibraryService library, ProfileArchives archives, IDeploymentStorage storage, ModContentStore contents, SettingsStore settingsStore,
-    Func<IReadOnlyList<string>> discover, IDialogService dialogs) : ViewModelBase
+public sealed partial class LibrarySession(LibraryService library, ProfileArchives archives, IDeploymentStorage storage, ModContentStore contents, SettingsStore settingsStore,
+    Func<IReadOnlyList<string>> discover, IDialogService dialogs) : ViewModelBase, IAsyncDisposable
 {
     private readonly ProfileFileMods fileMods = new(contents);
     public ProfileFileModHealth FileModHealth { get; private set; } = ProfileFileModHealth.Empty;
@@ -21,17 +21,64 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public bool HasFileModWarnings => FileModHealth.Warnings.Count > 0;
     public bool FileModSelectionMatches(Profile profile) => FileModHealth.Complete && FileModHealth.Signature == ProfileFileMods.Signature(State, profile);
     public event EventHandler? Changed;
+    public event EventHandler? ModDiagnosticsChanged;
     public LibraryState State { get; private set; } = LibraryState.Empty;
     public ApplicationSettings Settings { get; private set; } = new();
     public DeploymentInspection? Inspection { get; private set; }
     public string DeploymentProblem { get; private set; } = "";
     public string RepatchWarnings { get; private set; } = "";
     public bool HasRepatchWarnings => RepatchWarnings.Length > 0;
-    private void SetRepatchWarnings(IEnumerable<string> warnings)
+    private sealed record ModRepairWarning(string SourceStamp, string? Options, string Message);
+    private readonly Dictionary<Guid, ModRepairWarning> modRepairWarnings = [];
+    private string WarningSourceStamp(Mod mod) => GameDirectory + ":" + Settings.UpdateArmCulling + ":" +
+        string.Join(",", mod.PatchSets.SelectMany(set => set.Files.Select(file => set.Id + ":" + file.Sha256)));
+    public IReadOnlyDictionary<Guid, string> GetModWarnings(Profile? profile = null)
+    {
+        profile ??= ActiveProfile;
+        var warnings = new Dictionary<Guid, string>();
+        foreach (var (id, warning) in modRepairWarnings)
+        {
+            var mod = State.Mods.FirstOrDefault(mod => mod.Id == id);
+            var entry = profile?.Entries.FirstOrDefault(entry => entry.ModId == id);
+            if (mod is null || warning.SourceStamp != WarningSourceStamp(mod) ||
+                warning.Options is not null && (entry is null || warning.Options != PatchSelection.OptionsHash(mod, entry))) continue;
+            warnings[id] = warning.Message;
+        }
+        return warnings;
+    }
+    private void SetRepatchWarnings(IEnumerable<string> warnings, IReadOnlyDictionary<Guid, string[]>? byMod = null, Profile? profile = null)
     {
         RepatchWarnings = string.Join("\n", warnings.Distinct());
+        modRepairWarnings.Clear();
+        foreach (var (id, messages) in byMod ?? new Dictionary<Guid, string[]>())
+        {
+            var mod = State.Mods.Single(mod => mod.Id == id);
+            var entry = profile?.Entries.FirstOrDefault(entry => entry.ModId == id);
+            modRepairWarnings[id] = new(WarningSourceStamp(mod), entry is null ? null : PatchSelection.OptionsHash(mod, entry), string.Join("\n", messages.Distinct()));
+        }
         Notify(nameof(RepatchWarnings)); Notify(nameof(HasRepatchWarnings));
         Changed?.Invoke(this, EventArgs.Empty);
+    }
+    private readonly Dictionary<Guid, (string Context, string Message)> modErrors = [];
+    private string ErrorContext(Profile profile) => GameDirectory + ":" + Settings.Repatch + ":" +
+        System.Text.Json.JsonSerializer.Serialize(profile) + ":" + string.Join(";", State.Mods
+            .Where(mod => profile.Entries.Any(entry => entry.ModId == mod.Id && entry.Enabled)).Select(WarningSourceStamp));
+    public IReadOnlyDictionary<Guid, string> GetModErrors(Profile? profile = null)
+    {
+        profile ??= ActiveProfile;
+        if (profile is null) return new Dictionary<Guid, string>();
+        var context = ErrorContext(profile);
+        var errors = profile.Entries.Where(entry => entry.Enabled && modErrors.TryGetValue(entry.ModId, out var error) && error.Context == context)
+            .ToDictionary(entry => entry.ModId, entry => modErrors[entry.ModId].Message);
+        var preview = PreviewFor(profile);
+        var conflicts = preview is not null ? preview.Warnings :
+            FileModHealth.Complete && FileModHealth.Signature == ProfileFileMods.Signature(State, profile)
+                ? FileModHealth.ModWarnings : new Dictionary<Guid, string[]>();
+        foreach (var (id, messages) in conflicts)
+            errors[id] = string.Join("\n\n", new[] { errors.GetValueOrDefault(id, "") }.Concat(messages).Where(text => text.Length > 0).Distinct());
+        foreach (var (id, message) in preview?.Errors ?? new Dictionary<Guid, string>())
+            errors[id] = message;
+        return errors;
     }
     private RepairOptions RepatchOptions => new(Culling: Settings.UpdateArmCulling ? CullingPolicy.CurrentGameArms : CullingPolicy.Patch);
     public Profile? ActiveProfile => State.Profiles.FirstOrDefault(p => p.Id == State.ActiveProfileId);
@@ -69,9 +116,9 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     public async Task ReloadAsync(CancellationToken ct)
     {
         State = await Task.Run(() => library.LoadAsync(ct), ct);
-        await RefreshInspectionAsync(ct); Publish();
+        await RefreshInspectionAsync(ct); Publish(forcePreview: true);
     }
-    private void Publish() { Notify(nameof(State)); Notify(nameof(GameDirectory)); Notify(nameof(DeploymentStatus)); Changed?.Invoke(this, EventArgs.Empty); }
+    private void Publish(bool forcePreview = false) { QueueFileModPreviews(forcePreview); Notify(nameof(State)); Notify(nameof(GameDirectory)); Notify(nameof(DeploymentStatus)); Changed?.Invoke(this, EventArgs.Empty); }
     private readonly Dictionary<Guid, string?> iconPaths = [];
     public string? GetIconPath(Mod mod)
     {
@@ -179,6 +226,9 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     }
     private async Task RefreshInspectionAsync(CancellationToken ct)
     {
+        CancelFileModPreviews();
+        await fileModPreviewTask;
+        fileModPreviewSelection = null;
         Inspection = null; DeploymentProblem = ""; FileModHealth = ProfileFileModHealth.Empty;
         Notify(nameof(FileModHealth)); Notify(nameof(FileModWarnings)); Notify(nameof(HasFileModWarnings));
         if (GameDirectory == "") return;
@@ -194,13 +244,41 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
     private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException(Localizer.Text("Choose your game folder in Settings first."));
     public async Task DeployAsync(Guid profileId, IDialogService dialogs, CancellationToken ct, IProgress<DeploymentProgress>? progress = null)
     {
+        var profile = State.Profiles.Single(profile => profile.Id == profileId);
+        await PauseFileModPreviewsAsync();
+        try
+        {
+            if (await DeployCoreAsync(profileId, dialogs, ct, progress))
+            {
+                modErrors.Clear();
+                Changed?.Invoke(this, EventArgs.Empty);
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            var context = ErrorContext(profile);
+            Guid? affected = null;
+            for (Exception? cause = ex; cause is not null; cause = cause.InnerException)
+                if (cause.Data["Quartermaster.ModId"] is Guid id) { affected = id; break; }
+            foreach (var entry in profile.Entries.Where(entry => entry.Enabled && (affected is null || entry.ModId == affected)))
+            {
+                var name = State.Mods.Single(mod => mod.Id == entry.ModId).Name;
+                modErrors[entry.ModId] = (context, Localizer.Interpolate($"Could not deploy {name}: {ex.Message}"));
+            }
+            Changed?.Invoke(this, EventArgs.Empty);
+            throw;
+        }
+        finally { ResumeFileModPreviews(); }
+    }
+    private async Task<bool> DeployCoreAsync(Guid profileId, IDialogService dialogs, CancellationToken ct, IProgress<DeploymentProgress>? progress)
+    {
         var request = ProfilePatches.Resolve(State, profileId); var target = RequireGame();
         SetRepatchWarnings([]);
         var profile = State.Profiles.Single(profile => profile.Id == profileId);
         var preparedFiles = await Task.Run(() => fileMods.PrepareAsync(State, profile, target, ct), ct);
         var hasFileWork = preparedFiles.Plan.Files.Count > 0 || !FileModHealth.Complete || FileModHealth.Signature != preparedFiles.Signature;
-        if (preparedFiles.Warnings.Count > 0 && !await dialogs.ConfirmAsync(Localizer.Text("File mod conflicts"),
-            string.Join("\n", preparedFiles.Warnings) + Localizer.Text("\n\nApply this file-mod merge using the loadout priority?"), Localizer.Text("Apply merge"))) return;
+        if (preparedFiles.Warnings.Count > 0 && !await dialogs.ReviewFileMergeAsync(new Mods.FileMergeReviewViewModel(preparedFiles.Plan), ct)) return false;
         IPatchRepairer? adapter = null;
         if (Settings.Repatch != RepatchMode.Never && request.Patches.Count > 0)
         {
@@ -208,7 +286,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             var affected = await Task.Run(async () =>
             {
                 var changed = new HashSet<Guid>();
-                var warnings = new List<string>();
+                var warnings = new Dictionary<Guid, List<string>>();
                 foreach (var patch in request.Patches)
                 {
                     await ModOperation.RunAsync(State.Mods.FirstOrDefault(mod => mod.Id == patch.SourceId)?.Name ?? patch.SourceId.ToString(), async () =>
@@ -219,21 +297,26 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
                             payloads.TryGetValue(PatchFileKind.GpuResources, out var gpu) ? gpu : (ReadOnlyMemory<byte>?)null,
                             payloads.TryGetValue(PatchFileKind.Stream, out var stream) ? stream : (ReadOnlyMemory<byte>?)null);
                         var result = adapter.RepairSet(input, ct);
-                        warnings.AddRange(result.Warnings);
+                        if (result.Warnings.Count > 0)
+                        {
+                            if (!warnings.TryGetValue(patch.SourceId, out var messages)) warnings[patch.SourceId] = messages = [];
+                            messages.AddRange(result.Warnings);
+                        }
                         if (result.RemovedUnits > 0) throw new InvalidDataException(Localizer.Text("Repatching would remove missing units. Use an updated mod."));
                         if (!input.Main.Span.SequenceEqual(result.Output.Main.Span) || !SameCompanion(input.Gpu, result.Output.Gpu) ||
                             !SameCompanion(input.Stream, result.Output.Stream)) changed.Add(patch.SourceId);
-                    });
+                    }, patch.SourceId);
                 }
                 return (Changed: changed, Warnings: warnings);
             }, ct);
-            SetRepatchWarnings(affected.Warnings);
+            SetRepatchWarnings(affected.Warnings.Values.SelectMany(messages => messages),
+                affected.Warnings.ToDictionary(pair => pair.Key, pair => pair.Value.ToArray()), profile);
             var changedMods = affected.Changed;
             if (changedMods.Count == 0) adapter = null;
             else if (Settings.Repatch == RepatchMode.Ask)
             {
                 var names = string.Join("\n", State.Mods.Where(m => changedMods.Contains(m.Id)).Select(m => m.Name));
-                if (!await dialogs.ConfirmAsync(Localizer.Text("Repatch required"), Localizer.Interpolate($"These mods need repatching for the installed game:\n\n{names}\n\nRepatch and deploy? Originals will remain unchanged."), Localizer.Text("Repatch and deploy"))) return;
+                if (!await dialogs.ConfirmAsync(Localizer.Text("Repatch required"), Localizer.Interpolate($"These mods need repatching for the installed game:\n\n{names}\n\nRepatch and deploy? Originals will remain unchanged."), Localizer.Text("Repatch and deploy"))) return false;
             }
         }
         ct.ThrowIfCancellationRequested();
@@ -248,6 +331,7 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             }, ct);
         }
         finally { await ReloadAsync(CancellationToken.None); }
+        return true;
     }
     private static bool SameCompanion(ReadOnlyMemory<byte>? a, ReadOnlyMemory<byte>? b) => a.HasValue == b.HasValue &&
         (!a.HasValue || a.Value.Span.SequenceEqual(b!.Value.Span));
@@ -326,17 +410,22 @@ public sealed class LibrarySession(LibraryService library, ProfileArchives archi
             throw new ArgumentException(Localizer.Text("Export outside the game directory."));
         SetRepatchWarnings([]);
         var warnings = await ModOperation.RunAsync(mod.Name, () => Task.Run(() => contents.ExportRepatchedAsync(mod, destination, new RepatcherAdapter(GameArchives.Open(game, ct), RepatchOptions), ct), ct));
-        SetRepatchWarnings(warnings);
+        SetRepatchWarnings(warnings, new Dictionary<Guid, string[]> { [mod.Id] = warnings.ToArray() });
     }
     public async Task PurgeAsync(CancellationToken ct)
     {
+        await PauseFileModPreviewsAsync();
         try
         {
             var game = RequireGame();
             await Task.Run(() => fileMods.RestoreAsync(game, ct), ct);
             await Task.Run(() => new DeploymentService(storage).PurgeAsync(game, ct), ct);
         }
-        finally { await ReloadAsync(CancellationToken.None); }
+        finally
+        {
+            try { await ReloadAsync(CancellationToken.None); }
+            finally { ResumeFileModPreviews(); }
+        }
     }
     public async Task<string?> GetLaunchWarningAsync(Guid profileId, CancellationToken ct)
     {
