@@ -7,6 +7,7 @@
 ### Changes
 
 - explicit support for filemods (+merger)
+- Fix another import issue with arsenal imports
 
 
 ## 0.10.4 — 2026-10-23
