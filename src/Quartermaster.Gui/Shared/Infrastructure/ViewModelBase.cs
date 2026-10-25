@@ -31,7 +31,9 @@ public abstract class SessionViewModel(Quartermaster.Gui.Services.AppServices se
     protected void WatchSession()
     {
         Session.Changed += (_, _) => Refresh();
+        Session.ModDiagnosticsChanged += (_, _) => RefreshModDiagnostics();
         Refresh();
     }
+    protected virtual void RefreshModDiagnostics() { }
     protected abstract void Refresh();
 }

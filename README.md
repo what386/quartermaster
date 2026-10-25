@@ -67,6 +67,25 @@ marked green; yellow mod outlines indicate a difference from what is deployed.
 
 Use **Purge** to remove any deployed patches and have a vanilla game.
 
+File mods have a document icon in Library and loadouts. Supported settings-file
+packages are merged into game configs when you deploy; their Lua installers are
+not deployed. Select package variants in **Mod options**, then arrange the loadout
+using your profile's priority direction. Conflicting values and incompatible
+whole-file replacements are shown for review before deployment, with each file's
+winning and overridden or skipped mods listed separately. Results remain in the
+affected mods' error tooltips. These tooltips name the config file, list which
+mod's edits are applied and which are overridden or skipped, and update in the
+background as you toggle mods, change options, or reorder the loadout. Confirmed
+conflicts use a red error icon because some edits will be lost. It also identifies
+mods that cannot be merged or could not be deployed. Game files change only when you apply the loadout or purge.
+
+You can also import standalone `generated_*.dl_bin` files, file-mod `.stream`
+bundles, or folders containing variants. Disable a file mod and deploy again, or
+use **Purge**, to restore the original configs. No launch-and-exit installation
+step is needed. Close the game before deploying. Restore changes made by other
+file-editing tools first; Quartermaster refuses to overwrite unrecognized or
+newer game files with old backups.
+
 Use **Edit description** beneath the profile title to save notes for a loadout.
 Choose **Inspect conflicts**, or right-click a mod and select it, to inspect
 overlapping resources. The priority selector previews the winner without changing

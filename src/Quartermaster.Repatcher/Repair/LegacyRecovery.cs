@@ -34,7 +34,7 @@ internal static class LegacyRecovery
         foreach (var (item, candidates) in assignments)
         {
             BinaryData.Put64(output, table.ItemTableOffset + item.Index * 80 + 16, candidates[0].Start);
-            warnings.Add(new("LegacyOffsetRecovered", $"Recovered resource {item.Record.FileId:x16} at 0x{candidates[0].Start:x} from its unique complete payload gap."));
+            warnings.Add(new("LegacyOffsetRecovered", $"An incorrect file location in this older patch was repaired.\nAsset ID: {item.Record.FileId:x16}\nIts complete content was found and retained. No action is needed."));
         }
         return output;
     }

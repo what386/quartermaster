@@ -5,3 +5,4 @@ dist/
 examples/
 .env
 build/
+__pycache__/

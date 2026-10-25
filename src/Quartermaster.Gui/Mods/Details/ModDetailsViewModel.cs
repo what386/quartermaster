@@ -70,14 +70,16 @@ public sealed class ModDetailsViewModel : ViewModelBase
         }, showProgress: false, modName: mod.Name);
         return saved;
     }
+    public bool IsFileBased => mod.IsFileBased;
+    public string FileModDescription => Localizer.Text("File-based mod: merged into game configs when you deploy. Choose variants in Mod options. Disable and deploy, or purge, to restore the original configs. No Lua installer or launch-and-exit step is needed.");
     public string Name => mod.Name;
     public string Description => string.IsNullOrWhiteSpace(mod.Description) ? Localizer.Text("No description provided.") : mod.Description;
     public string Version => ModPresentation.Version(mod) ?? Localizer.Text("Not specified");
     public string ImportedAt => mod.ImportedAt.ToLocalTime().ToString("g");
     public string ResourceSummary => $"{ModPresentation.Count(mod.PatchSets.Count, "patch set")} · {ModPresentation.Count(mod.PatchSets.Sum(p => p.Resources.Count), "indexed resource")}";
-    public IReadOnlyList<string> Archives => mod.PatchSets.Select(p => p.Archive).Distinct().ToArray();
-    public IReadOnlyList<string> Files => mod.PatchSets.SelectMany(p => p.Files).Select(f => f.RelativePath).ToArray();
-    public bool HasOptions => mod.Options.Count > 0;
+    public IReadOnlyList<string> Archives => mod.PatchSets.Where(set => set.ContentKind == ModContentKind.ArchivePatch).Select(p => p.Archive).Distinct().ToArray();
+    public IReadOnlyList<string> Files => mod.PatchSets.SelectMany(p => p.Files).Select(f => f.RelativePath).Distinct().ToArray();
+    public bool HasOptions => mod.Options.Any(option => !mod.IsInstallerOption(option));
     public IReadOnlyList<ModRelationshipItem> Dependencies { get; private set; } = [];
     public IReadOnlyList<ModRelationshipItem> Dependents { get; private set; } = [];
     public IReadOnlyList<string> Collisions { get; private set; } = [];
@@ -153,10 +155,12 @@ public sealed class ModRelationshipItem(string name, string status, string notes
 public sealed class ModOptionsViewModel
 {
     public IReadOnlyList<OptionEdit> Options { get; }
+    public bool IsFileBased { get; }
     public bool HasOptions => Options.Count > 0;
     public ModOptionsViewModel(Mod mod, IReadOnlyList<OptionSelection> selections, IReadOnlyList<ModOptionImages>? images = null)
     {
-        Options = mod.Options.Select(o => new OptionEdit(o, selections.FirstOrDefault(s => s.OptionId == o.Id) ?? new(o.Id), images?.FirstOrDefault(image => image.OptionId == o.Id))).ToArray();
+        IsFileBased = mod.IsFileBased;
+        Options = mod.Options.Where(option => !mod.IsInstallerOption(option)).Select(o => new OptionEdit(o, selections.FirstOrDefault(s => s.OptionId == o.Id) ?? new(o.Id), images?.FirstOrDefault(image => image.OptionId == o.Id))).ToArray();
     }
     public IReadOnlyList<OptionSelection> Selections() => Options.Select(o => new OptionSelection(o.Id, o.Enabled, o.ChoiceIndex)).ToArray();
 }

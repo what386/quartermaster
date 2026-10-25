@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 
-CATALOGS = Path(__file__).resolve().parents[1] / "src/Quartermaster.Gui/Localization/Catalogs"
+CATALOGS = Path(__file__).resolve().parents[2] / "src/Quartermaster.Gui/Localization/Catalogs"
 
 
 def load_catalog(path: Path) -> dict:

@@ -148,7 +148,11 @@ staged sets alongside failures.
 
 [`RepatcherAdapter`](../src/Quartermaster.Core/Patching/RepatcherAdapter.cs) implements
 `IPatchRepairer.RepairSet`, translates unsuccessful engine results to
-`InvalidDataException`, and forwards warning messages. The interface's default
+`InvalidDataException`, and forwards warning messages. Warnings explain preserved
+model content, distance-detail models (LODs), and arm-visibility fallbacks in plain
+language, retaining resource IDs for diagnosis. Recovery messages describe what
+was repaired and whether any action is needed. The GUI attributes deployment
+warnings to both the mod and archive. The interface's default
 `RepairSet` implementation only wraps main-buffer repair and preserves companions;
 implement it explicitly for engines that can rebuild them.
 
@@ -180,7 +184,7 @@ repair; recreate the index after game updates. Buffers are limited to .NET array
 sizes.
 
 Equipment assets are embedded at build time. Refresh them with
-`python3 scripts/refresh-repatcher-data.py`; see the
+`python3 scripts/dev/refresh-repatcher-data.py`; see the
 [data maintenance notes](../src/Quartermaster.Repatcher/Data/README.md) for revision
 pinning, provenance, schema validation, and preview commands.
 

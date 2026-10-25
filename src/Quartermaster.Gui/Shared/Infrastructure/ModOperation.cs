@@ -9,16 +9,21 @@ internal static class ModOperation
         public string ModName { get; } = name;
     }
 
-    public static async Task RunAsync(string name, Func<Task> action)
+    public static async Task RunAsync(string name, Func<Task> action, Guid? modId = null)
     {
-        await RunAsync(name, async () => { await action(); return true; });
+        await RunAsync(name, async () => { await action(); return true; }, modId);
     }
 
-    public static async Task<T> RunAsync<T>(string name, Func<Task<T>> action)
+    public static async Task<T> RunAsync<T>(string name, Func<Task<T>> action, Guid? modId = null)
     {
         try { return await action(); }
         catch (OperationCanceledException) { throw; }
         catch (ModException ex) when (ex.ModName == name) { throw; }
-        catch (Exception ex) { throw new ModException(name, ex); }
+        catch (Exception ex)
+        {
+            var failure = new ModException(name, ex);
+            if (modId is { } id) failure.Data["Quartermaster.ModId"] = id;
+            throw failure;
+        }
     }
 }

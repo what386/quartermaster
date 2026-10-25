@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SpaceWizards.Sodium" Version="0.3.0" />
+    <ProjectReference Include="../Quartermaster.Repatcher/Quartermaster.Repatcher.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="THIRD_PARTY_NOTICES.txt" CopyToOutputDirectory="PreserveNewest" TargetPath="FileMerger-THIRD_PARTY_NOTICES.txt" />
+  </ItemGroup>
+</Project>

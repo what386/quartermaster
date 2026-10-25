@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-icon_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../src/Quartermaster.Gui/Assets" && pwd)"
+icon_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../src/Quartermaster.Gui/Assets" && pwd)"
 
 # icon.svg is the canonical source; alternate designs are kept separately.
 magick -background none "$icon_root/icon.svg" -strip "PNG32:$icon_root/icon.png"

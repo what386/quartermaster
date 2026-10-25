@@ -7,5 +7,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../Quartermaster.Core/Quartermaster.Core.csproj" />
+    <ProjectReference Include="../Quartermaster.FileMerger/Quartermaster.FileMerger.csproj" />
   </ItemGroup>
 </Project>

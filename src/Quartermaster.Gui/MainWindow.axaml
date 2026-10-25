@@ -72,12 +72,7 @@
         </Grid>
       </Border>
       <Border Grid.Column="1" Padding="12" ClipToBounds="True">
-        <Grid RowDefinitions="Auto,*">
-          <Expander x:Name="RepatchWarnings" Header="{loc:Loc 'Repatch warnings'}" IsVisible="{Binding Session.HasRepatchWarnings}" Margin="0,0,0,8">
-            <ScrollViewer MaxHeight="180"><TextBlock Text="{Binding Session.RepatchWarnings}" TextWrapping="Wrap" /></ScrollViewer>
-          </Expander>
-          <ContentControl Grid.Row="1" x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
-        </Grid>
+        <ContentControl x:Name="PageHost" Content="{Binding CurrentPage}" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" />
       </Border>
     </Grid>
     <Canvas x:Name="OnboardingLayer" IsVisible="{Binding Onboarding.IsTourVisible}">

@@ -39,7 +39,7 @@ public class LoaderPriorityTests
                 .Single(view => view.DataContext is ProfileModItem row && row.Mod.Id == modId)
                 .FindControl<Border>("ModWarning")!;
             Assert.True(WarningIcon(loader.Id).IsVisible);
-            Assert.Equal(loaderRow.WarningDescription, ToolTip.GetTip(WarningIcon(loader.Id)));
+            Assert.Equal(loaderRow.WarningDescription, Assert.IsType<TextBlock>(ToolTip.GetTip(WarningIcon(loader.Id))).Text);
             Assert.False(WarningIcon(other.Id).IsVisible);
             model.Search = "Other";
             Assert.True(loaderRow.HasWarnings);

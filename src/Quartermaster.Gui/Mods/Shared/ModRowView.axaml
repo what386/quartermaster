@@ -5,7 +5,10 @@
     <Button Grid.Column="1" Classes="rowSwitch" Classes.active="{Binding IsEnabled}" Command="{Binding EnableCommand}" IsVisible="{Binding HasToggle}" AutomationProperties.Name="{Binding ToggleDescription}" VerticalAlignment="Center" Margin="8,0,14,0">
       <Grid Width="30"><Ellipse Fill="{DynamicResource SwitchKnobBrush}" Width="14" Height="14" HorizontalAlignment="{Binding KnobAlignment}" /></Grid>
     </Button>
-    <Border Grid.Column="2" Classes="modTile" ClipToBounds="True" Classes.loaded="{Binding IsLoaded}" Classes.unloaded="{Binding IsUnloaded}" Classes.warning="{Binding HasDeploymentWarning}" ToolTip.Tip="{Binding DeploymentDescription}" HorizontalAlignment="Left" VerticalAlignment="Center">
+    <Border x:Name="DeploymentIcon" Grid.Column="2" Classes="modTile" ClipToBounds="True" Classes.loaded="{Binding IsLoaded}" Classes.unloaded="{Binding IsUnloaded}" Classes.warning="{Binding HasDeploymentWarning}" HorizontalAlignment="Left" VerticalAlignment="Center">
+      <ToolTip.Tip>
+        <TextBlock DataContext="{Binding DataContext, ElementName=DeploymentIcon}" Text="{Binding DeploymentDescription}" MaxWidth="440" TextWrapping="Wrap" />
+      </ToolTip.Tip>
       <Grid>
         <Image x:Name="ModIcon" Stretch="UniformToFill" />
         <TextBlock x:Name="ModMonogram" Text="{Binding Monogram}" FontSize="14" FontWeight="SemiBold" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
@@ -17,6 +20,11 @@
       <TextBlock Text="{Binding TagSummary}" IsVisible="{Binding HasTags}" Classes="muted" FontSize="10" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding TagSummary}" />
     </StackPanel>
     <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+      <Border x:Name="FileModIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding IsFileBased}"
+              ToolTip.Tip="{loc:Loc 'File mod — merged into game configs'}" AutomationProperties.Name="{loc:Loc 'File mod'}">
+        <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/file-mod.svg"
+                        Foreground="{DynamicResource MutedBrush}" Margin="2" IsHitTestVisible="False" />
+      </Border>
       <Border x:Name="LuaIcon" Width="24" Height="24" Background="Transparent" IsVisible="{Binding UsesLua}"
               ToolTip.Tip="{loc:Loc 'Contains Lua scripts'}" AutomationProperties.Name="{loc:Loc 'Contains Lua scripts'}">
         <shared:SvgIcon Source="avares://Quartermaster.Gui/Assets/lua.svg"
@@ -29,8 +37,19 @@
       </Border>
       <Button x:Name="UpdateModButton" Content="{loc:Loc 'Update'}" Classes="primary" Command="{Binding UpdateCommand}" IsVisible="{Binding HasUpdate}"
               ToolTip.Tip="{Binding UpdateDescription}" AutomationProperties.Name="{loc:Loc 'Update mod'}" Padding="8,4" MinHeight="0" />
+      <Border x:Name="ModError" Width="24" Height="24" Background="Transparent" IsVisible="{Binding HasErrors}"
+              AutomationProperties.Name="{Binding ErrorDescription}">
+        <ToolTip.Tip>
+          <TextBlock DataContext="{Binding DataContext, ElementName=ModError}" Text="{Binding ErrorDescription}" MaxWidth="440" TextWrapping="Wrap" />
+        </ToolTip.Tip>
+        <Path Data="M7,2 L17,2 L22,7 L22,17 L17,22 L7,22 L2,17 L2,7 Z M8,8 L16,16 M16,8 L8,16" Stretch="Uniform"
+              Stroke="{DynamicResource ErrorBrush}" StrokeThickness="1.7" Margin="2" IsHitTestVisible="False" />
+      </Border>
       <Border x:Name="ModWarning" Width="24" Height="24" Background="Transparent" IsVisible="{Binding HasWarnings}"
-              ToolTip.Tip="{Binding WarningDescription}" AutomationProperties.Name="{Binding WarningDescription}">
+              AutomationProperties.Name="{Binding WarningDescription}">
+        <ToolTip.Tip>
+          <TextBlock DataContext="{Binding DataContext, ElementName=ModWarning}" Text="{Binding WarningDescription}" MaxWidth="440" TextWrapping="Wrap" />
+        </ToolTip.Tip>
         <Path Data="M12,2 L22,21 L2,21 Z M12,8 L12,14 M12,17 L12,18" Stretch="Uniform"
               Stroke="{DynamicResource ClashBrush}" StrokeThickness="1.7" Margin="2" IsHitTestVisible="False" />
       </Border>

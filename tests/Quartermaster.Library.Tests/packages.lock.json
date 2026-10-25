@@ -34,6 +34,11 @@
         "resolved": "1.3.8",
         "contentHash": "LhwlPa7c1zs1OV2XadMtAWdImjLIsqFJPoRcIWAadSRn0Ri1DepK65UbWLPmt4riLqx2d40xjXRk0ogpqNtK7g=="
       },
+      "libsodium": {
+        "type": "Transitive",
+        "resolved": "1.0.20.1",
+        "contentHash": "pkiceEqJDQFHjbga3k/oPfTVX9g+GKJZ1VrkuiLhaymt9YNw1Dr7cX9hNuZuNaWcr9WD0moW55k4pMwzQ7JaZQ=="
+      },
       "Microsoft.CodeCoverage": {
         "type": "Transitive",
         "resolved": "18.10.1",
@@ -50,6 +55,22 @@
         "contentHash": "KYz2omqkoz9E2mWa4fdgT+Ycie1wi5968EmyJlusjlp87RxxtA2FvDm8tcBEYIDzLnkWGnsKjE4d13Z7/rxkQA==",
         "dependencies": {
           "Microsoft.TestPlatform.ObjectModel": "18.10.1"
+        }
+      },
+      "SpaceWizards.Sodium": {
+        "type": "Transitive",
+        "resolved": "0.3.0",
+        "contentHash": "/F0c4l0+eDW/ODPa8WIdlO6SjzWu0i6PxsfhccTugLyu/NU7uChPJlgkWSH0G4eJ47Fo3Bm+bDHwKcclSrBJuQ==",
+        "dependencies": {
+          "SpaceWizards.Sodium.Interop": "1.1.0"
+        }
+      },
+      "SpaceWizards.Sodium.Interop": {
+        "type": "Transitive",
+        "resolved": "1.1.0",
+        "contentHash": "A+3RZ8qk3+1cB8KAha7QsYeRuK/iMsxO63zVLTidWWYGk8bKl8Jc44OsIY/rknCZoqePEoj6uzkxwrvp/boc+g==",
+        "dependencies": {
+          "libsodium": "1.0.20.1"
         }
       },
       "xunit.abstractions": {
@@ -95,13 +116,21 @@
       "quartermaster.core": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Repatcher": "[0.8.1, )"
+          "Quartermaster.Repatcher": "[0.10.4, )"
+        }
+      },
+      "quartermaster.filemerger": {
+        "type": "Project",
+        "dependencies": {
+          "Quartermaster.Repatcher": "[0.10.4, )",
+          "SpaceWizards.Sodium": "[0.3.0, )"
         }
       },
       "quartermaster.library": {
         "type": "Project",
         "dependencies": {
-          "Quartermaster.Core": "[0.8.1, )"
+          "Quartermaster.Core": "[0.10.4, )",
+          "Quartermaster.FileMerger": "[0.10.4, )"
         }
       },
       "quartermaster.repatcher": {

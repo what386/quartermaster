@@ -1,5 +1,7 @@
 using Quartermaster.Core.Deployment;
 using Quartermaster.Library.Mods;
+using Quartermaster.Library.Importing;
+using Quartermaster.Library.Profiles;
 
 namespace Quartermaster.Library.Storage;
 
@@ -80,6 +82,12 @@ public sealed class StorageManager(string applicationDirectory)
             throw new InvalidDataException("Invalid deployment ledger.");
         var uncertain = ledger is not null && ledger.Status != DeploymentStatus.Complete;
         var deployed = ledger?.Mods.ToHashSet() ?? [];
+        if (ledger is not null && Directory.Exists(ledger.TargetDirectory))
+        {
+            var fileMods = await new ProfileFileMods(new ModContentStore(root)).InspectAsync(ledger.TargetDirectory, ct).ConfigureAwait(false);
+            deployed.UnionWith(fileMods.AppliedModIds);
+            uncertain |= !fileMods.Complete;
+        }
         long deployedBytes = 0;
         if (ledger is not null)
             foreach (var file in ledger.Files)

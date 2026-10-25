@@ -21,8 +21,8 @@ reference credits the archive-name index to HD2SDK Community Edition. See
 From the repository root, using Python 3:
 
 ```sh
-python3 scripts/refresh-repatcher-data.py --check
-python3 scripts/refresh-repatcher-data.py
+python3 scripts/dev/refresh-repatcher-data.py --check
+python3 scripts/dev/refresh-repatcher-data.py
 # Or with just:
 just refresh-repatcher-data
 ```
@@ -50,7 +50,7 @@ for authenticated GitHub API requests if unauthenticated rate limits are reached
 
 Review the resulting diff and run `dotnet test tests/Quartermaster.Repatcher.Tests`
 before committing refreshed assets. The refresh script's checks can be run with
-`python3 -m unittest discover -s scripts/tests`.
+`python3 -m unittest discover -s scripts/dev`.
 
 New or unclassified equipment retains its own LOD data; unfamiliar units are
 never eligible for current-game arm culling solely from a guessed role.

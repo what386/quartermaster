@@ -3,6 +3,7 @@
     <Project Path="src/Quartermaster.Interop/Quartermaster.Interop.csproj" />
     <Project Path="src/Quartermaster.SelfUpdate/Quartermaster.SelfUpdate.csproj" />
     <Project Path="src/Quartermaster.Providers/Quartermaster.Providers.csproj" />
+    <Project Path="src/Quartermaster.FileMerger/Quartermaster.FileMerger.csproj" />
     <Project Path="src/Quartermaster.Gui/Quartermaster.Gui.csproj" />
     <Project Path="src/Quartermaster.Repatcher/Quartermaster.Repatcher.csproj" />
     <Project Path="src/Quartermaster.Core/Quartermaster.Core.csproj" />
@@ -12,6 +13,7 @@
     <Project Path="tests/Quartermaster.Interop.Tests/Quartermaster.Interop.Tests.csproj" />
     <Project Path="tests/Quartermaster.SelfUpdate.Tests/Quartermaster.SelfUpdate.Tests.csproj" />
     <Project Path="tests/Quartermaster.Providers.Tests/Quartermaster.Providers.Tests.csproj" />
+    <Project Path="tests/Quartermaster.FileMerger.Tests/Quartermaster.FileMerger.Tests.csproj" />
     <Project Path="tests/Quartermaster.Gui.Tests/Quartermaster.Gui.Tests.csproj" />
     <Project Path="tests/Quartermaster.Repatcher.Tests/Quartermaster.Repatcher.Tests.csproj" />
     <Project Path="tests/Quartermaster.Core.Tests/Quartermaster.Core.Tests.csproj" />

@@ -10,5 +10,6 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1" PrivateAssets="all" />
     <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.4" />
     <ProjectReference Include="../../src/Quartermaster.Gui/Quartermaster.Gui.csproj" />
+    <Compile Include="../Quartermaster.FileMerger.Tests/Fixture.cs" Link="Fixtures/FileModFixture.cs" />
   </ItemGroup>
 </Project>

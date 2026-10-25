@@ -701,7 +701,7 @@ public class GuiTests
                 var row = window.GetVisualDescendants().OfType<ModRowView>().Single(view => view.DataContext is ProfileModItem mod && mod.Name == name);
                 var border = row.GetVisualDescendants().OfType<Border>().Single(b => b.Classes.Contains("modTile"));
                 Assert.Equal(Avalonia.Media.Color.Parse(color), Assert.IsAssignableFrom<Avalonia.Media.ISolidColorBrush>(border.BorderBrush).Color);
-                Assert.Equal(item.DeploymentDescription, ToolTip.GetTip(border));
+                Assert.Equal(item.DeploymentDescription, Assert.IsType<TextBlock>(ToolTip.GetTip(border)).Text);
             }
             Check("Cape", ModDeploymentState.Warning, "#E2C457");
             profiles.SelectedMod = profiles.Entries.Single(e => e.Name == "Cape");
@@ -1714,6 +1714,8 @@ public class GuiTests
         await profiles.DeployCommand.ExecuteAsync();
         Assert.False(f.Services.Operations.IsError);
         Assert.Contains("absent from installed game", f.Services.Session.RepatchWarnings);
+        var rows = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage).Entries;
+        Assert.Contains(rows, row => row.HasWarnings && row.WarningDescription.Contains("absent from installed game"));
         Assert.Equal(previous, File.ReadAllBytes(Path.Combine(f.Game, Fixture.Archive + ".patch_0")));
     }
 

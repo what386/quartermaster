@@ -11,6 +11,7 @@ public sealed class JsonLibraryStore : ILibraryStore
 {
     public string Root { get; }
     public JsonLibraryStore(string root) => Root = Path.GetFullPath(root);
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, IReadOnlyList<PatchSet>> fileDetectionCache = new();
     private sealed record LibraryDocument(int SchemaVersion, IReadOnlyList<Mod> Mods, IReadOnlyList<UpdateCheck> UpdateChecks);
     private sealed record ProfilesDocument(int SchemaVersion, IReadOnlyList<Profile> Profiles, Guid? ActiveProfileId);
     public async Task<LibraryState> LoadAsync(CancellationToken cancellationToken = default)
@@ -36,8 +37,25 @@ public sealed class JsonLibraryStore : ILibraryStore
         catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or NullReferenceException)
         { throw new InvalidDataException($"Invalid library state: {ex.Message}", ex); }
         var mods = new List<Mod>();
-        foreach (var mod in state.Mods)
+        foreach (var original in state.Mods)
+        {
+            var mod = original;
+            if (mod.FileDetectionVersion < FileModMetadata.Version)
+            {
+                var key = mod.Id.ToString() + string.Join("|", mod.PatchSets.Select(set =>
+                    $"{set.Id}:{set.Archive}:{set.Folder}:{set.ContentKind}:" + string.Join(",", set.Files.Select(file => file.RelativePath + ":" + file.Sha256))));
+                if (!fileDetectionCache.TryGetValue(key, out var classified))
+                {
+                    var sets = new List<PatchSet>();
+                    var directory = ManagedPaths.Resolve(Root, "library/" + mod.Id.ToString("N"));
+                    foreach (var set in mod.PatchSets)
+                        sets.Add(await FileModMetadata.ClassifyAsync(directory, set, cancellationToken).ConfigureAwait(false));
+                    fileDetectionCache[key] = classified = sets.ToArray();
+                }
+                mod = mod with { PatchSets = classified, FileDetectionVersion = FileModMetadata.Version };
+            }
             mods.Add(await ManifestReader.CorrectLegacyIncludesAsync(Root, mod, cancellationToken).ConfigureAwait(false));
+        }
         return state with { Mods = mods.ToArray() };
     }
     public async Task SaveAsync(LibraryState state, CancellationToken cancellationToken = default)

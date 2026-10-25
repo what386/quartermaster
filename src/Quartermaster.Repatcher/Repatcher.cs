@@ -95,7 +95,7 @@ public sealed partial class Repatcher(IUnitResourceSource resources, RepairOptio
                     if (options.MissingUnits == MissingUnitPolicy.Keep)
                     {
                         retained.Add(record);
-                        warnings.Add(new("MissingUnitKept", $"Kept unit {record.FileId:x16}, absent from installed game data; its compatibility could not be verified.", record.FileId));
+                        warnings.Add(new("MissingUnitKept", $"Model compatibility could not be checked.\nModel ID: {record.FileId:x16}\nThis model is absent from installed game data. Its modded content was kept instead of removed.\nIf it fails to appear or looks broken in game, check that the mod supports your game version and look for an updated mod.", record.FileId));
                         outcomes.Add(new(record.FileId, "MissingKept", true));
                     }
                     else

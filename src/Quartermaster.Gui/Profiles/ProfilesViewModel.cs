@@ -11,7 +11,7 @@ namespace Quartermaster.Gui.Profiles;
 
 public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
-public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "") : ViewModelBase, IModRow, IProfileListItem
+public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "", string ErrorDescription = "", string? DeploymentDetail = null) : ViewModelBase, IModRow, IProfileListItem
 {
     public Mod Mod { get; private set; } = Mod;
     public ProfileEntry Entry { get; private set; } = Entry;
@@ -22,8 +22,23 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public ModDeploymentState DeploymentState { get; private set; } = DeploymentState;
     public string WarningDescription { get; private set; } = WarningDescription;
     public bool HasWarnings => WarningDescription.Length > 0;
+    public string ErrorDescription { get; private set; } = ErrorDescription;
+    public bool HasErrors => ErrorDescription.Length > 0;
+    public void UpdateDiagnostics(string warnings, string errors)
+    {
+        var changes = new (string Name, object? Before, object? After)[]
+        {
+            (nameof(WarningDescription), WarningDescription, warnings),
+            (nameof(ErrorDescription), ErrorDescription, errors),
+            (nameof(HasWarnings), HasWarnings, warnings.Length > 0),
+            (nameof(HasErrors), HasErrors, errors.Length > 0),
+        };
+        WarningDescription = warnings; ErrorDescription = errors;
+        NotifyChanges(changes);
+    }
     public bool InstalledAsDependency => Mod.InstalledAsDependency;
     public bool UsesLua => Mod.UsesLua;
+    public bool IsFileBased => Mod.IsFileBased;
     public AsyncCommand? UpdateCommand { get; private set; }
     public void Update(ProfileModItem value)
     {
@@ -39,8 +54,11 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
             (nameof(HasConflict), HasConflict, value.HasConflict),
             (nameof(WarningDescription), WarningDescription, value.WarningDescription),
             (nameof(HasWarnings), HasWarnings, value.HasWarnings),
+            (nameof(HasErrors), HasErrors, value.HasErrors),
+            (nameof(ErrorDescription), ErrorDescription, value.ErrorDescription),
             (nameof(InstalledAsDependency), InstalledAsDependency, value.InstalledAsDependency),
             (nameof(UsesLua), UsesLua, value.UsesLua),
+            (nameof(IsFileBased), IsFileBased, value.IsFileBased),
             (nameof(IconPath), IconPath, value.IconPath),
             (nameof(IsLoaded), IsLoaded, value.IsLoaded),
             (nameof(IsUnloaded), IsUnloaded, value.IsUnloaded),
@@ -57,6 +75,8 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
         };
         Mod = value.Mod; Entry = value.Entry; Index = value.Index;
         WarningDescription = value.WarningDescription;
+        ErrorDescription = value.ErrorDescription;
+        DeploymentDetail = value.DeploymentDetail;
         HasConflict = value.HasConflict; IconPath = value.IconPath; DeploymentState = value.DeploymentState;
         // Update commands act on the mod ID, so retain them while an update remains available.
         if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
@@ -78,15 +98,16 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public bool IsLoaded => DeploymentState == ModDeploymentState.Loaded;
     public bool IsUnloaded => DeploymentState == ModDeploymentState.Unloaded;
     public bool HasDeploymentWarning => DeploymentState is ModDeploymentState.Warning or ModDeploymentState.Unknown;
-    public string DeploymentDescription => DeploymentState switch
+    private string? DeploymentDetail { get; set; } = DeploymentDetail;
+    public string DeploymentDescription => DeploymentDetail ?? (DeploymentState switch
     {
         ModDeploymentState.Unloaded => Localizer.Text("Disabled and unloaded"),
         ModDeploymentState.Loaded => Localizer.Text("Enabled and deployed"),
         ModDeploymentState.Unknown => Localizer.Text("Deployment state could not be verified. Check the game folder or purge and redeploy."),
         _ => Entry.Enabled ? Localizer.Text("Enabled but not deployed as configured. Deploy this profile to apply changes.") :
             Localizer.Text("Disabled but still deployed. Redeploy or purge to unload.")
-    };
-    public bool HasOptions => Mod.Options.Count > 0;
+    });
+    public bool HasOptions => Mod.Options.Any(option => !Mod.IsInstallerOption(option));
     public bool HasToggle => true;
     public bool IsGrouped => Entry.GroupId is not null;
     public bool IsEnabled => Entry.Enabled;
@@ -214,7 +235,7 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         }, () => HasProfile && Session.GameDirectory != "");
         PurgeCommand = Operations.CreateCommand("Purging patches", async ct =>
         {
-            if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Purge patches"), Localizer.Text("Remove all mod patch files from the selected game folder? Imported originals and profiles will remain."), "Purge"))
+            if (await Services.Dialogs.ConfirmAsync(Localizer.Text("Purge patches"), Localizer.Text("Remove all mod patches and restore file-mod game configs? Imported originals and profiles will remain."), "Purge"))
                 await Session.PurgeAsync(ct);
         }, () => Session.GameDirectory != "");
         Operations.PropertyChanged += (_, e) =>
@@ -238,11 +259,21 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         if (moved.Entries.SequenceEqual(entries)) return Task.CompletedTask;
         return Operations.RunAsync("Reordering mods", ct => Save(moved, ct), showProgress: false);
     }
+    private Guid? lastActiveProfileId;
+    protected override void RefreshModDiagnostics()
+    {
+        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, diagnostics: Session.GetModWarnings(SelectedProfile));
+        var errors = Session.GetModErrors(SelectedProfile);
+        foreach (var row in Entries) row.UpdateDiagnostics(warnings.GetValueOrDefault(row.Mod.Id, ""), errors.GetValueOrDefault(row.Mod.Id, ""));
+    }
     protected override void Refresh()
     {
         Profiles = Session.State.Profiles.ToArray(); Notify(nameof(Profiles));
-        // Session refreshes also replace mod metadata, so rebuild once even if the profile is unchanged.
-        Set(ref profile, Session.ActiveProfile ?? Profiles.FirstOrDefault(), nameof(SelectedProfile));
+        // Background diagnostics should retain the viewed loadout. Deliberate active-profile changes still select it.
+        var selected = lastActiveProfileId == Session.State.ActiveProfileId && profile is not null
+            ? Profiles.FirstOrDefault(candidate => candidate.Id == profile.Id) : null;
+        lastActiveProfileId = Session.State.ActiveProfileId;
+        Set(ref profile, selected ?? Session.ActiveProfile ?? Profiles.FirstOrDefault(), nameof(SelectedProfile));
         RebuildEntries();
     }
     private void RebuildEntries()
@@ -259,14 +290,18 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         var mods = Session.State.Mods.ToDictionary(m => m.Id);
         var report = SelectedProfile is null ? new ConflictReport([], []) : ConflictAnalyzer.Analyze(ProfilePatches.Resolve(Session.State, SelectedProfile));
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
-        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, report);
+        var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, report, Session.GetModWarnings(SelectedProfile));
+        var errors = Session.GetModErrors(SelectedProfile);
+        var deploymentDetails = SelectedProfile is null ? new Dictionary<Guid, string>() : DeploymentMessages.ForProfile(Session, SelectedProfile);
         var rows = SelectedProfile?.Entries.Select((e, index) =>
         {
             // Recycled controls retain their appearance during silent edits; RunAsync still prevents concurrent saves.
+            var deploymentState = DeploymentStateFor(mods[e.ModId], e);
+            if (deploymentState == ModDeploymentState.Loaded && deploymentDetails.ContainsKey(e.ModId)) deploymentState = ModDeploymentState.Warning;
             var row = new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !Entries.Single(row => row.Mod.Id == e.ModId).IsEnabled), ct)),
-                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e),
-                warnings.GetValueOrDefault(e.ModId, ""));
+                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), deploymentState,
+                warnings.GetValueOrDefault(e.ModId, ""), errors.GetValueOrDefault(e.ModId, ""), deploymentDetails.GetValueOrDefault(e.ModId));
             row.SetUpdate(Services.Downloads.CreateUpdateCommand(mods[e.ModId]), Services.Downloads.UpdateDescription(mods[e.ModId]));
             if (existing.TryGetValue(e.ModId, out var current)) { current.Update(row); return current; }
             return row;
@@ -291,12 +326,22 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         if (Session.Inspection is not { Ledger.Status: DeploymentStatus.Complete } inspection)
             return ModDeploymentState.Unknown;
         var owned = inspection.Ledger.Files.Where(file => file.SourceId == mod.Id).ToArray();
+        var selectedSets = PatchSelection.Select(mod, entry);
+        if (mod.IsFileBased)
+        {
+            var fileLoaded = Session.FileModHealth.AppliedModIds.Contains(mod.Id);
+            if (!entry.Enabled) return fileLoaded || owned.Length > 0 ? ModDeploymentState.Warning : ModDeploymentState.Unloaded;
+            var fileSelected = selectedSets.Any(set => set.ContentKind == ModContentKind.FileMod);
+            if (fileSelected && (!Session.FileModSelectionMatches(SelectedProfile!) || !fileLoaded)) return ModDeploymentState.Warning;
+            if (!selectedSets.Any(set => set.ContentKind == ModContentKind.ArchivePatch))
+                return fileSelected ? ModDeploymentState.Loaded : ModDeploymentState.Unloaded;
+        }
         var health = inspection.Files.ToDictionary(file => file.Name, file => file.Status);
         var anyLoaded = owned.Any(file => health.TryGetValue(file.Name, out var status) && status != ManagedFileStatus.Missing);
         if (!entry.Enabled) return anyLoaded ? ModDeploymentState.Warning : ModDeploymentState.Unloaded;
         if (!anyLoaded) return ModDeploymentState.Warning;
         // Match the selected variants and original hashes; repatched files have their own deployed hashes.
-        var expected = PatchSelection.Select(mod, entry).SelectMany(set => set.Files.Select(file => (set.Id, File: file)))
+        var expected = selectedSets.Where(set => set.ContentKind == ModContentKind.ArchivePatch).SelectMany(set => set.Files.Select(file => (set.Id, File: file)))
             .ToDictionary(item => (item.Id, item.File.Kind), item => item.File);
         var optionsHash = PatchSelection.OptionsHash(mod, entry);
         return owned.Count(file => !file.GeneratedByRepair) == expected.Count && owned.All(file =>

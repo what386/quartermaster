@@ -9,7 +9,7 @@ import unittest
 from unittest.mock import patch
 
 
-spec = importlib.util.spec_from_file_location("refresh_repatcher_data", Path(__file__).resolve().parents[1] / "refresh-repatcher-data.py")
+spec = importlib.util.spec_from_file_location("refresh_repatcher_data", Path(__file__).resolve().parent / "refresh-repatcher-data.py")
 refresh = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(refresh)
 
