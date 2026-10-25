@@ -1,6 +1,13 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-23*
+*Generated on 2026-10-25*
+
+## 0.11.0 — 2026-10-25
+
+### Changes
+
+- explicit support for filemods (+merger)
+
 
 ## 0.10.4 — 2026-10-23
 

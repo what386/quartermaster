@@ -18,10 +18,3 @@
 - [ ] Support size-changing file mods
       @created 2026-10-23 22:40
 
-
-## Completed
-
-- [x] explicit support for filemods (+merger)
-      @created 2026-10-25 18:59
-      @completed 2026-10-25 18:59
-
