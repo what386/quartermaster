@@ -12,6 +12,21 @@ namespace Quartermaster.Library.Tests;
 public class LibraryTests
 {
     [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(5)]
+    public async Task DirectImportsStillRejectUnsupportedManifestSchemasWithTheActualVersion(int version)
+    {
+        using var f = new Fixture(); var source = f.Source("Unsupported schema");
+        await File.WriteAllTextAsync(Path.Combine(source, "manifest.json"), "{\"Version\":" + version + "}");
+        var error = await Assert.ThrowsAsync<InvalidDataException>(() => f.Library.ImportAsync(source));
+        Assert.Contains($"Unsupported manifest schema version {version}", error.Message);
+        Assert.Contains("manifest.json", error.Message);
+        Assert.Contains("ModVersion", error.Message);
+        Assert.Empty((await f.Library.LoadAsync()).Mods);
+    }
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task LuaDetectionUsesPackedResourcesAndWorksAfterReload(bool lua)

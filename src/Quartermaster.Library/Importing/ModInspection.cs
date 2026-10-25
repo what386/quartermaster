@@ -24,7 +24,8 @@ internal static class ManifestReader
         if (manifests.Length == 0) return (null, []);
         if (manifests.Length > 1) throw new InvalidDataException("Import contains multiple mod manifests.");
         var manifest = await JsonFiles.ReadAsync<Manifest>(ManagedPaths.Resolve(root, manifests[0]), ct).ConfigureAwait(false);
-        if (manifest.Version != 1) throw new InvalidDataException("Unsupported manifest version.");
+        if (manifest.Version != 1)
+            throw new InvalidDataException($"Unsupported manifest schema version {manifest.Version} in '{manifests[0]}'. Supported schema: 1. A mod release version belongs in ModVersion.");
         var baseFolder = Path.GetDirectoryName(manifests[0])?.Replace('\\', '/') ?? "";
         string ResolvePrefix(string raw)
         {

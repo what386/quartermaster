@@ -42,16 +42,16 @@ public class ModWarningTests
             CancellationToken.None
         );
         Assert.Same(row, model.Entries.Single(row => row.Mod.Id == dependent.Id));
-        Assert.Contains("Requires Requirement (disabled)", row.WarningDescription);
+        Assert.Contains("Enable Requirement in this loadout", row.WarningDescription);
         Assert.Contains(
-            "Required by enabled mod Dependent",
+            "Required by:\n  Dependent",
             model.Entries.Single(row => row.Mod.Id == requirement.Id).WarningDescription
         );
         // Filtering must not remove warnings from the deployment confirmation.
         model.Search = "nothing visible";
         f.Dialogs.Confirm = false;
         await model.DeployCommand.ExecuteAsync();
-        Assert.Contains(row.WarningDescription, f.Dialogs.Confirmations.Last().Message);
+        Assert.Contains(row.WarningDescription.Replace("\n", "\n  "), f.Dialogs.Confirmations.Last().Message);
         await f.Services.Session.SaveProfileAsync(profile, false, CancellationToken.None);
         Assert.False(row.HasWarnings);
         await f.Services.Session.SaveProfileAsync(
@@ -59,7 +59,7 @@ public class ModWarningTests
             false,
             CancellationToken.None
         );
-        Assert.Contains("missing from this profile", row.WarningDescription);
+        Assert.Contains("Add Requirement from Library to this loadout and enable it", row.WarningDescription);
         // Metadata survives reopening the library, without a provider request.
         await using var reopened = f.ReopenServices();
         await reopened.Session.InitializeAsync(CancellationToken.None);
@@ -99,9 +99,9 @@ public class ModWarningTests
         );
         var model = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
         var row = model.Entries.Single(row => row.Mod.Id == first.Id);
-        Assert.Contains("Requires Missing", row.WarningDescription);
-        Assert.Contains("Clashes with Winner", row.WarningDescription);
-        Assert.Contains("Winner wins", row.WarningDescription);
+        Assert.Contains("Dependency:\n  Missing", row.WarningDescription);
+        Assert.Contains("Overridden mods:\n  First", row.WarningDescription);
+        Assert.Contains("Applied mod:\n  Winner", row.WarningDescription);
         var window = new MainWindow { DataContext = f.Shell };
         window.Show();
         try
@@ -126,22 +126,22 @@ public class ModWarningTests
             );
             f.Dialogs.Confirm = false;
             await model.DeployCommand.ExecuteAsync();
-            Assert.Contains("Requires Missing", f.Dialogs.Confirmations.Last().Message);
-            Assert.Contains("Clashes with Winner", f.Dialogs.Confirmations.Last().Message);
+            Assert.Contains("Download or import Missing", f.Dialogs.Confirmations.Last().Message);
+            Assert.Contains("These mods replace the same game assets", f.Dialogs.Confirmations.Last().Message);
             await model.MoveModAsync(first.Id, winner.Id, true);
-            Assert.Contains("First wins", row.WarningDescription);
+            Assert.Contains("Applied mod:\n  First", row.WarningDescription);
             Assert.Equal(row.WarningDescription, Assert.IsType<TextBlock>(ToolTip.GetTip(icon)).Text);
             await f.Services.Session.SaveProfileAsync(
                 ProfileEditor.SetEnabled(model.SelectedProfile!, winner.Id, false),
                 false,
                 CancellationToken.None
             );
-            Assert.DoesNotContain("Clashes", row.WarningDescription);
+            Assert.DoesNotContain("Overridden mods:", row.WarningDescription);
             Assert.True(row.HasWarnings);
             f.Shell.Navigate(PageKind.Mods);
             var library = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
             Assert.Contains(
-                "missing from your library",
+                "Download or import Missing",
                 library.Mods.Single(mod => mod.Mod.Id == first.Id).WarningDescription
             );
         }

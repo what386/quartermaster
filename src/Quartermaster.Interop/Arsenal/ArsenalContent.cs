@@ -35,13 +35,23 @@ internal static class ArsenalContent
         if (document is null) return await contents.ImportAsync(mod.Directory, mod.Name, ct).ConfigureAwait(false);
         var changed = false;
         var version = document.FirstOrDefault(pair => pair.Key.Equals("Version", StringComparison.OrdinalIgnoreCase));
-        // Some Arsenal manifests use Version for the mod release instead of the schema.
-        if (version.Value is JsonValue release && release.TryGetValue<string>(out var releaseName))
+        // Arsenal manifests also use Version for a release, as either a string or a number.
+        // Keep integer 1 as the normal schema marker. Normalize releases in the copy only;
+        // ordinary library imports still require the supported Quartermaster manifest schema.
+        if (version.Value is JsonValue release)
         {
-            if (!document.Any(pair => pair.Key.Equals("ModVersion", StringComparison.OrdinalIgnoreCase)))
-                document["ModVersion"] = releaseName;
-            document[version.Key] = 1;
-            changed = true;
+            string? releaseName = null;
+            if (release.TryGetValue<string>(out var text)) releaseName = text;
+            else if (release.GetValueKind() == JsonValueKind.Number &&
+                (!release.TryGetValue<int>(out var schema) || schema != 1))
+                releaseName = release.ToJsonString(); // Preserve numeric spelling, such as 5.0.
+            if (releaseName is not null)
+            {
+                if (!document.Any(pair => pair.Key.Equals("ModVersion", StringComparison.OrdinalIgnoreCase)))
+                    document["ModVersion"] = releaseName;
+                document[version.Key] = 1;
+                changed = true;
+            }
         }
         var property = document?.FirstOrDefault(pair => pair.Key.Equals("Options", StringComparison.OrdinalIgnoreCase));
         if (property?.Value is JsonArray options && options.Any(option => option is JsonValue value && value.TryGetValue<string>(out _)))

@@ -11,7 +11,7 @@ namespace Quartermaster.Gui.Profiles;
 
 public enum ModDeploymentState { Unloaded, Loaded, Warning, Unknown }
 
-public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "", string ErrorDescription = "") : ViewModelBase, IModRow, IProfileListItem
+public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, AsyncCommand EnableCommand, bool HasConflict, string? IconPath = null, ModDeploymentState DeploymentState = ModDeploymentState.Unknown, string WarningDescription = "", string ErrorDescription = "", string? DeploymentDetail = null) : ViewModelBase, IModRow, IProfileListItem
 {
     public Mod Mod { get; private set; } = Mod;
     public ProfileEntry Entry { get; private set; } = Entry;
@@ -76,6 +76,7 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
         Mod = value.Mod; Entry = value.Entry; Index = value.Index;
         WarningDescription = value.WarningDescription;
         ErrorDescription = value.ErrorDescription;
+        DeploymentDetail = value.DeploymentDetail;
         HasConflict = value.HasConflict; IconPath = value.IconPath; DeploymentState = value.DeploymentState;
         // Update commands act on the mod ID, so retain them while an update remains available.
         if (HasUpdate != value.HasUpdate) { UpdateCommand = value.UpdateCommand; Notify(nameof(UpdateCommand)); }
@@ -97,14 +98,15 @@ public sealed class ProfileModItem(Mod Mod, ProfileEntry Entry, int Index, Async
     public bool IsLoaded => DeploymentState == ModDeploymentState.Loaded;
     public bool IsUnloaded => DeploymentState == ModDeploymentState.Unloaded;
     public bool HasDeploymentWarning => DeploymentState is ModDeploymentState.Warning or ModDeploymentState.Unknown;
-    public string DeploymentDescription => DeploymentState switch
+    private string? DeploymentDetail { get; set; } = DeploymentDetail;
+    public string DeploymentDescription => DeploymentDetail ?? (DeploymentState switch
     {
         ModDeploymentState.Unloaded => Localizer.Text("Disabled and unloaded"),
         ModDeploymentState.Loaded => Localizer.Text("Enabled and deployed"),
         ModDeploymentState.Unknown => Localizer.Text("Deployment state could not be verified. Check the game folder or purge and redeploy."),
         _ => Entry.Enabled ? Localizer.Text("Enabled but not deployed as configured. Deploy this profile to apply changes.") :
             Localizer.Text("Disabled but still deployed. Redeploy or purge to unload.")
-    };
+    });
     public bool HasOptions => Mod.Options.Any(option => !Mod.IsInstallerOption(option));
     public bool HasToggle => true;
     public bool IsGrouped => Entry.GroupId is not null;
@@ -290,13 +292,16 @@ public sealed partial class ProfilesViewModel : SessionViewModel
         var colliding = report.Resources.SelectMany(c => c.SourceIds).ToHashSet();
         var warnings = ModWarnings.ForProfile(Session.State, SelectedProfile, report, Session.GetModWarnings(SelectedProfile));
         var errors = Session.GetModErrors(SelectedProfile);
+        var deploymentDetails = SelectedProfile is null ? new Dictionary<Guid, string>() : DeploymentMessages.ForProfile(Session, SelectedProfile);
         var rows = SelectedProfile?.Entries.Select((e, index) =>
         {
             // Recycled controls retain their appearance during silent edits; RunAsync still prevents concurrent saves.
+            var deploymentState = DeploymentStateFor(mods[e.ModId], e);
+            if (deploymentState == ModDeploymentState.Loaded && deploymentDetails.ContainsKey(e.ModId)) deploymentState = ModDeploymentState.Warning;
             var row = new ProfileModItem(mods[e.ModId], e, index,
             new AsyncCommand(() => Operations.RunAsync("Changing enabled mods", ct => Save(ProfileEditor.SetEnabled(SelectedProfile!, e.ModId, !Entries.Single(row => row.Mod.Id == e.ModId).IsEnabled), ct)),
-                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), DeploymentStateFor(mods[e.ModId], e),
-                warnings.GetValueOrDefault(e.ModId, ""), errors.GetValueOrDefault(e.ModId, ""));
+                () => !Operations.IsProgressVisible, Operations.ReportError), colliding.Contains(e.ModId), Session.GetIconPath(mods[e.ModId]), deploymentState,
+                warnings.GetValueOrDefault(e.ModId, ""), errors.GetValueOrDefault(e.ModId, ""), deploymentDetails.GetValueOrDefault(e.ModId));
             row.SetUpdate(Services.Downloads.CreateUpdateCommand(mods[e.ModId]), Services.Downloads.UpdateDescription(mods[e.ModId]));
             if (existing.TryGetValue(e.ModId, out var current)) { current.Update(row); return current; }
             return row;

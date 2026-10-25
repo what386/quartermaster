@@ -367,6 +367,53 @@ public sealed class ArsenalTests
     }
 
     [Theory]
+    [InlineData("4", null, "4")] // Skip Intro's downloaded manifest uses integer Version 4.
+    [InlineData("5", null, "5")]
+    [InlineData("5.0", null, "5.0")]
+    [InlineData("0", null, "0")]
+    [InlineData("1", null, null)]
+    [InlineData("1.0", null, "1.0")]
+    [InlineData("\"5.0\"", null, "5.0")]
+    [InlineData("5", "release-5.0", "release-5.0")]
+    public async Task ArsenalReleaseVersionsAreNormalizedOnlyInTheImportedCopy(string version, string? explicitVersion, string? expected)
+    {
+        using var f = new Fixture(); var root = await ArsenalData(f);
+        var folder = Path.Combine(root, "mods", "b");
+        var intro = Path.Combine(folder, "skipintro"); Directory.CreateDirectory(intro);
+        foreach (var file in Directory.GetFiles(folder)) File.Move(file, Path.Combine(intro, Path.GetFileName(file)));
+        var manifest = "{\"version\":" + version +
+            (explicitVersion is null ? "" : ",\"modVersion\":" + JsonSerializer.Serialize(explicitVersion)) +
+            ",\"Options\":[{\"Name\":\"Skip Intro\",\"Include\":[\"skipintro\"]}]}";
+        var path = Path.Combine(folder, "manifest.json"); await File.WriteAllTextAsync(path, manifest);
+        var dataPath = Path.Combine(root, "hd2a_data.json"); var data = await File.ReadAllTextAsync(dataPath);
+        var plan = await ArsenalReader.ReadAsync(root);
+        plan = plan with
+        {
+            Mods = plan.Mods.Select(mod => mod.Id == B ? mod with { Name = "Skip Intro (3/30/26)" } : mod).ToArray(),
+            Profiles = plan.Profiles.Select(profile => profile with
+            { Rows = profile.Rows.Select(row => row.Id == B ? row with { Options = [new("Skip Intro", true, [])] } : row).ToArray() }).ToArray()
+        };
+        var result = await new ArsenalImporter(f.Store, f.Contents).ImportAsync(plan);
+        var imported = (await f.Library.LoadAsync()).Mods.Single(mod => mod.Name == "Skip Intro (3/30/26)");
+        Assert.Equal(expected, imported.Version);
+        Assert.Equal("Skip Intro", Assert.Single(imported.Options).Name);
+        foreach (var profile in result.Profiles)
+        {
+            var entry = profile.Entries.Single(entry => entry.ModId == imported.Id);
+            Assert.True(Assert.Single(entry.Options).Enabled);
+            Assert.Single(PatchSelection.Select(imported, entry with { Enabled = true }));
+        }
+        var stored = JsonNode.Parse(await File.ReadAllTextAsync(Path.Combine(f.Contents.GetModDirectory(imported.Id), "manifest.json")))!;
+        Assert.Equal(1, stored["version"]!.GetValue<int>());
+        Assert.Equal(manifest, await File.ReadAllTextAsync(path));
+        Assert.Equal(data, await File.ReadAllTextAsync(dataPath));
+        // The normalized copy remains a normal importable mod, including exports/reimports.
+        var reimported = await f.Contents.ImportAsync(f.Contents.GetModDirectory(imported.Id), imported.Name, CancellationToken.None);
+        Assert.Equal(expected, reimported.Version);
+        Assert.Equal("Skip Intro", Assert.Single(reimported.Options).Name);
+    }
+
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]

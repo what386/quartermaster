@@ -5,7 +5,10 @@
     <Button Grid.Column="1" Classes="rowSwitch" Classes.active="{Binding IsEnabled}" Command="{Binding EnableCommand}" IsVisible="{Binding HasToggle}" AutomationProperties.Name="{Binding ToggleDescription}" VerticalAlignment="Center" Margin="8,0,14,0">
       <Grid Width="30"><Ellipse Fill="{DynamicResource SwitchKnobBrush}" Width="14" Height="14" HorizontalAlignment="{Binding KnobAlignment}" /></Grid>
     </Button>
-    <Border Grid.Column="2" Classes="modTile" ClipToBounds="True" Classes.loaded="{Binding IsLoaded}" Classes.unloaded="{Binding IsUnloaded}" Classes.warning="{Binding HasDeploymentWarning}" ToolTip.Tip="{Binding DeploymentDescription}" HorizontalAlignment="Left" VerticalAlignment="Center">
+    <Border x:Name="DeploymentIcon" Grid.Column="2" Classes="modTile" ClipToBounds="True" Classes.loaded="{Binding IsLoaded}" Classes.unloaded="{Binding IsUnloaded}" Classes.warning="{Binding HasDeploymentWarning}" HorizontalAlignment="Left" VerticalAlignment="Center">
+      <ToolTip.Tip>
+        <TextBlock DataContext="{Binding DataContext, ElementName=DeploymentIcon}" Text="{Binding DeploymentDescription}" MaxWidth="440" TextWrapping="Wrap" />
+      </ToolTip.Tip>
       <Grid>
         <Image x:Name="ModIcon" Stretch="UniformToFill" />
         <TextBlock x:Name="ModMonogram" Text="{Binding Monogram}" FontSize="14" FontWeight="SemiBold" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />

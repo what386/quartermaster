@@ -6,7 +6,10 @@ public sealed record PlannedFileWrite(string Target, string ExpectedCurrentSha25
     ReadOnlyMemory<byte> Content, bool Restore);
 public sealed record FileMergePlan(string GameDirectory, string? StateRevision, IReadOnlyList<PlannedFileWrite> Files,
     IReadOnlyList<MergeConflict> Conflicts, IReadOnlyList<SkippedFileMod> Skipped);
-public sealed record InstalledConfigStatus(string Target, bool Matches);
+public sealed record InstalledConfigStatus(string Target, bool Matches)
+{
+    public bool Exists { get; init; } = true;
+}
 public sealed record FileInstallInspection(bool Complete, IReadOnlyList<InstalledConfigStatus> Files);
 
 /// <summary>Plans, applies and restores generated config files. State and content-addressed original backups are
@@ -26,7 +29,8 @@ public sealed class FileModInstaller
         foreach (var file in state.Files)
         {
             var path = TargetPath(game, file.Target);
-            files.Add(new(file.Target, File.Exists(path) && FileModPaths.Hash(await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false)) == file.AppliedSha256));
+            var exists = File.Exists(path);
+            files.Add(new(file.Target, exists && FileModPaths.Hash(await File.ReadAllBytesAsync(path, ct).ConfigureAwait(false)) == file.AppliedSha256) { Exists = exists });
         }
         return new(state.Complete, files.ToArray());
     }

@@ -109,7 +109,7 @@ public sealed class FileModTests
         Assert.Equal(200u, ReadValue(target)); Assert.Empty(f.Services.Session.Inspection!.Ledger.Files);
         Assert.True(vm.SelectedMod!.IsLoaded); Assert.Null(await f.Services.Session.GetLaunchWarningAsync(profileId, CancellationToken.None));
         vm.Options!.Options[0].ChoiceIndex = 1; await vm.ApplyOptionsCommand.ExecuteAsync();
-        Assert.Contains("file mods", await f.Services.Session.GetLaunchWarningAsync(profileId, CancellationToken.None));
+        Assert.Contains("file-mod options changed", await f.Services.Session.GetLaunchWarningAsync(profileId, CancellationToken.None));
         Assert.True(vm.SelectedMod!.HasDeploymentWarning);
         await vm.DeployCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
         Assert.Equal(300u, ReadValue(target));
@@ -119,6 +119,42 @@ public sealed class FileModTests
         Assert.Equal(300u, ReadValue(target));
         await vm.PurgeCommand.ExecuteAsync(); Assert.False(f.Services.Operations.IsError, f.Services.Operations.Message);
         Assert.Equal(config.Stock, await File.ReadAllBytesAsync(target)); Assert.Equal(0, f.Launches);
+    }
+
+    [AvaloniaFact]
+    public async Task ConfigDamageAndOlderReceiptsHaveSpecificDeploymentMessages()
+    {
+        using var f = new Fixture(); using var config = new ConfigFixture();
+        await f.Shell.InitializeAsync(); var target = GameConfig(f, config);
+        await f.Services.Session.ImportAsync(Package(f, config, "Water"), CancellationToken.None);
+        var mod = f.Services.Session.State.Mods.Single(); var profileId = f.Services.Session.ActiveProfile!.Id;
+        await f.Services.Session.AddModToProfileAsync(mod.Id, profileId, CancellationToken.None);
+        await f.Services.Session.DeployAsync(profileId, f.Dialogs, CancellationToken.None);
+        var vm = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage); var row = vm.Entries.Single();
+        await File.WriteAllBytesAsync(target, [0]); await f.Services.Session.ReloadAsync(CancellationToken.None);
+        Assert.Contains("Merged config changed", row.DeploymentDescription);
+        Assert.Contains(ConfigFixture.Target, row.DeploymentDescription);
+        var warning = await f.Services.Session.GetLaunchWarningAsync(profileId, CancellationToken.None);
+        Assert.Contains("Water", warning); Assert.Contains(ConfigFixture.Target, warning);
+        File.Delete(target); await f.Services.Session.ReloadAsync(CancellationToken.None);
+        Assert.Contains("Missing merged config", row.DeploymentDescription);
+        Assert.Contains("Steam", row.DeploymentDescription);
+        await File.WriteAllBytesAsync(target, config.Stock);
+        await f.Services.Session.DeployAsync(profileId, f.Dialogs, CancellationToken.None);
+        var receiptPath = Directory.GetFiles(Path.Combine(f.Data, "filemod-receipts"), "*.json").Single();
+        var receipt = System.Text.Json.Nodes.JsonNode.Parse(await File.ReadAllTextAsync(receiptPath))!;
+        receipt.AsObject().Remove("selection"); await File.WriteAllTextAsync(receiptPath, receipt.ToJsonString());
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        vm.SelectedMod = row; vm.Options!.Options[0].ChoiceIndex = 1; await vm.ApplyOptionsCommand.ExecuteAsync();
+        Assert.Contains("older deployment record has no option or order details", row.DeploymentDescription);
+        Assert.DoesNotContain("File mods not included", row.DeploymentDescription);
+        // Invalid new metadata must be reported as an inspection error, not silently treated as undeployed.
+        receipt["selection"] = new System.Text.Json.Nodes.JsonArray(new System.Text.Json.Nodes.JsonObject
+        { ["modId"] = Guid.Empty.ToString(), ["sourceHash"] = "invalid" });
+        await File.WriteAllTextAsync(receiptPath, receipt.ToJsonString());
+        await f.Services.Session.ReloadAsync(CancellationToken.None);
+        Assert.Contains("could not be inspected", row.DeploymentDescription);
+        Assert.Contains("Invalid file-mod deployment receipt", row.DeploymentDescription);
     }
 
     [AvaloniaFact]

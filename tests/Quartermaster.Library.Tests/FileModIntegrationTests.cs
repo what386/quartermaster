@@ -49,6 +49,8 @@ public sealed class FileModIntegrationTests
         Assert.Equal(expected, BinaryPrimitives.ReadUInt32LittleEndian(output.AsSpan(28)));
         var health = await service.InspectAsync(data, CancellationToken.None);
         Assert.True(health.Complete); Assert.Equal(plan.Signature, health.Signature); Assert.Equal(2, health.AppliedModIds.Count);
+        Assert.Equal(plan.Selection, health.Selection);
+        Assert.All(health.Files, file => { Assert.True(file.Exists); Assert.True(file.Matches); });
         await service.RestoreAsync(data, CancellationToken.None);
         Assert.Equal(config.Stock, await File.ReadAllBytesAsync(Path.Combine(config.Game, ConfigFixture.Target)));
     }

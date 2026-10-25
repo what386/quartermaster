@@ -21,7 +21,7 @@ public sealed partial class Repatcher
             var preserveLod = options.Lod != LodPolicy.CurrentGame;
             if (options.Lod == LodPolicy.EquipmentSafe && safety.DetectedNames.Count == 0 &&
                 original.Resources.Any(r => r.Record.TypeId == PatchTable.UnitTypeId))
-                warnings.Add(new("UnclassifiedLodPreserved", "Equipment could not be classified; preserved custom LODs conservatively while updating supported format fields."));
+                warnings.Add(new("UnclassifiedLodPreserved", "The equipment type could not be identified.\nThe mod's original model detail levels (LODs), used at different viewing distances, were kept. Supported game-format fields were still updated.\nIf the model looks wrong at a distance, check for an updated mod."));
             var repair = RepairMain(main, preserveLod, cancellationToken);
             warnings.AddRange(repair.Warnings);
             if (repair.Data is null) return new(repair.Status, null, Error: repair.Error) { Warnings = warnings, Units = repair.Units };
@@ -34,9 +34,9 @@ public sealed partial class Repatcher
                 var eligible = entries.Where(r => r.Record.TypeId == PatchTable.UnitTypeId &&
                     EquipmentSafety.IsCanonicalArm(r.Record.FileId) && resources.ContainsUnit(r.Record.FileId)).ToArray();
                 if (recovered || eligible.Length == 0 || resources is not IGameResourceSource)
-                    warnings.Add(new("CullingFallback", recovered ? "Current-game culling is disabled for recovered legacy patches." :
-                        eligible.Length == 0 ? "No canonical arm units are eligible for current-game culling; patch culling was preserved." :
-                        "The game source cannot supply companion payloads; patch culling was preserved."));
+                    warnings.Add(new("CullingFallback", recovered ? "The arm-visibility update was skipped because this patch needed recovery from an older format.\nThe mod's original visibility data was kept. Repatching can continue; if arms disappear or clip, check for an updated mod." :
+                        eligible.Length == 0 ? "The arm-visibility update was skipped because no supported arm models were found in this patch.\nThe mod's original visibility data was kept. No action is needed unless arms disappear or clip in game." :
+                        "The arm-visibility update was skipped because the required game model data could not be read.\nThe mod's original visibility data was kept. Check the selected game folder if you need this update."));
                 else
                 {
                     try
@@ -56,14 +56,14 @@ public sealed partial class Repatcher
                         replaced.UnionWith(eligible.Select(e => e.Record.FileId));
                     }
                     catch (Exception ex) when (ex is InvalidDataException or IOException or OverflowException or KeyNotFoundException)
-                    { warnings.Add(new("CullingFallback", $"Current-game culling failed; preserved patch culling for all units. {ex.Message}")); }
+                    { warnings.Add(new("CullingFallback", $"The arm-visibility update failed. The mod's original visibility data was kept for every model, and repatching can continue.\nReason: {ex.Message}\nIf arms disappear or clip in game, check for an updated mod.")); }
                 }
             }
             if (recovered)
             {
                 output = updated.Rebuild(entries, cancellationToken);
                 entries = PatchDocument.Read(output).Resources.ToArray();
-                warnings.Add(new("LegacyRebuilt", "Rebuilt recovered TOC and companions by resource identity; verified payloads independently of old physical order."));
+                warnings.Add(new("LegacyRebuilt", "An older patch layout was repaired.\nIts file index and related model data were rebuilt and verified; the mod's content was retained. No action is needed."));
             }
             var byKey = entries.ToDictionary(r => (r.Record.FileId, r.Record.TypeId));
             var headers = 0; var bones = 0; var missing = 0; var sidecars = 0; var checkedUnits = 0;

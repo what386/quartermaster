@@ -9,12 +9,18 @@ using Quartermaster.Library.Storage;
 
 namespace Quartermaster.Library.Profiles;
 
+public sealed record FileModSelection(Guid ModId, string? OptionsHash, string SourceHash);
+
 public sealed record PreparedProfileFileMods(FileMergePlan Plan, string? Signature, IReadOnlyList<Guid> AppliedModIds, IReadOnlyList<string> Warnings)
 {
     public Dictionary<Guid, string[]> ModWarnings { get; init; } = [];
+    public IReadOnlyList<FileModSelection> Selection { get; init; } = [];
 }
 public sealed record ProfileFileModHealth(bool Complete, string? Signature, IReadOnlyList<Guid> AppliedModIds, IReadOnlyList<string> Warnings)
 {
+    public IReadOnlyList<FileModSelection> Selection { get; init; } = [];
+    public IReadOnlyList<InstalledConfigStatus> Files { get; init; } = [];
+    public string? InspectionError { get; init; }
     public static ProfileFileModHealth Empty => new(true, null, [], []);
     public IReadOnlyDictionary<Guid, string[]> ModWarnings { get; init; } = new Dictionary<Guid, string[]>();
 }
@@ -45,6 +51,7 @@ public sealed class ProfileFileMods(ModContentStore contents)
     private sealed record Receipt(string GameDirectory, bool Complete, string? Signature, Guid[] AppliedModIds, string[] Warnings)
     {
         public Dictionary<Guid, string[]> ModWarnings { get; init; } = [];
+        public IReadOnlyList<FileModSelection> Selection { get; init; } = [];
     }
     private static string GameRoot(string dataDirectory) => Path.GetDirectoryName(ManagedPaths.CanonicalDirectory(dataDirectory))!;
     private string ReceiptPath(string dataDirectory)
@@ -52,6 +59,19 @@ public sealed class ProfileFileMods(ModContentStore contents)
         var path = GameRoot(dataDirectory);
         if (OperatingSystem.IsWindows()) path = path.ToUpperInvariant();
         return ManagedPaths.Resolve(contents.ApplicationDirectory, "filemod-receipts/" + Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(path))) + ".json");
+    }
+
+    public static IReadOnlyList<FileModSelection> Selection(LibraryState state, Profile profile)
+    {
+        var mods = state.Mods.ToDictionary(mod => mod.Id);
+        return ProfileEditor.InDeploymentOrder(profile).Where(entry => entry.Enabled).Select(entry =>
+        {
+            var mod = mods[entry.ModId];
+            var sets = PatchSelection.Select(mod, entry).Where(set => set.ContentKind == ModContentKind.FileMod).ToArray();
+            return sets.Length == 0 ? null : new FileModSelection(mod.Id, PatchSelection.OptionsHash(mod, entry),
+                Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(sets.Select(set => new
+                { set.Id, set.FileModPayloadIndex, Files = set.Files.Select(file => new { file.RelativePath, file.Sha256 }) })))));
+        }).OfType<FileModSelection>().ToArray();
     }
 
     public static string? Signature(LibraryState state, Profile profile)
@@ -133,16 +153,16 @@ public sealed class ProfileFileMods(ModContentStore contents)
         }
         var warnings = messages.ToArray();
         return new(plan, Signature(state, profile), applied, warnings)
-        { ModWarnings = modWarnings.ToDictionary(pair => pair.Key, pair => pair.Value.Distinct().ToArray()) };
+        { ModWarnings = modWarnings.ToDictionary(pair => pair.Key, pair => pair.Value.Distinct().ToArray()), Selection = Selection(state, profile) };
     }
 
     public Task BeginAsync(PreparedProfileFileMods prepared, string dataDirectory, CancellationToken ct) =>
-        JsonFiles.WriteAsync(ReceiptPath(dataDirectory), new Receipt(GameRoot(dataDirectory), false, prepared.Signature, prepared.AppliedModIds.ToArray(), prepared.Warnings.ToArray()) { ModWarnings = prepared.ModWarnings }, ct);
+        JsonFiles.WriteAsync(ReceiptPath(dataDirectory), new Receipt(GameRoot(dataDirectory), false, prepared.Signature, prepared.AppliedModIds.ToArray(), prepared.Warnings.ToArray()) { ModWarnings = prepared.ModWarnings, Selection = prepared.Selection }, ct);
 
     public async Task ApplyAsync(PreparedProfileFileMods prepared, string dataDirectory, CancellationToken ct)
     {
         await installer.ApplyAsync(prepared.Plan, ct).ConfigureAwait(false);
-        await JsonFiles.WriteAsync(ReceiptPath(dataDirectory), new Receipt(GameRoot(dataDirectory), true, prepared.Signature, prepared.AppliedModIds.ToArray(), prepared.Warnings.ToArray()) { ModWarnings = prepared.ModWarnings }, CancellationToken.None).ConfigureAwait(false);
+        await JsonFiles.WriteAsync(ReceiptPath(dataDirectory), new Receipt(GameRoot(dataDirectory), true, prepared.Signature, prepared.AppliedModIds.ToArray(), prepared.Warnings.ToArray()) { ModWarnings = prepared.ModWarnings, Selection = prepared.Selection }, CancellationToken.None).ConfigureAwait(false);
     }
 
     public async Task RestoreAsync(string dataDirectory, CancellationToken ct)
@@ -158,12 +178,14 @@ public sealed class ProfileFileMods(ModContentStore contents)
         var receipt = File.Exists(path) ? await JsonFiles.ReadAsync<Receipt>(path, ct).ConfigureAwait(false) : null;
         if (receipt is not null && (!string.Equals(receipt.GameDirectory, GameRoot(dataDirectory), OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) ||
             receipt.AppliedModIds is null || receipt.Warnings is null || receipt.AppliedModIds.Any(id => id == Guid.Empty) ||
+            receipt.Selection is null || receipt.Selection.Any(item => item is null || item.ModId == Guid.Empty || !PatchValidation.IsHash(item.SourceHash) || item.OptionsHash is not null && !PatchValidation.IsHash(item.OptionsHash)) ||
+            receipt.Selection.Select(item => item.ModId).Distinct().Count() != receipt.Selection.Count ||
             receipt.Signature is not null && !PatchValidation.IsHash(receipt.Signature)))
             throw new InvalidDataException("Invalid file-mod deployment receipt.");
         var healthy = inspection.Complete && inspection.Files.All(file => file.Matches) && (receipt?.Complete ?? inspection.Files.Count == 0);
         var attributed = receipt?.ModWarnings ?? [];
         if (attributed.Count == 0 && receipt?.Warnings.Length > 0)
             attributed = receipt.AppliedModIds.ToDictionary(id => id, _ => receipt.Warnings);
-        return new(healthy, receipt?.Signature, receipt?.AppliedModIds ?? [], receipt?.Warnings ?? []) { ModWarnings = attributed };
+        return new(healthy, receipt?.Signature, receipt?.AppliedModIds ?? [], receipt?.Warnings ?? []) { ModWarnings = attributed, Selection = receipt?.Selection ?? [], Files = inspection.Files };
     }
 }

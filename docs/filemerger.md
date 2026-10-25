@@ -295,8 +295,15 @@ same warning system. Failed deployments expose a separate red error icon and
 tooltip, attributed by structured mod ID or file-mod source when available.
 Installation-wide failures apply to all enabled entries. Errors are scoped to the
 attempted game, loadout, options, and source hashes, and clear on a successful
-retry. Confirmed overlaps are errors even when priority chooses an output: edits
-from overridden mods will be lost. Missing dependencies and repatch preservation
+retry. Deployment receipts also persist the effective per-mod order, option hash,
+and config-source hash. `DeploymentMessages` uses these snapshots to distinguish
+changed options, updated sources, added/removed file mods, and priority changes.
+Older receipts without snapshots retain signature checks but explicitly report
+that detailed selection history is unavailable. Installed-config inspection
+reports missing versus modified targets; unreadable receipts remain inspection
+errors instead of being mistaken for an undeployed selection. Confirmed overlaps
+are errors even when priority chooses an output: edits from overridden mods will
+be lost. Missing dependencies and repatch preservation
 diagnostics remain warnings. Conflict messages name the config file and list the
 applied, overridden, or skipped mods on separate lines, with blank lines between
 sections. Messages describe loss of overlapping edits or whole-file replacement;

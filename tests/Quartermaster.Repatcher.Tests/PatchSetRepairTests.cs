@@ -77,7 +77,7 @@ public class PatchSetRepairTests
         Assert.Equal(old.AsSpan(0x80, 24).ToArray(), unit.AsSpan(0x80, 24).ToArray());
         Assert.Equal(0xA4CD40u, Fixtures.Read32(unit, 0x2c));
         Assert.Equal(21u, Fixtures.Read32(unit, (int)Fixtures.Read32(unit, 0x5c) + 20));
-        Assert.Contains(result.Warnings, w => w.Code == "MissingUnitKept");
+        Assert.Contains(result.Warnings, w => w.Code == "MissingUnitKept" && w.Message.Contains("modded content was kept") && w.Message.Contains("updated mod"));
         Assert.Contains(result.Equipment, e => e.Contains("SR-24"));
         Assert.Contains(result.ArmorAudits, a => a.PresentRoles == 1 && a.MissingRoles.Count == 9);
         Assert.Equal(2, result.Audit!.CheckedUnits); Assert.Equal(0, result.Audit.ChangedHeaders);
@@ -104,7 +104,7 @@ public class PatchSetRepairTests
     {
         var input = Set((1, PatchTable.UnitTypeId, Fixtures.Unit(24, 0xA4CD36, 0x11), [], []));
         var result = new Repatcher(new UnitSource((1, Fixtures.Unit(8, 0xA4CD40)))).RepairSet(input);
-        Assert.NotNull(result.Output); Assert.Contains(result.Warnings, w => w.Code == "UnclassifiedLodPreserved");
+        Assert.NotNull(result.Output); Assert.Contains(result.Warnings, w => w.Code == "UnclassifiedLodPreserved" && w.Message.Contains("viewing distances") && w.Message.Contains("kept"));
         Assert.Equal(0x98u, Fixtures.Read32(Payload(result.Output!, 1), 0x34));
         Assert.Null(new Repatcher(new UnitSource((1, Fixtures.Unit(8, 1)))).RepairSet(input).Output);
     }

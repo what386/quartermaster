@@ -239,7 +239,11 @@ public sealed partial class LibrarySession(LibraryService library, ProfileArchiv
             if (!FileModHealth.Complete) DeploymentProblem = Localizer.Text("File mods are incomplete or have changed outside Quartermaster. Purge or redeploy before running the game.");
             Notify(nameof(FileModHealth)); Notify(nameof(FileModWarnings)); Notify(nameof(HasFileModWarnings));
         }
-        catch (Exception ex) when (ex is IOException or ArgumentException) { DeploymentProblem = ex.Message; }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException)
+        {
+            DeploymentProblem = ex.Message;
+            FileModHealth = FileModHealth with { Complete = false, InspectionError = ex.Message };
+        }
     }
     private string RequireGame() => GameDirectory != "" ? GameDirectory : throw new InvalidOperationException(Localizer.Text("Choose your game folder in Settings first."));
     public async Task DeployAsync(Guid profileId, IDialogService dialogs, CancellationToken ct, IProgress<DeploymentProgress>? progress = null)
@@ -300,7 +304,7 @@ public sealed partial class LibrarySession(LibraryService library, ProfileArchiv
                         if (result.Warnings.Count > 0)
                         {
                             if (!warnings.TryGetValue(patch.SourceId, out var messages)) warnings[patch.SourceId] = messages = [];
-                            messages.AddRange(result.Warnings);
+                            messages.AddRange(result.Warnings.Select(message => Localizer.Interpolate($"Archive:\n  {patch.Archive}\n\n{message}")));
                         }
                         if (result.RemovedUnits > 0) throw new InvalidDataException(Localizer.Text("Repatching would remove missing units. Use an updated mod."));
                         if (!input.Main.Span.SequenceEqual(result.Output.Main.Span) || !SameCompanion(input.Gpu, result.Output.Gpu) ||
@@ -430,14 +434,6 @@ public sealed partial class LibrarySession(LibraryService library, ProfileArchiv
     public async Task<string?> GetLaunchWarningAsync(Guid profileId, CancellationToken ct)
     {
         await RefreshInspectionAsync(ct); Publish();
-        if (DeploymentProblem != "") return DeploymentProblem + Localizer.Text(" Purge patches, then redeploy.");
-        if (Inspection is null) return Localizer.Text("Deployment could not be inspected. Choose a game folder in Settings.");
-        if (Inspection.NeedsPurge) return Localizer.Text("Deployment is incomplete or unknown. Purge patches, then redeploy before running the game.");
-        if (!FileModSelectionMatches(State.Profiles.Single(profile => profile.Id == profileId)))
-            return Localizer.Text("The selected file mods or their options are not deployed. Deploy the selected loadout before running the game.");
-        var plan = DeploymentPlanner.Create(ProfilePatches.Resolve(State, profileId));
-        if (Inspection.Ledger.SelectionId != profileId || Inspection.Ledger.Signature != plan.Signature)
-            return Localizer.Interpolate($"The selected profile or its loadout is not deployed. Currently deployed profile: {DeployedProfileName}. Deploy the selected profile before running, or continue with the installed loadout.");
-        return null;
+        return Mods.DeploymentMessages.Launch(this, State.Profiles.Single(profile => profile.Id == profileId));
     }
 }
