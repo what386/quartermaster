@@ -2,6 +2,13 @@
 
 *Generated on 2026-10-25*
 
+## 0.11.1 — 2026-10-25
+
+### Changes
+
+- fix broken release (thanks gh)
+
+
 ## 0.11.0 — 2026-10-25
 
 ### Changes

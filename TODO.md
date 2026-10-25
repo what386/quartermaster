@@ -18,10 +18,3 @@
 - [ ] Support size-changing file mods
       @created 2026-10-23 22:40
 
-
-## Completed
-
-- [x] fix broken release (thanks gh)
-      @created 2026-10-25 19:10
-      @completed 2026-10-25 19:10
-
