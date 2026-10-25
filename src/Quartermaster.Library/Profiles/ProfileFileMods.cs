@@ -79,8 +79,14 @@ public sealed class ProfileFileMods(ModContentStore contents)
         var mods = state.Mods.ToDictionary(mod => mod.Id);
         var selected = ProfileEditor.InDeploymentOrder(profile).Where(entry => entry.Enabled).SelectMany(entry =>
             PatchSelection.Select(mods[entry.ModId], entry).Where(set => set.ContentKind == ModContentKind.FileMod)
-                .Select(set => new { Mod = entry.ModId, Set = set.Id, set.FileModPayloadIndex,
-                    Files = set.Files.Select(file => new { file.RelativePath, file.Sha256 }), Options = PatchSelection.OptionsHash(mods[entry.ModId], entry) })).ToArray();
+                .Select(set => new
+                {
+                    Mod = entry.ModId,
+                    Set = set.Id,
+                    set.FileModPayloadIndex,
+                    Files = set.Files.Select(file => new { file.RelativePath, file.Sha256 }),
+                    Options = PatchSelection.OptionsHash(mods[entry.ModId], entry)
+                })).ToArray();
         return selected.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(selected)));
     }
 

@@ -70,8 +70,12 @@ internal static class FileModMetadata
             var archive = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(file)))[..16];
             for (var index = 0; index < detected.Mods.Count; index++)
                 sets.Add(new(Guid.NewGuid(), archive, 0, Path.GetDirectoryName(file)?.Replace('\\', '/') ?? "", [stored], [])
-                { ContentKind = ModContentKind.FileMod, FileModPayloadIndex = index,
-                    FileModTarget = detected.Mods[index].Target, FileModVariantName = detected.Mods[index].Name });
+                {
+                    ContentKind = ModContentKind.FileMod,
+                    FileModPayloadIndex = index,
+                    FileModTarget = detected.Mods[index].Target,
+                    FileModVariantName = detected.Mods[index].Name
+                });
         }
         return sets;
     }
