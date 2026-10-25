@@ -10,6 +10,7 @@
     <ProjectReference Include="../Quartermaster.Repatcher/Quartermaster.Repatcher.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Data/config-tables.json" />
     <None Include="THIRD_PARTY_NOTICES.txt" CopyToOutputDirectory="PreserveNewest" TargetPath="FileMerger-THIRD_PARTY_NOTICES.txt" />
   </ItemGroup>
 </Project>

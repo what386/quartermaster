@@ -1,0 +1,68 @@
+{
+  "$schema": "config-tables.schema.json",
+  "schemaVersion": 1,
+  "tables": [
+    {
+      "type": "0xe0a72cf0",
+      "name": "Damage settings",
+      "layout": "id-rows",
+      "recordSize": 76,
+      "idOffset": 0,
+      "fields": {
+        "4": "Damage",
+        "8": "Durable damage",
+        "12": "Armor penetration (direct)",
+        "16": "Armor penetration (slight angle)",
+        "20": "Armor penetration (large angle)",
+        "24": "Armor penetration (extreme angle)",
+        "28": "Demolition force",
+        "32": "Stagger force",
+        "36": "Push force"
+      }
+    },
+    {
+      "type": "0x1f42878e",
+      "name": "Recharge",
+      "layout": "entity-keyed",
+      "recordSize": 4,
+      "fields": { "0": "Recharge time" }
+    },
+    {
+      "type": "0x54270608",
+      "name": "Jump pack",
+      "layout": "entity-keyed",
+      "recordSize": 280
+    },
+    {
+      "type": "0x14729b6a",
+      "name": "Sensor",
+      "layout": "entity-keyed",
+      "recordSize": 44
+    },
+    {
+      "type": "0xff67a367",
+      "name": "Detector",
+      "layout": "entity-keyed",
+      "recordSize": 24
+    },
+    {
+      "type": "0x84ce7eee",
+      "name": "Weapon wind-up",
+      "layout": "entity-keyed",
+      "recordSize": 36,
+      "fields": { "0": "Wind-up time", "4": "Wind-down time" }
+    },
+    {
+      "type": "0x32528174",
+      "name": "Laser designator",
+      "layout": "entity-keyed",
+      "recordSize": 64
+    },
+    {
+      "type": "0x63ce0feb",
+      "name": "Armor passive",
+      "layout": "armor-passive",
+      "maxRecords": 4096
+    }
+  ]
+}

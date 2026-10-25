@@ -656,6 +656,8 @@
     "Required by:\n  {0}\n\nEnable {1} in this loadout, or disable {2} if you do not want to use it.": "以下模组需要此依赖：\n  {0}\n\n在此模组配置中启用 {1}，或者在不想使用 {2} 时将其禁用。",
     "Archive:\n  {0}\n\nApplied mod:\n  {1}\n\nOverridden mods:\n{2}\n\nThese mods replace the same game assets in this archive. Only {3}'s replacements for those assets are used. Unrelated assets are kept.\n\nDisable a conflicting mod or choose different options to keep its replacements. Reordering only changes which mod wins.": "归档：\n  {0}\n\n应用的模组：\n  {1}\n\n被覆盖的模组：\n{2}\n\n这些模组替换了此归档中相同的游戏资源。对于这些资源，只会使用 {3} 的替换内容。其他资源会保留。\n\n要保留其他模组的替换内容，请禁用冲突的模组或选择其他选项。调整顺序只会改变哪个模组优先。",
     "Dependency:\n  {0}\n\nDownload or import {1}, then add it to the same loadout and enable it.\nDependency information comes from the mod's metadata and may be outdated.": "依赖：\n  {0}\n\n下载或导入 {1}，然后将其添加到同一模组配置并启用。\n依赖信息来自模组的元数据，可能已经过时。",
-    "Archive:\n  {0}\n\n{1}": "归档：\n  {0}\n\n{1}"
+    "Archive:\n  {0}\n\n{1}": "归档：\n  {0}\n\n{1}",
+    "Only the applied mod is installed for this file. These file mods cannot be safely combined.": "此文件仅安装所应用的模组。这些文件模组无法安全地合并。",
+    "Reason:\n{0}": "原因：\n{0}"
   }
 }

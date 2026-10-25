@@ -656,6 +656,8 @@
     "Required by:\n  {0}\n\nEnable {1} in this loadout, or disable {2} if you do not want to use it.": "Nécessaire pour :\n  {0}\n\nActivez {1} dans cette configuration de mods, ou désactivez {2} si vous ne souhaitez pas l'utiliser.",
     "Archive:\n  {0}\n\nApplied mod:\n  {1}\n\nOverridden mods:\n{2}\n\nThese mods replace the same game assets in this archive. Only {3}'s replacements for those assets are used. Unrelated assets are kept.\n\nDisable a conflicting mod or choose different options to keep its replacements. Reordering only changes which mod wins.": "Archive :\n  {0}\n\nMod appliqué :\n  {1}\n\nMods écrasés :\n{2}\n\nCes mods remplacent les mêmes éléments du jeu dans cette archive. Pour ces éléments, seuls les remplacements de {3} sont utilisés. Les autres éléments sont conservés.\n\nDésactivez un mod en conflit ou choisissez d'autres options pour conserver ses remplacements. Réorganiser les mods change uniquement lequel est prioritaire.",
     "Dependency:\n  {0}\n\nDownload or import {1}, then add it to the same loadout and enable it.\nDependency information comes from the mod's metadata and may be outdated.": "Dépendance :\n  {0}\n\nTéléchargez ou importez {1}, puis ajoutez-le à la même configuration de mods et activez-le.\nLes informations sur les dépendances proviennent des métadonnées du mod et peuvent être obsolètes.",
-    "Archive:\n  {0}\n\n{1}": "Archive :\n  {0}\n\n{1}"
+    "Archive:\n  {0}\n\n{1}": "Archive :\n  {0}\n\n{1}",
+    "Only the applied mod is installed for this file. These file mods cannot be safely combined.": "Seul le mod appliqué est installé pour ce fichier. Ces mods de fichiers ne peuvent pas être combinés de façon sûre.",
+    "Reason:\n{0}": "Raison :\n{0}"
   }
 }

@@ -30,6 +30,7 @@ public sealed class FileMergeReviewTests
         Assert.Equal("Replacement", replacement.Winner);
         Assert.Equal("Skipped", Assert.Single(replacement.OtherMods).Name);
         Assert.True(replacement.WholeFile);
+        Assert.Contains("Reason:\nDifferent layout", replacement.Summary);
         using var f = new Fixture();
         var dialog = new FileMergeReviewDialog(model);
         var window = new MainWindow { Content = dialog }; window.Show();

@@ -59,27 +59,34 @@ the library does not attempt to translate old mods to a different game build.
 For raw candidates, the caller must establish trusted stock beforehand: another
 editor can preserve that same game hash, so it cannot identify pristine ciphertext.
 
-The merger compares each LDLD block with stock in 32-bit payload cells, including
-a final short cell. This preserves complete float/integer values rather than
-combining individual changed bytes into a value no mod requested. Distinct edits
-combine; identical edits do not conflict. Different writes to one cell produce a
-`MergeConflict` with the target, block type/index, payload offset, and both mod
-names. These are binary offsets, not stat names or a semantic schema parser.
-LDLD framing, payload bounds, and block flags are validated. Header correction
-bytes are excluded from the diff.
+The merger compares each candidate with stock. Known damage rows, keyed component
+tables (recharge, jump pack, sensor, detector, wind-up, and laser designator), and
+armor passive arrays are matched by stable record IDs. They can grow or shrink:
+independent record additions and edits combine, row counts and hash lookup indexes
+are rebuilt, and passive array offsets are recalculated. A deletion conflicts
+with an edit to that record; an unchanged copy does not undo another mod's deletion.
+Competing additions of the same ID use the highest-priority whole record.
 
-The conventional 8–15-byte zero-pad/hash-correction trailer at the end of the last
-block is excluded when comparing with stock. A merge output gets a fresh trailer
-inside that block, with an aligned correction word solved to retain the stock
-MurmurHash64A. This changes neither requested gameplay values nor their precision.
-NaCl sealed-box encoding authenticates the output, which is decrypted again for
-verification. Encryption is randomized, so compare plaintext or the game hash
-rather than expecting repeat encryptions to produce identical ciphertext.
+Within records, and in unchanged-size unparsed blocks, complete 32-bit cells are
+merged rather than individual bytes. Conflicts identify the final winning/losing
+sources. `MergeConflict.RecordId` identifies a structured record, with a
+record-relative `Offset` (`-1` for whole-record conflicts); otherwise `Offset` is
+payload-relative. These are binary identities and offsets, not named stats.
 
-Other layout changes are exclusive, including changed block order/type/count,
-payload lengths, or framing gaps. If any candidate changes the layout, only the
-highest-priority candidate for that file is installed, byte for byte; every other
-candidate is reported in `Skipped`. Other target files still merge normally.
+Block positions may shift when a supported table grows, while block count/type
+order and framing gaps remain unchanged. Ambiguous layouts, unknown resizing,
+duplicate record IDs, invalid indexes/offsets, or unsafe combined passive arrays
+remain exclusive: only the highest-priority candidate for that file is installed,
+byte for byte; the others appear in `Skipped`. Other targets merge independently.
+See [the developer documentation](../../docs/filemerger.md) for exact layouts and
+limits; arbitrary new table formats or whole-block additions are not supported.
+
+The conventional 8–15-byte zero-pad/hash-correction trailer is excluded from mod
+comparisons and regenerated after rebuilding. The stock MurmurHash64A is retained
+without approximating gameplay values. Framing, supported record structures,
+counts, indexes and offsets are checked before and after correction; sealed-box
+output is decrypted again for verification. Encryption is randomized, so compare
+plaintext or the game hash rather than ciphertext from different encryptions.
 
 `GameConfigCodec` and `ConfigHash` expose the underlying primitives for tooling.
 `Encrypt` only encrypts; `EncryptPreservingHash` validates LDLD and adds the hash
@@ -137,3 +144,12 @@ Run `dotnet test tests/Quartermaster.FileMerger.Tests`. Tests generate synthetic
 LDLD configs, sealed payloads, patches, and ZIPs. They do not require `examples/`,
 installed game files, SHODAN, or a game launch. Local example validation is a
 separate read-only smoke check; the examples are intentionally uncommitted.
+
+## Extending table support
+
+Add verified layouts to [`Data/config-tables.json`](Data/config-tables.json), which
+is embedded at build time. The adjacent schema provides editor validation.
+Existing `id-rows`, `entity-keyed`, and `armor-passive` handlers retain their C#
+structural checks. New table structures still need a handler. See the
+[registry contract and extension workflow](../../docs/filemerger.md#table-registry)
+for variants, bounds, metadata, custom registries, and required test coverage.

@@ -656,6 +656,8 @@
     "Required by:\n  {0}\n\nEnable {1} in this loadout, or disable {2} if you do not want to use it.": "이 모드가 필요한 모드:\n  {0}\n\n이 모드 구성에서 {1}을(를) 활성화하거나, {2}을(를) 사용하지 않을 경우 비활성화하세요.",
     "Archive:\n  {0}\n\nApplied mod:\n  {1}\n\nOverridden mods:\n{2}\n\nThese mods replace the same game assets in this archive. Only {3}'s replacements for those assets are used. Unrelated assets are kept.\n\nDisable a conflicting mod or choose different options to keep its replacements. Reordering only changes which mod wins.": "아카이브:\n  {0}\n\n적용되는 모드:\n  {1}\n\n덮어쓰이는 모드:\n{2}\n\n이 모드들은 이 아카이브의 같은 게임 리소스를 대체합니다. 해당 리소스에는 {3}의 대체 내용만 사용됩니다. 관련 없는 리소스는 유지됩니다.\n\n다른 모드의 대체 내용을 유지하려면 충돌하는 모드를 비활성화하거나 다른 옵션을 선택하세요. 순서를 바꾸면 우선 적용되는 모드만 바뀝니다.",
     "Dependency:\n  {0}\n\nDownload or import {1}, then add it to the same loadout and enable it.\nDependency information comes from the mod's metadata and may be outdated.": "필수 모드:\n  {0}\n\n{1}을(를) 다운로드하거나 가져온 뒤 같은 모드 구성에 추가하고 활성화하세요.\n필수 모드 정보는 모드의 메타데이터에서 가져오며 오래된 정보일 수 있습니다.",
-    "Archive:\n  {0}\n\n{1}": "아카이브:\n  {0}\n\n{1}"
+    "Archive:\n  {0}\n\n{1}": "아카이브:\n  {0}\n\n{1}",
+    "Only the applied mod is installed for this file. These file mods cannot be safely combined.": "이 파일에는 적용되는 모드만 설치됩니다. 이 파일 모드들은 안전하게 병합할 수 없습니다.",
+    "Reason:\n{0}": "이유:\n{0}"
   }
 }

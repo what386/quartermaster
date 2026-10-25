@@ -87,7 +87,7 @@ public sealed class ProfileFileMods(ModContentStore contents)
                     Files = set.Files.Select(file => new { file.RelativePath, file.Sha256 }),
                     Options = PatchSelection.OptionsHash(mods[entry.ModId], entry)
                 })).ToArray();
-        return selected.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(selected)));
+        return selected.Length == 0 ? null : Convert.ToHexStringLower(SHA256.HashData(JsonSerializer.SerializeToUtf8Bytes(new { TableRegistry = ConfigTableRegistry.Default.Fingerprint, Selected = selected })));
     }
 
     public async Task<PreparedProfileFileMods> PrepareAsync(LibraryState state, Profile profile, string dataDirectory, CancellationToken ct)
@@ -152,7 +152,7 @@ public sealed class ProfileFileMods(ModContentStore contents)
         foreach (var group in plan.Skipped.GroupBy(skip => (skip.Target, skip.WinningSource)))
         {
             var skip = group.First();
-            var message = $"Config file:\n  {skip.Target}\n\nApplied mod:\n  {skip.WinningMod}\n\nSkipped mods:\n{Names(group.Select(item => item.Name))}\n\nThese file layouts cannot be merged. Only the applied mod is used for this entire file; all edits from the skipped mods are lost.\n\nDisable a conflicting mod or choose compatible options.";
+            var message = $"Config file:\n  {skip.Target}\n\nApplied mod:\n  {skip.WinningMod}\n\nSkipped mods:\n{Names(group.Select(item => item.Name))}\n\nThese file mods cannot be safely combined. Only the applied mod is used for this entire file; all edits from the skipped mods are lost.\n\nReason:\n{string.Join("\n", group.Select(item => item.Reason).Distinct())}\n\nDisable a conflicting mod or choose compatible options.";
             messages.Add(message);
             Add(skip.WinningSource, message);
             foreach (var source in group.Select(item => item.Source).Distinct()) Add(source, message);

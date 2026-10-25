@@ -79,7 +79,9 @@ Use **Purge** to remove any deployed patches and have a vanilla game.
 File mods have a document icon in Library and loadouts. Supported settings-file
 packages are merged into game configs when you deploy; their Lua installers are
 not deployed. Select package variants in **Mod options**, then arrange the loadout
-using your profile's priority direction. Conflicting values and incompatible
+using your profile's priority direction. Known config tables support additions and
+removals of records even when file sizes differ. Unsupported structural changes
+still require an exclusive choice for that file. Conflicting values and incompatible
 whole-file replacements are shown for review before deployment, with each file's
 winning and overridden or skipped mods listed separately. Results remain in the
 affected mods' error tooltips. These tooltips name the config file, list which
