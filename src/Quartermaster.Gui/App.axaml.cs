@@ -22,7 +22,13 @@ public partial class App : Application
         {
             var window = new MainWindow();
             var services = new AppServices(AppServices.DefaultDataDirectory, new DialogService(() => window),
-                shutdownForUpdate: () => Dispatcher.UIThread.Post(window.Close));
+                shutdownForUpdate: () => Dispatcher.UIThread.Post(window.Close),
+                restartAfterDataMove: () => Dispatcher.UIThread.Post(() =>
+                {
+                    var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot determine the application executable.");
+                    global::System.Diagnostics.Process.Start(new global::System.Diagnostics.ProcessStartInfo(executable) { UseShellExecute = false });
+                    window.Close();
+                }));
             var viewModel = new MainWindowViewModel(services);
             window.DataContext = viewModel;
             window.Opened += async (_, _) => await viewModel.InitializeAsync();

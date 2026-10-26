@@ -30,10 +30,12 @@ public sealed class AppServices : IAsyncDisposable
     public Action LaunchGame { get; }
     public Action<Uri> OpenBrowser { get; }
     public IDialogService Dialogs { get; }
+    public Action RestartAfterDataMove { get; }
     public AppServices(string directory, IDialogService dialogs, Func<IReadOnlyList<string>>? discover = null, Action? launchGame = null, Action<Uri>? openBrowser = null, HttpClient? nexusApi = null, HttpClient? nexusDownloads = null, HttpClient? githubApi = null, HttpClient? githubDownloads = null,
-        Func<Quartermaster.SelfUpdate.SelfUpdateManager>? appUpdateManager = null, Action? shutdownForUpdate = null)
+        Func<Quartermaster.SelfUpdate.SelfUpdateManager>? appUpdateManager = null, Action? shutdownForUpdate = null, Action? restartAfterDataMove = null)
     {
         DataDirectory = Path.GetFullPath(directory); Dialogs = dialogs;
+        RestartAfterDataMove = restartAfterDataMove ?? (() => throw new InvalidOperationException("Application restart was not configured."));
         var log = new JsonEventLog(DataDirectory);
         Operations = new(log.AppendAsync);
         LaunchGame = launchGame ?? (() => global::System.Diagnostics.Process.Start(
@@ -68,6 +70,20 @@ public sealed class AppServices : IAsyncDisposable
             throw new InvalidOperationException(Localizer.Text("Application shutdown was not configured."))));
     }
     public async ValueTask DisposeAsync() { IsDisposed = true; lifetime.Cancel(); AppUpdates.Dispose(); await Session.DisposeAsync().ConfigureAwait(false); await Providers.DisposeAsync().ConfigureAwait(false); Nexus.Dispose(); GitHub.Dispose(); }
-    public static string DefaultDataDirectory => Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")
-        ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster");
+    public static string DefaultDataDirectory
+    {
+        get
+        {
+            var fallback = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster");
+            var configured = Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY");
+            if (!string.IsNullOrWhiteSpace(configured)) return Path.GetFullPath(configured);
+            var pointer = Path.Combine(fallback, "data-directory.txt");
+            try { if (File.Exists(pointer) && File.ReadAllText(pointer).Trim() is { Length: > 0 } value) return Path.GetFullPath(value); }
+            catch (IOException) { }
+            return fallback;
+        }
+    }
+
+    public static string DataDirectoryPointer => Path.Combine(
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Quartermaster"), "data-directory.txt");
 }

@@ -103,10 +103,11 @@
         <TextBlock Text="{loc:Loc 'Storage'}" Classes="sectionTitle" />
         <Grid x:Name="StorageSettings" ColumnDefinitions="180,*">
           <TextBlock Text="{loc:Loc 'Library storage'}" FontWeight="SemiBold" />
-          <Grid Grid.Column="1" ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" HorizontalAlignment="Left">
+          <Grid Grid.Column="1" ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8" HorizontalAlignment="Left">
             <SelectableTextBlock Text="{Binding LibraryDirectory}" Classes="muted" TextWrapping="Wrap" VerticalAlignment="Center" />
             <Button x:Name="ManageStorageButton" Grid.Column="1" Content="{loc:Loc 'Manage storage…'}" Click="OpenStorage" />
-            <Button Grid.Column="2" Content="{loc:Loc 'Refresh'}" Command="{Binding ScanStorageCommand}" />
+            <Button Grid.Column="2" Content="{loc:Loc 'Move data folder…'}" Command="{Binding MoveDataDirectoryCommand}" />
+            <Button Grid.Column="3" Content="{loc:Loc 'Refresh'}" Command="{Binding ScanStorageCommand}" />
           </Grid>
         </Grid>
         <TextBlock Text="{loc:Loc 'Calculating storage…'}" IsVisible="{Binding IsStorageOverviewLoading}" Classes="muted" />

@@ -76,8 +76,20 @@ public sealed partial class SettingsViewModel
     public string StorageCleanupResult => storageCleanupResult;
     public AsyncCommand ScanStorageCommand { get; private set; } = null!;
     public AsyncCommand CleanStorageCommand { get; private set; } = null!;
+    public AsyncCommand MoveDataDirectoryCommand { get; private set; } = null!;
     private void InitializeStorageCommands()
     {
+        MoveDataDirectoryCommand = Operations.CreateCommand("Moving data folder", async ct =>
+        {
+            if (!string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("QUARTERMASTER_DATA_DIRECTORY")))
+                throw new InvalidOperationException("The data folder is controlled by QUARTERMASTER_DATA_DIRECTORY.");
+            var destination = await Services.Dialogs.PickFolderAsync(Localizer.Text("Choose an empty folder on the drive where Quartermaster should store its data"));
+            if (destination is null) return;
+            var message = Localizer.Current.Format("Move all Quartermaster data, including mods and profiles, to {0}? Quartermaster will restart when the move completes.", destination);
+            if (!await Services.Dialogs.ConfirmAsync(Localizer.Text("Move data folder"), message, Localizer.Text("Move and restart"))) return;
+            await Task.Run(() => DataDirectoryRelocator.Move(Services.DataDirectory, destination, AppServices.DataDirectoryPointer), ct);
+            Services.RestartAfterDataMove();
+        });
         ScanStorageCommand = Operations.CreateCommand("Scanning storage", async ct =>
         {
             storageCleanupResult = ""; Notify(nameof(StorageCleanupResult));
