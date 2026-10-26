@@ -171,7 +171,7 @@ public sealed class FileModIntegrationTests
         await File.WriteAllBytesAsync(path, original);
         await File.WriteAllBytesAsync(Path.Combine(config.Game, ConfigFixture.Target), GameConfigCodec.Encrypt(ConfigFixture.Config(firstValue: 900)));
         error = await Assert.ThrowsAsync<InvalidDataException>(() => service.PrepareAsync(state, profile, data, CancellationToken.None));
-        Assert.Contains("Needs a new version", error.Message);
+        Assert.Contains("Try updating the mod or game.", error.Message);
         Assert.Equal(mod.Id, error.Data["Quartermaster.ModId"]);
     }
 

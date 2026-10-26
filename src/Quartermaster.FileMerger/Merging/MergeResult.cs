@@ -2,6 +2,9 @@ namespace Quartermaster.FileMerger;
 
 public sealed record MergeConflict(string Target, uint BlockType, int BlockIndex, int Offset, string LosingMod, string WinningMod)
 {
+    // For structured tables this identifies the record; Offset is then relative to that record.
+    // Offset -1 denotes a whole-record addition/removal conflict.
+    public string? RecordId { get; init; }
     public string? LosingSource { get; init; }
     public string? WinningSource { get; init; }
 }

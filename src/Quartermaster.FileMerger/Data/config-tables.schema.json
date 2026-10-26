@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Quartermaster config table registry",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "tables"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "schemaVersion": { "const": 1 },
+    "tables": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1024,
+      "items": { "$ref": "#/$defs/table" }
+    }
+  },
+  "$defs": {
+    "label": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "size": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 1048576,
+      "multipleOf": 4
+    },
+    "offset": { "type": "integer", "minimum": 0, "multipleOf": 4 },
+    "fields": {
+      "type": "object",
+      "maxProperties": 256,
+      "propertyNames": { "pattern": "^[0-9]+$" },
+      "additionalProperties": { "$ref": "#/$defs/label" }
+    },
+    "variant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["recordSize"],
+      "properties": {
+        "recordSize": { "$ref": "#/$defs/size" },
+        "idOffset": { "$ref": "#/$defs/offset" },
+        "fields": { "$ref": "#/$defs/fields" }
+      }
+    },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "name", "layout"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^0[xX][0-9a-fA-F]{8}$",
+          "not": { "pattern": "^0[xX]00000000$" }
+        },
+        "name": { "$ref": "#/$defs/label" },
+        "layout": { "enum": ["id-rows", "counted-id-rows", "entity-keyed", "armor-passive", "recharge"] },
+        "recordSize": { "$ref": "#/$defs/size" },
+        "idOffset": { "$ref": "#/$defs/offset" },
+        "headerSize": { "type": "integer", "minimum": 4, "maximum": 4096, "multipleOf": 4 },
+        "countOffset": { "$ref": "#/$defs/offset" },
+        "fields": { "$ref": "#/$defs/fields" },
+        "variants": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": { "$ref": "#/$defs/variant" }
+        },
+        "maxRecords": { "type": "integer", "minimum": 1, "maximum": 250000 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "layout": { "const": "armor-passive" } } },
+          "then": { "properties": { "maxRecords": { "maximum": 4096 } } }
+        },
+        {
+          "if": { "properties": { "layout": { "enum": ["armor-passive", "recharge"] } } },
+          "then": {
+            "properties": {
+              "recordSize": false,
+              "idOffset": false,
+              "fields": false,
+              "variants": false
+            }
+          },
+          "else": {
+            "oneOf": [
+              {
+                "required": ["recordSize"],
+                "properties": { "variants": false }
+              },
+              {
+                "required": ["variants"],
+                "properties": {
+                  "recordSize": false,
+                  "idOffset": false,
+                  "fields": false
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "layout": { "const": "id-rows" } } },
+          "then": { "properties": { "headerSize": false, "countOffset": false } }
+        },
+        {
+          "if": { "properties": { "layout": { "const": "counted-id-rows" } } },
+          "then": {
+            "required": ["headerSize", "countOffset"],
+            "properties": {
+              "headerSize": { "type": "integer", "minimum": 4, "maximum": 4096, "multipleOf": 4 },
+              "countOffset": { "$ref": "#/$defs/offset" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "layout": { "const": "entity-keyed" } } },
+          "then": {
+            "properties": {
+              "idOffset": { "const": 0 },
+              "variants": {
+                "items": { "properties": { "idOffset": { "const": 0 } } }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

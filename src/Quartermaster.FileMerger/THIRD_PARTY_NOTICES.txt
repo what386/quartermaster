@@ -1,15 +1,11 @@
 Format research
 ===============
-SHODAN Stat Editor (offline/gamedata.lua), provided in examples/filemods,
-documents the generated_*.dl_bin sealed-box keys, LDLD framing, and seeded
-MurmurHash64A parameters. SHODAN is distributed under GPL-3.0. This project
+SHODAN Stat Editor (offline/gamedata.lua, offline/hostdata.lua, and
+src/stat_editor_offline.lua), provided in examples/filemods, documents the
+generated_*.dl_bin sealed-box keys, LDLD framing, seeded MurmurHash64A parameters,
+and keyed/row/passive table field layouts. SHODAN is distributed under GPL-3.0. This project
 contains an independent implementation of those file-format operations; it
 does not embed SHODAN's Lua/native code or invoke SHODAN.
-
-The HD2FM1 metadata framing and fingerprints were inspected in the installer
-resources supplied with the example file mods. No mod scripts or game data are
-redistributed by this project. Medic File Merger's description informed the
-intended behavior; none of its code or binaries are used.
 
 SpaceWizards.Sodium and SpaceWizards.Sodium.Interop, Copyright Space Wizards, MIT license
 https://github.com/space-wizards/SpaceWizards.Sodium

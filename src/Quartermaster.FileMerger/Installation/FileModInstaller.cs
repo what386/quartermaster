@@ -17,7 +17,12 @@ public sealed record FileInstallInspection(bool Complete, IReadOnlyList<Installe
 public sealed class FileModInstaller
 {
     private readonly string stateDirectory;
-    public FileModInstaller(string stateDirectory) => this.stateDirectory = FileModPaths.ResolveRoot(stateDirectory, mustExist: false);
+    private readonly ConfigTableRegistry registry;
+    public FileModInstaller(string stateDirectory, ConfigTableRegistry? registry = null)
+    {
+        this.stateDirectory = FileModPaths.ResolveRoot(stateDirectory, mustExist: false);
+        this.registry = registry ?? ConfigTableRegistry.Default;
+    }
 
     public async Task<FileInstallInspection> InspectAsync(string gameDirectory, CancellationToken ct = default)
     {
@@ -71,7 +76,7 @@ public sealed class FileModInstaller
                 writes.Add(new(target, currentHash, original, original, true));
             else
             {
-                var result = ConfigMerger.Merge(target, original, selected, ct);
+                var result = ConfigMerger.Merge(target, original, selected, ct, registry);
                 writes.Add(new(target, currentHash, original, result.Content, false));
                 conflicts.AddRange(result.Conflicts); skipped.AddRange(result.Skipped);
             }

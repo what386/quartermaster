@@ -104,8 +104,10 @@ public sealed class MergerTests
         using var f = new Fixture(); var mod = f.Mod("Water", 0, 200);
         var changedStock = GameConfigCodec.Encrypt(Fixture.Config(firstValue: 900));
         var failure = Assert.Throws<InvalidDataException>(() => ConfigMerger.Merge(Fixture.Target, changedStock, [mod]));
-        Assert.Contains("Water", failure.Message); Assert.Contains("Needs a new version", failure.Message);
-        Assert.Throws<InvalidDataException>(() => ConfigMerger.Merge(Fixture.Target, changedStock, [mod with { StockFingerprints = [] }]));
+        Assert.Contains("Water", failure.Message); Assert.Contains("Try updating the mod or game.", failure.Message);
+        failure = Assert.Throws<InvalidDataException>(() => ConfigMerger.Merge(Fixture.Target, changedStock, [mod with { StockFingerprints = [] }]));
+        Assert.Contains("Water", failure.Message); Assert.Contains("game hash differs", failure.Message);
+        Assert.Contains("Try updating the mod or game.", failure.Message);
         Assert.Throws<InvalidDataException>(() => ConfigMerger.Merge(Fixture.Target, f.Stock, [mod with { Target = "data/game/generated_other.dl_bin" }]));
         Assert.Throws<InvalidDataException>(() => FileModPaths.ValidateTarget("data/game/../../game.dll"));
         Assert.Throws<OperationCanceledException>(() => ConfigMerger.Merge(Fixture.Target, f.Stock, [mod], new CancellationToken(true)));

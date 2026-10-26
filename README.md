@@ -70,7 +70,9 @@ Use **Purge** to remove any deployed patches and have a vanilla game.
 File mods have a document icon in Library and loadouts. Supported settings-file
 packages are merged into game configs when you deploy; their Lua installers are
 not deployed. Select package variants in **Mod options**, then arrange the loadout
-using your profile's priority direction. Conflicting values and incompatible
+using your profile's priority direction. Known config tables support additions and
+removals of records even when file sizes differ. Unsupported structural changes
+still require an exclusive choice for that file. Conflicting values and incompatible
 whole-file replacements are shown for review before deployment, with each file's
 winning and overridden or skipped mods listed separately. Results remain in the
 affected mods' error tooltips. These tooltips name the config file, list which
@@ -172,8 +174,12 @@ are skipped; incomplete deployments protect library content until you purge or r
 Provider credentials are stored separately and are excluded from exports.
 
 Application data is stored under `Quartermaster` in your user's local application
-data directory. Its location is shown in Settings. Set
-`QUARTERMASTER_DATA_DIRECTORY` to use another location.
+data directory by default. Use **Settings → Storage → Move data folder…** to
+relocate the library, profiles, settings, credentials, and app data to an empty
+folder on another drive. Quartermaster verifies copied files and restarts at the
+new location. It removes the old data after the new library opens; if startup or
+cleanup fails, it keeps the old copy. The active location is shown in Settings.
+`QUARTERMASTER_DATA_DIRECTORY` continues to override the saved location when set.
 
 ## Development
 

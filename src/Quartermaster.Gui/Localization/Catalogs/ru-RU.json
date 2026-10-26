@@ -656,6 +656,8 @@
     "Required by:\n  {0}\n\nEnable {1} in this loadout, or disable {2} if you do not want to use it.": "Требуется для:\n  {0}\n\nВключите {1} в этом наборе модов или отключите {2}, если не хотите его использовать.",
     "Archive:\n  {0}\n\nApplied mod:\n  {1}\n\nOverridden mods:\n{2}\n\nThese mods replace the same game assets in this archive. Only {3}'s replacements for those assets are used. Unrelated assets are kept.\n\nDisable a conflicting mod or choose different options to keep its replacements. Reordering only changes which mod wins.": "Архив:\n  {0}\n\nПрименённый мод:\n  {1}\n\nПерезаписанные моды:\n{2}\n\nЭти моды заменяют одни и те же ресурсы игры в этом архиве. Для этих ресурсов используются только замены из {3}. Остальные ресурсы сохраняются.\n\nОтключите конфликтующий мод или выберите другие параметры, чтобы сохранить его замены. Изменение порядка меняет только то, какой мод имеет приоритет.",
     "Dependency:\n  {0}\n\nDownload or import {1}, then add it to the same loadout and enable it.\nDependency information comes from the mod's metadata and may be outdated.": "Зависимость:\n  {0}\n\nСкачайте или импортируйте {1}, затем добавьте его в тот же набор модов и включите.\nСведения о зависимостях берутся из метаданных мода и могут быть устаревшими.",
-    "Archive:\n  {0}\n\n{1}": "Архив:\n  {0}\n\n{1}"
+    "Archive:\n  {0}\n\n{1}": "Архив:\n  {0}\n\n{1}",
+    "Only the applied mod is installed for this file. These file mods cannot be safely combined.": "Для этого файла устанавливается только применённый мод. Эти файловые моды нельзя безопасно объединить.",
+    "Reason:\n{0}": "Причина:\n{0}"
   }
 }

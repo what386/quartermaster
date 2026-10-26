@@ -40,6 +40,22 @@ internal sealed class Fixture : IDisposable
             bytes[offset + 16] = 1;
         }
     }
+    public static byte[] DamageConfig(params (uint Id, uint Value)[] records)
+    {
+        var bytes = new byte[4 + 24 + 16 + records.Length * 76];
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes, 1);
+        "LDLD\x01\0\0\0"u8.CopyTo(bytes.AsSpan(4));
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(12), 0xe0a72cf0);
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(16), (uint)(bytes.Length - 28));
+        bytes[20] = 1;
+        BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(36), (uint)records.Length);
+        for (var i = 0; i < records.Length; i++)
+        {
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(44 + i * 76), records[i].Id);
+            BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(48 + i * 76), records[i].Value);
+        }
+        return bytes;
+    }
     public byte[] Payload(FileMod mod)
     {
         var meta = Encoding.UTF8.GetBytes($"name={mod.Name}\nversion=1\ntarget={mod.Target}\nsize={mod.Content.Length}\nstock={FileModPaths.Fingerprint(Stock)}\nmod={FileModPaths.Fingerprint(mod.Content.Span)}\n");

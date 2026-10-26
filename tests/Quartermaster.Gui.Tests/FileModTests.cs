@@ -158,6 +158,45 @@ public sealed class FileModTests
     }
 
     [AvaloniaFact]
+    public async Task SizeChangingModsPreviewDeployAndDisableWithoutFalseFileConflicts()
+    {
+        using var f = new Fixture(); using var config = new ConfigFixture();
+        await f.Shell.InitializeAsync(); var target = GameConfig(f, config);
+        var baseline = ConfigFixture.DamageConfig((1, 100)); var stock = GameConfigCodec.Encrypt(baseline);
+        await File.WriteAllBytesAsync(target, stock);
+        foreach (var (name, plain) in new[]
+        {
+            ("Add damage row", ConfigFixture.DamageConfig((1, 100), (2, 200))),
+            ("Edit damage row", ConfigFixture.DamageConfig((1, 110)))
+        })
+        {
+            var directory = Path.Combine(f.Root, name); Directory.CreateDirectory(directory);
+            await File.WriteAllBytesAsync(Path.Combine(directory, "generated_entities.dl_bin"), GameConfigCodec.EncryptPreservingHash(plain, ConfigHash.Compute(baseline)));
+            await f.Services.Session.ImportAsync(directory, CancellationToken.None);
+            var mod = f.Services.Session.State.Mods.Single(mod => mod.Name == name);
+            await f.Services.Session.AddModToProfileAsync(mod.Id, f.Services.Session.ActiveProfile!.Id, CancellationToken.None);
+        }
+        var vm = Assert.IsType<ProfilesViewModel>(f.Shell.CurrentPage);
+        await f.Services.Session.WaitForFileModPreviewsAsync();
+        Assert.All(vm.Entries, row => { Assert.False(row.HasErrors); Assert.False(row.HasWarnings); });
+        Assert.Equal(stock, await File.ReadAllBytesAsync(target));
+        await f.Services.Session.DeployAsync(vm.SelectedProfile!.Id, f.Dialogs, CancellationToken.None);
+        Assert.Empty(f.Dialogs.FileMergeReviews);
+        var output = GameConfigCodec.Decrypt(await File.ReadAllBytesAsync(target));
+        Assert.Equal(2u, BinaryPrimitives.ReadUInt32LittleEndian(output.AsSpan(36)));
+        Assert.Equal(110u, BinaryPrimitives.ReadUInt32LittleEndian(output.AsSpan(48)));
+        Assert.Equal(200u, BinaryPrimitives.ReadUInt32LittleEndian(output.AsSpan(124)));
+        Assert.Equal(ConfigHash.Compute(baseline), ConfigHash.Compute(output));
+        vm.SelectedMod = vm.Entries.Single(row => row.Name == "Add damage row"); await vm.ToggleCommand.ExecuteAsync();
+        await f.Services.Session.DeployAsync(vm.SelectedProfile!.Id, f.Dialogs, CancellationToken.None);
+        output = GameConfigCodec.Decrypt(await File.ReadAllBytesAsync(target));
+        Assert.Equal(1u, BinaryPrimitives.ReadUInt32LittleEndian(output.AsSpan(36)));
+        Assert.Equal(110u, BinaryPrimitives.ReadUInt32LittleEndian(output.AsSpan(48)));
+        await f.Services.Session.PurgeAsync(CancellationToken.None);
+        Assert.Equal(stock, await File.ReadAllBytesAsync(target)); Assert.Equal(0, f.Launches);
+    }
+
+    [AvaloniaFact]
     public async Task ConflictsAreReviewedAndReorderingChangesTheWinningFileMod()
     {
         using var f = new Fixture(); using var config = new ConfigFixture(); await f.Shell.InitializeAsync(); var target = GameConfig(f, config);
@@ -324,7 +363,7 @@ public sealed class FileModTests
         await f.Services.Session.WaitForFileModPreviewsAsync();
         var failed = vm.Entries.Single(row => row.Name == "Water");
         Assert.True(failed.HasErrors);
-        Assert.Contains("Needs a new version", failed.ErrorDescription);
+        Assert.Contains("Try updating the mod or game.", failed.ErrorDescription);
         Assert.False(vm.Entries.Single(row => row.Name == "Armor").HasErrors);
         Assert.False(f.Services.Operations.IsError); // Background checks do not interrupt editing with an error toast.
         var view = new ModRowView { DataContext = failed }; var window = new Window { Content = view }; window.Show();
@@ -361,7 +400,7 @@ public sealed class FileModTests
         var errors = f.Services.Session.GetModErrors();
         var modError = Assert.Single(errors);
         Assert.Equal(f.Services.Session.State.Mods.Single(mod => mod.Name == "Water").Id, modError.Key);
-        Assert.Contains("Needs a new version", modError.Value);
+        Assert.Contains("Try updating the mod or game.", modError.Value);
         f.Shell.Navigate(PageKind.Mods);
         var library = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
         Assert.True(library.Mods.Single(mod => mod.Name == "Water").HasErrors);

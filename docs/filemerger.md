@@ -159,22 +159,72 @@ ciphertext hashes are unsuitable as stable profile-selection signatures.
 | Any candidate changes unsupported layout details | Install only the highest-priority candidate for that target, unchanged; report all others as skipped. |
 | Package does not recognize stock, or plaintext game hashes differ | Fail preparation with the candidate's name, source, and target. |
 
-Cells are four bytes relative to each block's payload, with a final short cell
-when necessary. Comparing complete cells prevents partial byte edits from being
-combined into an integer or float that no candidate supplied. This is a binary
-cell merger, not a schema-aware field merger.
+All edits are measured against the same verified stock config, not against the
+previous mod's output. Values are merged in complete four-byte cells, with a
+short final cell when needed. Identical writes do not conflict; conflicting writes
+report the final winner, including when three or more mods touch the same value.
 
-Compatible candidates retain block count, order, types, header positions, and
-inter-block framing bytes. Payload sizes must match except for a final
-8–15-byte correction trailer: any bytes preceding its last eight bytes must be
-zero. That trailer is excluded from gameplay comparisons and regenerated for the
-combined result. Reserved header correction bytes are not merged as payload data.
+`StructuredConfigMerger` matches the LDLD block sequence by type and occurrence.
+Header positions may move when an earlier payload grows or shrinks. Headers and
+payload lengths are rebuilt; reserved header correction bytes are not gameplay
+edits. Whole-block insertion or removal is supported when exactly one
+highest-priority mod changes the block sequence, each block type is unique,
+retained blocks stay in their original order, and there are no inter-block gaps.
+Retained blocks still merge against stock; added blocks come from that structural
+mod. Deleting a block conflicts with lower-priority edits to its payload.
+Multiple structural mods, reordered blocks, repeated block types, or mixed
+block-sequence and retained-block size changes use the existing exclusive-file
+fallback.
 
-A genuine insertion, deletion, reordered block, or changed payload layout takes
-the exclusive-replacement path. Matching values by record or field identity and
-rebuilding their internal offsets are outside this implementation. Different file
-sizes are therefore supported only for the recognized correction convention or
-as an exclusive replacement. Other target files still merge independently.
+`ConfigTable` recognizes these record layouts only when their full stock layout
+validates exactly; a guessed byte anchor or apparent padding is not sufficient:
+
+| Type | Layout |
+| --- | --- |
+| `0xe0a72cf0` damage | 16-byte descriptor/count header; 76-byte records keyed by their `u32` ID. |
+| `0x1f42878e` recharge | Entity hash index; 4-byte records, optional retained unindexed value, and recognized internal correction area. |
+| `0x54270608` jump pack | Entity hash index; 280-byte records. |
+| `0x14729b6a` sensor | Entity hash index; 44-byte records. |
+| `0xff67a367` detector | Entity hash index; 24-byte records. |
+| `0x84ce7eee` weapon wind-up | Entity hash index; 36-byte records. |
+| `0x32528174` laser designator | Entity hash index; 64-byte records. |
+| `0x63ce0feb` armor passive | 56-byte header; ID-keyed 16-byte modifiers and 12-byte weapon-stat modifiers. |
+
+Keyed tables have 16-byte buckets (`u64` entity ID, `u32` record index, zero padding)
+and fixed-stride records. Parsing requires unique nonzero keys, unique and complete
+record-index coverage (excluding the optional retained recharge value), correct
+linear-probe lookup placement, and one unambiguous
+bucket-array boundary. Output uses two buckets per record (at least two buckets),
+rebuilding lookup slots and record indexes after additions or removals. Damage
+rows preserve their descriptor. Armor passives preserve their ID, recompute array
+counts and payload-relative offsets, reject duplicate IDs/ambiguous arrays, and
+refuse a combined result with more than three described modifiers.
+
+`ConfigRecordMerger` matches stock and mod records by ID, merging independent
+edits even when record positions change. Additions with different IDs coexist.
+Competing additions of the same ID select the highest-priority whole record.
+Deletion versus editing is a conflict resolved by priority; an unchanged stock
+copy in another mod does not reverse a deletion. Editing after deletion restores
+the stock record plus subsequent edits, without resurrecting earlier edits.
+Conflicts retain both source identities and the record ID.
+
+Unparsed blocks retain cell merging when payload sizes match. The recognized
+8–15-byte final correction trailer is excluded from mod comparisons and generated
+afresh. Its length must match absolute eight-byte alignment, and padding before
+the last correction word must be zero. Known tables accept that trailer only in
+mod/output files; it cannot make an unknown stock table look like a known schema.
+The explicit recharge handler also accepts its internal correction area as
+described under [Table registry](#table-registry).
+
+Unsupported resizing, ambiguous identities/indexes, unsupported array offsets,
+unsafe combined passive descriptions, or changed framing take the exclusive-file
+path: the highest-priority candidate for that target is installed unchanged, and
+all others are reported as skipped. Other target files still merge independently.
+Per-table record and hash-probe limits bound parsing and rebuilding. Combined
+output is limited to 256 MiB including sealed-box overhead and correction space.
+Rebuilt tables are validated before and after hash correction, then encryption is
+verified by decrypting the result. Supported size changes do not bypass version,
+fingerprint, backup, or publication checks.
 
 ## Results and error handling
 
@@ -182,8 +232,10 @@ as an exclusive replacement. Other target files still merge independently.
 helper paths. Neither collection is a deployment request.
 
 `MergeResult.Content` contains complete sealed output for one target.
-`MergeConflict` identifies target, block type/index, payload-relative cell offset,
-and losing/winning mod names. `SkippedFileMod` records target, name, reason, and
+`MergeConflict` identifies target, block type/index, both source identities, and
+losing/winning mod names. With `RecordId`, `Offset` is record-relative; `-1`
+represents a whole-record addition/deletion conflict. Without `RecordId`, the
+offset remains payload-relative. `SkippedFileMod` records target, name, reason, and
 source attribution. Retain these reports even when the resulting output is valid.
 An empty input selection returns stock bytes; inputs that introduce no gameplay
 changes also retain the original ciphertext.
@@ -258,7 +310,7 @@ Portable profiles retain all original variants and selections.
 resolves enabled sets through `PatchSelection` and orders them through
 `ProfileEditor.InDeploymentOrder`. It re-verifies selected source bytes and
 re-detects payloads before planning. Selection signatures include source hashes,
-set IDs, payload indexes, options, and effective order. Receipts and installed-file
+set IDs, payload indexes, options, effective order, and table-registry rules. Receipts and installed-file
 health drive deployment outlines, launch warnings, and storage protection.
 
 `LibrarySession` prepares the config merge before repatching or publication and
@@ -320,6 +372,74 @@ failed composite deployment leaves an unhealthy ledger or pending receipt rather
 than a clean deployment status. App config state lives under `filemods` and profile
 receipts under `filemod-receipts`, keyed per installation. These directories are
 not staging-cleanup candidates.
+
+## Table registry
+
+[`Data/config-tables.json`](../src/Quartermaster.FileMerger/Data/config-tables.json)
+is embedded in the engine assembly. It defines supported block type IDs, display
+names, layout handlers, record sizes, ID offsets, and optional field labels.
+`ConfigTableRegistry.Default` exposes the immutable bundled definitions. The
+adjacent JSON Schema assists editors; `ConfigTableRegistry.Load(Stream)` is the
+authoritative validator and does not fetch schemas or external includes.
+
+To support a researched table that uses an existing layout, add a definition to
+the bundled JSON and tests using synthetic stock, additions/deletions, reordered
+records, and independent edits. Rebuild the application to distribute it. For example:
+
+```json
+{
+  "type": "0x12345678",
+  "name": "Example settings",
+  "layout": "id-rows",
+  "recordSize": 32,
+  "idOffset": 0,
+  "fields": { "4": "Example value" }
+}
+```
+
+The type in this example is illustrative, not an identified game table. A type ID
+alone does not establish compatibility. Verify the header, record identities,
+record size, and absence of unhandled pointers against decrypted files.
+
+| Layout | Structural contract owned by C# |
+| --- | --- |
+| `id-rows` | A 16-byte header with count at byte 8 and reserved zero at byte 12; fixed-size records with unique u32 IDs at `idOffset` (default 0). |
+| `counted-id-rows` | A verified fixed-size header (4–4096 bytes) with a configurable aligned u32 count offset, followed by fixed-size records with unique u32 IDs. Use only after checking all other header fields and confirming there are no payload-relative pointers. |
+| `entity-keyed` | A validated linear-probing index of 16-byte buckets containing u64 entity IDs and row indexes, followed by fixed-size records. IDs live in the index; `idOffset` must be absent or 0. |
+| `recharge` | Four-byte entity values with a validated bucket index, zero or one retained unindexed value, and an optional 16-byte internal hash-correction area in mod inputs. The stock layout determines whether the unindexed value is present. No configurable sizes, offsets, fields, or variants. |
+| `armor-passive` | A 56-byte header, modifier and weapon-stat arrays, pointer/count rebuilding, and the three-described-modifier limit. No configurable record size, ID offset, fields, or variants. |
+
+For supported versions with different fixed record sizes or ID locations, replace
+`recordSize`/`idOffset`/`fields` with `variants`, an array of those definitions.
+Exactly one variant must validate for each table. Stock and mods must select
+compatible strides and ID offsets. Ambiguous or unsupported resized layouts use
+the whole-file replacement path; they are never rebuilt by guessing anchors.
+The recharge handler preserves the unindexed stock value as a separate record
+when present. It accepts an internal correction area only after the validated
+values, with zeros surrounding an absolutely aligned eight-byte correction word.
+It removes that area during rebuilding and regenerates the game hash at the end
+of the file. Unknown trailers and ambiguous index boundaries remain unsupported.
+
+New index structures, pointer rules, or variable-length record formats require a
+C# handler and associated tests.
+
+`maxRecords` may lower the handler limit (250,000 records per array for rows/keyed,
+4,096 for passive), but cannot raise it. Sizes and offsets must address aligned
+four-byte cells. Loading rejects invalid or duplicate IDs, properties, variants,
+and labels, and enforces registry and record bounds. Labels are metadata only;
+they do not change merge units or currently name settings in GUI diagnostics.
+
+Tools may load a registry and pass it explicitly with
+`ConfigMerger.Merge(..., registry: registry)` or
+`new FileModInstaller(stateDirectory, registry)`. This replaces the definitions
+for that operation; include all required types. The app uses the bundled registry
+and does not scan for external overrides. Custom registries do not mutate the
+default registry or other callers.
+
+`Fingerprint` hashes the active layout and limit rules, independent of JSON order,
+formatting, names, and labels. Profile selection signatures include the bundled
+fingerprint, so changing merge rules makes previous deployment receipts stale
+and prompts a fresh merge.
 
 ## Maintenance and tests
 

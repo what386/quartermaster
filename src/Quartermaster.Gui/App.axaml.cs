@@ -22,10 +22,22 @@ public partial class App : Application
         {
             var window = new MainWindow();
             var services = new AppServices(AppServices.DefaultDataDirectory, new DialogService(() => window),
-                shutdownForUpdate: () => Dispatcher.UIThread.Post(window.Close));
+                shutdownForUpdate: () => Dispatcher.UIThread.Post(window.Close),
+                restartAfterDataMove: () => Dispatcher.UIThread.Post(() =>
+                {
+                    var executable = Environment.ProcessPath ?? throw new InvalidOperationException("Cannot determine the application executable.");
+                    global::System.Diagnostics.Process.Start(new global::System.Diagnostics.ProcessStartInfo(executable) { UseShellExecute = false });
+                    window.Close();
+                }));
             var viewModel = new MainWindowViewModel(services);
             window.DataContext = viewModel;
-            window.Opened += async (_, _) => await viewModel.InitializeAsync();
+            window.Opened += async (_, _) =>
+            {
+                await viewModel.InitializeAsync();
+                try { await Task.Run(() => DataDirectoryRelocator.FinalizePreviousMove(services.DataDirectory, AppServices.DataDirectoryPointer)); }
+                catch (IOException) { /* Keep the prior copy if cleanup is unavailable. */ }
+                catch (UnauthorizedAccessException) { /* Keep the prior copy if cleanup is unavailable. */ }
+            };
             var inbox = new NxmInbox(services.DataDirectory);
             var processingLink = false;
             var promptedLinks = new HashSet<string>();

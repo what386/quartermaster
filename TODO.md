@@ -1,7 +1,7 @@
 # TODO — quartermaster
 
 @created: 2026-10-03
-@modified: 2026-10-25
+@modified: 2026-10-26
 
 
 ## Tasks
@@ -14,7 +14,4 @@
 
 - [ ] retarget mods, e.g. switch armor sets for cosmetics
       @created 2026-10-15 21:34
-
-- [ ] Support size-changing file mods
-      @created 2026-10-23 22:40
 

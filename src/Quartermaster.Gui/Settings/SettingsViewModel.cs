@@ -65,7 +65,7 @@ public sealed partial class SettingsViewModel : SessionViewModel
     public bool ShowInstallation => Matches("Game and deployment Helldivers 2 installation folder Steam path");
     public bool ShowPriority => Matches("Game and deployment Profile load priority earlier later entries order " + ActiveProfileName);
     public bool ShowRepatch => Matches("Game and deployment Repatching repair automatic ask never patches culling arm current game LOD compatibility");
-    public bool ShowStorage => Matches("Storage Library storage management cleanup disk space temporary files previous versions originals profiles " + LibraryDirectory);
+    public bool ShowStorage => Matches("Storage Library storage management cleanup disk space temporary files previous versions originals profiles move data folder another drive relocation " + LibraryDirectory);
     public bool ShowVersion => Matches("App information Quartermaster application version build " + ApplicationVersion);
     public bool ShowPlatform => Matches("App information Operating system platform architecture " + PlatformInformation);
     public bool ShowRuntime => Matches("App information Runtime .NET " + RuntimeVersion);
