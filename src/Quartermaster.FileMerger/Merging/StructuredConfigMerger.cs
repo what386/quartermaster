@@ -20,7 +20,7 @@ internal static class StructuredConfigMerger
             var table = ConfigTable.Read(stock, index, registry, ct, allowTrailer: false);
             if (table is not null)
             {
-                var tables = inputs.Select(input => ConfigTable.Read(input.Document, index, registry, ct)).ToArray();
+                var tables = inputs.Select(input => ConfigTable.Read(input.Document, index, registry, ct, baseline: table)).ToArray();
                 if (tables.Any(candidate => candidate is null || !SameTable(table, candidate)))
                 { reason = "A config table has an unsupported or ambiguous record layout."; return false; }
                 var header = values.Merge(table.Header, inputs.Select((input, i) => new ConfigValueInput(input.Mod, tables[i]!.Header)).ToArray(), "table header").Bytes;
@@ -87,7 +87,7 @@ internal static class StructuredConfigMerger
                         }
             foreach (var input in inputs)
                 foreach (var (_, index) in group)
-                    if (ConfigTable.Read(input.Document, index, registry, ct) is { } table)
+                    if (ConfigTable.Read(input.Document, index, registry, ct, baseline: ConfigTable.Read(stock, index, registry, ct, allowTrailer: false)) is { } table)
                         foreach (var set in table.Sets)
                             foreach (var record in set.Records)
                                 if (owners.TryGetValue((set.Name, record.Id), out var locations) && !locations.Contains(index)) return false;
@@ -131,7 +131,7 @@ internal static class StructuredConfigMerger
         for (var index = 0; index < stock.Blocks.Count; index++)
             if (ConfigTable.Read(stock, index, registry, ct, allowTrailer: false) is { } baseline)
             {
-                var parsed = ConfigTable.Read(document, index, registry, ct);
+                var parsed = ConfigTable.Read(document, index, registry, ct, baseline: baseline);
                 if (parsed is null || !SameTable(baseline, parsed))
                     throw new InvalidDataException("Merged config table failed its record/index/offset validation.");
             }

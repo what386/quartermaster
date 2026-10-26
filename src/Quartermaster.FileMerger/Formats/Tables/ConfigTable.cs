@@ -11,13 +11,28 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
 {
     internal ConfigTableKind Kind => Definition.Kind;
 
-    internal static ConfigTable? Read(ConfigDocument document, int index, ConfigTableRegistry registry, CancellationToken ct, bool allowTrailer = true)
+    internal static ConfigTable? Read(ConfigDocument document, int index, ConfigTableRegistry registry, CancellationToken ct, bool allowTrailer = true, ConfigTable? baseline = null)
     {
         var block = document.Blocks[index];
         if (!registry.TryGet(block.Type, out var definition)) return null;
         var payload = document.Bytes.AsSpan(block.Data, block.Size);
         var last = allowTrailer && index == document.Blocks.Count - 1;
         if (definition.Kind == ConfigTableKind.Passive) return ReadPassive(payload, definition, block.Data, last);
+        if (definition.Kind == ConfigTableKind.Recharge)
+        {
+            // Recharge has four-byte values and may retain one unindexed value after the live rows.
+            // Resolve that count from stock; a correction trailer must not turn padding into a value.
+            ConfigTable? recharge = null;
+            for (var extra = 0; extra <= 1; extra++)
+            {
+                if (baseline is not null && extra != baseline.Sets.Count - 1) continue;
+                var candidate = ReadKeyed(payload, definition, 4, block.Data, last, ct, extra, allowTrailer);
+                if (candidate is null) continue;
+                if (recharge is not null) return null;
+                recharge = candidate;
+            }
+            return recharge;
+        }
         ConfigTable? found = null;
         foreach (var variant in definition.Variants)
         {
@@ -78,7 +93,7 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
         return records;
     }
 
-    private static ConfigTable? ReadKeyed(ReadOnlySpan<byte> data, ConfigTableDefinition definition, int stride, int start, bool last, CancellationToken ct)
+    private static ConfigTable? ReadKeyed(ReadOnlySpan<byte> data, ConfigTableDefinition definition, int stride, int start, bool last, CancellationToken ct, int unindexedRecords = 0, bool internalTrailer = false)
     {
         var keys = new List<(ulong Id, uint Row)>();
         var ids = new HashSet<ulong>(); var rows = new HashSet<uint>();
@@ -98,9 +113,9 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
                 if (!ids.Add(key) || !rows.Add(row)) break;
                 keys.Add((key, row)); maxRow = Math.Max(maxRow, row);
             }
-            var length = (long)buckets * 16 + (long)keys.Count * stride;
+            var length = (long)buckets * 16 + (long)(keys.Count + unindexedRecords) * stride;
             if (length > data.Length || (keys.Count > 0 ? maxRow >= keys.Count : buckets != 2) ||
-                !ValidEnd(data, (int)length, start, last)) continue;
+                !ValidEnd(data, (int)length, start, last) && !(internalTrailer && RechargeTrailer(data, (int)length, start))) continue;
             var valid = true;
             for (var slot = 0; slot < buckets && valid; slot++)
             {
@@ -118,9 +133,23 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
             var records = new List<ConfigRecord>(keys.Count);
             foreach (var item in keys.OrderBy(item => item.Row))
                 records.Add(new(item.Id, data.Slice(buckets * 16 + (int)item.Row * stride, stride).ToArray()));
-            found = new(definition, 0, [], [new("entity", stride, records)], (int)length);
+            var sets = new List<ConfigRecordSet> { new("entity", stride, records) };
+            if (unindexedRecords == 1)
+                sets.Add(new("unindexed recharge", 4, [new(0, data.Slice((int)length - 4, 4).ToArray())]));
+            found = new(definition, 0, [], sets, (int)length);
         }
         return found;
+    }
+
+    // The recharge mod reserves 16 bytes after its values: zero padding to an absolute
+    // eight-byte boundary, an eight-byte correction word, and zeros to the end of that area.
+    // This is only accepted by the explicit recharge handler, never for stock or unknown tables.
+    private static bool RechargeTrailer(ReadOnlySpan<byte> data, int end, int start)
+    {
+        var padding = (8 - ((start + end) & 7)) & 7;
+        return data.Length - end == 16 && padding <= 8 &&
+            data.Slice(end, padding).IndexOfAnyExcept((byte)0) < 0 &&
+            data[(end + padding + 8)..].IndexOfAnyExcept((byte)0) < 0;
     }
 
     // A recognized trailer is padding to an absolute 8-byte boundary followed by the correction word.
@@ -135,10 +164,10 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
     internal byte[] Write(IReadOnlyList<IReadOnlyList<ConfigRecord>> sets, byte[] header, CancellationToken ct)
     {
         if (sets.Any(records => records.Count > Definition.MaxRecords)) throw new InvalidDataException("Merged config table exceeds the record limit.");
-        if (Kind == ConfigTableKind.Keyed)
+        if (Kind is ConfigTableKind.Keyed or ConfigTableKind.Recharge)
         {
             var records = sets[0]; var buckets = checked(Math.Max(1, records.Count) * 2);
-            var output = new byte[checked(buckets * 16 + records.Count * Sets[0].Stride)];
+            var output = new byte[checked(buckets * 16 + records.Count * Sets[0].Stride + (sets.Count == 2 ? 4 : 0))];
             var probes = 0;
             for (var row = 0; row < records.Count; row++)
             {
@@ -151,6 +180,11 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
                 BinaryPrimitives.WriteUInt64LittleEndian(output.AsSpan(slot * 16), record.Id);
                 BinaryPrimitives.WriteUInt32LittleEndian(output.AsSpan(slot * 16 + 8), (uint)row);
                 record.Bytes.CopyTo(output, buckets * 16 + row * Sets[0].Stride);
+            }
+            if (sets.Count == 2)
+            {
+                if (sets[1].Count != 1) throw new InvalidDataException("The unindexed recharge value must be preserved.");
+                sets[1][0].Bytes.CopyTo(output, output.Length - 4);
             }
             return output;
         }

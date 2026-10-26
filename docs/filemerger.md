@@ -176,7 +176,7 @@ validates exactly; a guessed byte anchor or apparent padding is not sufficient:
 | Type | Layout |
 | --- | --- |
 | `0xe0a72cf0` damage | 16-byte descriptor/count header; 76-byte records keyed by their `u32` ID. |
-| `0x1f42878e` recharge | Entity hash index; 4-byte records. |
+| `0x1f42878e` recharge | Entity hash index; 4-byte records, optional retained unindexed value, and recognized internal correction area. |
 | `0x54270608` jump pack | Entity hash index; 280-byte records. |
 | `0x14729b6a` sensor | Entity hash index; 44-byte records. |
 | `0xff67a367` detector | Entity hash index; 24-byte records. |
@@ -186,7 +186,8 @@ validates exactly; a guessed byte anchor or apparent padding is not sufficient:
 
 Keyed tables have 16-byte buckets (`u64` entity ID, `u32` record index, zero padding)
 and fixed-stride records. Parsing requires unique nonzero keys, unique and complete
-record-index coverage, correct linear-probe lookup placement, and one unambiguous
+record-index coverage (excluding the optional retained recharge value), correct
+linear-probe lookup placement, and one unambiguous
 bucket-array boundary. Output uses two buckets per record (at least two buckets),
 rebuilding lookup slots and record indexes after additions or removals. Damage
 rows preserve their descriptor. Armor passives preserve their ID, recompute array
@@ -206,6 +207,8 @@ Unparsed blocks retain cell merging when payload sizes match. The recognized
 afresh. Its length must match absolute eight-byte alignment, and padding before
 the last correction word must be zero. Known tables accept that trailer only in
 mod/output files; it cannot make an unknown stock table look like a known schema.
+The explicit recharge handler also accepts its internal correction area as
+described under [Table registry](#table-registry).
 
 Unsupported resizing, ambiguous identities/indexes, unsupported array offsets,
 unsafe combined passive descriptions, or changed framing take the exclusive-file
@@ -396,6 +399,7 @@ record size, and absence of unhandled pointers against decrypted files.
 | --- | --- |
 | `id-rows` | A 16-byte header with count at byte 8 and reserved zero at byte 12; fixed-size records with unique u32 IDs at `idOffset` (default 0). |
 | `entity-keyed` | A validated linear-probing index of 16-byte buckets containing u64 entity IDs and row indexes, followed by fixed-size records. IDs live in the index; `idOffset` must be absent or 0. |
+| `recharge` | Four-byte entity values with a validated bucket index, zero or one retained unindexed value, and an optional 16-byte internal hash-correction area in mod inputs. The stock layout determines whether the unindexed value is present. No configurable sizes, offsets, fields, or variants. |
 | `armor-passive` | A 56-byte header, modifier and weapon-stat arrays, pointer/count rebuilding, and the three-described-modifier limit. No configurable record size, ID offset, fields, or variants. |
 
 For supported versions with different fixed record sizes or ID locations, replace
@@ -403,6 +407,12 @@ For supported versions with different fixed record sizes or ID locations, replac
 Exactly one variant must validate for each table. Stock and mods must select
 compatible strides and ID offsets. Ambiguous or unsupported resized layouts use
 the whole-file replacement path; they are never rebuilt by guessing anchors.
+The recharge handler preserves the unindexed stock value as a separate record
+when present. It accepts an internal correction area only after the validated
+values, with zeros surrounding an absolutely aligned eight-byte correction word.
+It removes that area during rebuilding and regenerates the game hash at the end
+of the file. Unknown trailers and ambiguous index boundaries remain unsupported.
+
 New index structures, pointer rules, or variable-length record formats require a
 C# handler and associated tests.
 

@@ -5,7 +5,7 @@ using System.Text.Json;
 
 namespace Quartermaster.FileMerger;
 
-public enum ConfigTableKind { Rows, Keyed, Passive }
+public enum ConfigTableKind { Rows, Keyed, Passive, Recharge }
 public sealed record ConfigTableVariant(int RecordSize, int IdOffset, IReadOnlyDictionary<int, string> Fields);
 public sealed record ConfigTableDefinition(uint Type, string Name, ConfigTableKind Kind, int MaxRecords,
     IReadOnlyList<ConfigTableVariant> Variants);
@@ -78,16 +78,17 @@ public sealed class ConfigTableRegistry
                     "id-rows" => ConfigTableKind.Rows,
                     "entity-keyed" => ConfigTableKind.Keyed,
                     "armor-passive" => ConfigTableKind.Passive,
+                    "recharge" => ConfigTableKind.Recharge,
                     _ => throw Invalid($"{context}: unknown layout '{layout}'; new structures require a C# handler")
                 };
                 var ceiling = kind == ConfigTableKind.Passive ? 4096 : 250_000;
                 var limit = item.TryGetProperty("maxRecords", out _) ? Integer(item, "maxRecords", context) : ceiling;
                 if (limit < 1 || limit > ceiling) throw Invalid($"{context}: maxRecords must be between 1 and {ceiling}");
                 var variants = new List<ConfigTableVariant>();
-                if (kind == ConfigTableKind.Passive)
+                if (kind is ConfigTableKind.Passive or ConfigTableKind.Recharge)
                 {
                     if (new[] { "recordSize", "idOffset", "fields", "variants" }.Any(key => item.TryGetProperty(key, out _)))
-                        throw Invalid($"{context}: armor-passive array and pointer rules are owned by its C# handler");
+                        throw Invalid($"{context}: {layout} structure rules are owned by its C# handler");
                 }
                 else if (item.TryGetProperty("variants", out var alternatives))
                 {

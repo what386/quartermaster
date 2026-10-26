@@ -55,7 +55,7 @@
           "not": { "pattern": "^0[xX]00000000$" }
         },
         "name": { "$ref": "#/$defs/label" },
-        "layout": { "enum": ["id-rows", "entity-keyed", "armor-passive"] },
+        "layout": { "enum": ["id-rows", "entity-keyed", "armor-passive", "recharge"] },
         "recordSize": { "$ref": "#/$defs/size" },
         "idOffset": { "$ref": "#/$defs/offset" },
         "fields": { "$ref": "#/$defs/fields" },
@@ -70,13 +70,16 @@
       "allOf": [
         {
           "if": { "properties": { "layout": { "const": "armor-passive" } } },
+          "then": { "properties": { "maxRecords": { "maximum": 4096 } } }
+        },
+        {
+          "if": { "properties": { "layout": { "enum": ["armor-passive", "recharge"] } } },
           "then": {
             "properties": {
               "recordSize": false,
               "idOffset": false,
               "fields": false,
-              "variants": false,
-              "maxRecords": { "maximum": 4096 }
+              "variants": false
             }
           },
           "else": {

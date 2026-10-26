@@ -215,6 +215,62 @@ public sealed class StructuredMergerTests
         Assert.Empty(result.Skipped); Assert.Empty(result.Conflicts);
     }
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void RechargeInternalCorrectionMergesWithWaterAndVaultChanges(bool reverse, bool vault)
+    {
+        // Three indexed values plus the fourth, unindexed stock value. The recharge mod
+        // extends this non-final block by 16 bytes for a hash correction, not new entities.
+        var recharge = Keyed(6, (10, 11), (18, 15), (99, 8)).Concat(new byte[4]).ToArray();
+        Put(recharge, 108, 5);
+        var settings = new byte[32]; Put(settings, 0, 5); Put(settings, 4, 195);
+        var baseline = Config((Recharge, recharge), (Unknown, settings)); var stock = GameConfigCodec.Encrypt(baseline);
+        var changed = new byte[recharge.Length + 16]; recharge.CopyTo(changed, 0);
+        Put(changed, 100, 7); Put64(changed, 116, 0x2d5b9243f86bbd41);
+        var jump = Mod("Jump recharge", baseline, stock, Config((Recharge, changed), (Unknown, settings)));
+        var waterSettings = settings.ToArray(); Put(waterSettings, 0, 10);
+        if (vault) Put(waterSettings, 4, 250);
+        var water = Mod("Water and optional vault", baseline, stock, Config((Recharge, recharge), (Unknown, waterSettings)));
+        var result = ConfigMerger.Merge(Fixture.Target, stock, reverse ? [water, jump] : [jump, water]);
+        Assert.Empty(result.Skipped); Assert.Empty(result.Conflicts);
+        var plain = GameConfigCodec.Decrypt(result.Content); var merged = Payload(plain);
+        Assert.Equal(112, merged.Length); Assert.Equal(7u, U32(merged, 100));
+        Assert.Equal(11u, U32(merged, 96)); Assert.Equal(8u, U32(merged, 104)); Assert.Equal(5u, U32(merged, 108));
+        Assert.Equal(10u, U32(Payload(plain, 1), 0)); Assert.Equal(vault ? 250u : 195u, U32(Payload(plain, 1), 4));
+        Assert.Equal(ConfigHash.Compute(baseline), ConfigHash.Compute(plain));
+    }
+
+    [Theory]
+    [InlineData(112)] // Leading correction padding must be zero.
+    [InlineData(124)] // Trailing correction padding must be zero.
+    public void RechargeDoesNotDiscardUnknownNonzeroTrailerBytes(int offset)
+    {
+        var recharge = Keyed(6, (10, 11), (18, 15), (99, 8)).Concat(new byte[4]).ToArray(); Put(recharge, 108, 5);
+        var baseline = Config((Recharge, recharge), (Unknown, new byte[32])); var stock = GameConfigCodec.Encrypt(baseline);
+        var changed = new byte[128]; recharge.CopyTo(changed, 0); Put(changed, offset, 1); Put64(changed, 116, 123);
+        var bad = Mod("Unknown extension", baseline, stock, Config((Recharge, changed), (Unknown, new byte[32])));
+        var unchanged = Mod("Unchanged", baseline, stock, baseline);
+        var result = ConfigMerger.Merge(Fixture.Target, stock, [unchanged, bad]);
+        Assert.Single(result.Skipped); Assert.Equal(bad.Content.ToArray(), result.Content);
+    }
+
+    [Fact]
+    public void RechargeRetainsEditsToItsUnindexedStockValue()
+    {
+        var recharge = Keyed(6, (10, 11), (18, 15), (99, 8)).Concat(new byte[4]).ToArray(); Put(recharge, 108, 5);
+        var baseline = Config((Recharge, recharge), (Unknown, new byte[32])); var stock = GameConfigCodec.Encrypt(baseline);
+        var first = recharge.ToArray(); Put(first, 108, 6);
+        var second = recharge.ToArray(); Put(second, 100, 7);
+        var result = ConfigMerger.Merge(Fixture.Target, stock, [
+            Mod("Unindexed edit", baseline, stock, Config((Recharge, first), (Unknown, new byte[32]))),
+            Mod("Indexed edit", baseline, stock, Config((Recharge, second), (Unknown, new byte[32]))) ]);
+        var payload = Payload(GameConfigCodec.Decrypt(result.Content));
+        Assert.Equal(6u, U32(payload, 108)); Assert.Equal(7u, U32(payload, 100)); Assert.Empty(result.Skipped); Assert.Empty(result.Conflicts);
+    }
+
     [Fact]
     public void InvalidKeyedLookupCannotBeRebuiltAsIfItHadStableRecords()
     {

@@ -22,6 +22,8 @@ public sealed class TableRegistryTests
         Assert.True(registry.TryGet(0xe0a72cf0, out var damage));
         Assert.Equal(76, Assert.Single(damage.Variants).RecordSize);
         Assert.Equal("Damage", damage.Variants[0].Fields[4]);
+        Assert.True(registry.TryGet(0x1f42878e, out var recharge));
+        Assert.Equal(ConfigTableKind.Recharge, recharge.Kind); Assert.Empty(recharge.Variants);
         Assert.True(registry.TryGet(0x63ce0feb, out var passive));
         Assert.Equal(ConfigTableKind.Passive, passive.Kind); Assert.Empty(passive.Variants);
     }
@@ -44,6 +46,7 @@ public sealed class TableRegistryTests
     [InlineData("\"recordSize\":76", "\"recordSize\":76,\"fields\":{\"4\":\"A\",\"04\":\"B\"}")]
     [InlineData("id-rows", "unknown")]
     [InlineData("id-rows", "armor-passive")]
+    [InlineData("id-rows", "recharge")]
     [InlineData("0x12345678", "0x00000000")]
     [InlineData("\"recordSize\":76", "\"variants\":[{\"recordSize\":76},{\"recordSize\":76}]")]
     [InlineData("\"recordSize\":76", "\"recordSize\":76,\"variants\":[{\"recordSize\":80}]")]

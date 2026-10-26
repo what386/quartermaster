@@ -149,7 +149,7 @@ separate read-only smoke check; the examples are intentionally uncommitted.
 
 Add verified layouts to [`Data/config-tables.json`](Data/config-tables.json), which
 is embedded at build time. The adjacent schema provides editor validation.
-Existing `id-rows`, `entity-keyed`, and `armor-passive` handlers retain their C#
+Existing `id-rows`, `entity-keyed`, `recharge`, and `armor-passive` handlers retain their C#
 structural checks. New table structures still need a handler. See the
 [registry contract and extension workflow](../../docs/filemerger.md#table-registry)
 for variants, bounds, metadata, custom registries, and required test coverage.

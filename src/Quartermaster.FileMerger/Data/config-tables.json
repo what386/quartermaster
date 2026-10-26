@@ -23,9 +23,7 @@
     {
       "type": "0x1f42878e",
       "name": "Recharge",
-      "layout": "entity-keyed",
-      "recordSize": 4,
-      "fields": { "0": "Recharge time" }
+      "layout": "recharge"
     },
     {
       "type": "0x54270608",
