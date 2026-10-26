@@ -363,7 +363,7 @@ public sealed class FileModTests
         await f.Services.Session.WaitForFileModPreviewsAsync();
         var failed = vm.Entries.Single(row => row.Name == "Water");
         Assert.True(failed.HasErrors);
-        Assert.Contains("Needs a new version", failed.ErrorDescription);
+        Assert.Contains("Try updating the mod or game.", failed.ErrorDescription);
         Assert.False(vm.Entries.Single(row => row.Name == "Armor").HasErrors);
         Assert.False(f.Services.Operations.IsError); // Background checks do not interrupt editing with an error toast.
         var view = new ModRowView { DataContext = failed }; var window = new Window { Content = view }; window.Show();
@@ -400,7 +400,7 @@ public sealed class FileModTests
         var errors = f.Services.Session.GetModErrors();
         var modError = Assert.Single(errors);
         Assert.Equal(f.Services.Session.State.Mods.Single(mod => mod.Name == "Water").Id, modError.Key);
-        Assert.Contains("Needs a new version", modError.Value);
+        Assert.Contains("Try updating the mod or game.", modError.Value);
         f.Shell.Navigate(PageKind.Mods);
         var library = Assert.IsType<ModsViewModel>(f.Shell.CurrentPage);
         Assert.True(library.Mods.Single(mod => mod.Name == "Water").HasErrors);
