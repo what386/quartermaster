@@ -8,7 +8,7 @@ namespace Quartermaster.FileMerger;
 public enum ConfigTableKind { Rows, Keyed, Passive, Recharge }
 public sealed record ConfigTableVariant(int RecordSize, int IdOffset, IReadOnlyDictionary<int, string> Fields);
 public sealed record ConfigTableDefinition(uint Type, string Name, ConfigTableKind Kind, int MaxRecords,
-    IReadOnlyList<ConfigTableVariant> Variants);
+    IReadOnlyList<ConfigTableVariant> Variants, int HeaderSize = 16, int CountOffset = 8);
 
 /// <summary>Immutable, validated definitions for the built-in table handlers. No executable rules or external includes.</summary>
 public sealed class ConfigTableRegistry
@@ -35,6 +35,8 @@ public sealed class ConfigTableRegistry
             table.Type,
             table.Kind,
             table.MaxRecords,
+            table.HeaderSize,
+            table.CountOffset,
             Variants = table.Variants.OrderBy(variant => variant.RecordSize).ThenBy(variant => variant.IdOffset)
                 .Select(variant => new { variant.RecordSize, variant.IdOffset })
         });
@@ -64,7 +66,7 @@ public sealed class ConfigTableRegistry
             var tables = new List<ConfigTableDefinition>(); var types = new HashSet<uint>();
             foreach (var item in source.EnumerateArray())
             {
-                Properties(item, "table", "type", "name", "layout", "recordSize", "idOffset", "fields", "variants", "maxRecords");
+                Properties(item, "table", "type", "name", "layout", "recordSize", "idOffset", "fields", "variants", "maxRecords", "headerSize", "countOffset");
                 var rawType = Text(item, "type", "table");
                 if (rawType.Length != 10 || !rawType.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
                     !uint.TryParse(rawType.AsSpan(2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, out var type) || type == 0)
@@ -75,7 +77,7 @@ public sealed class ConfigTableRegistry
                 var layout = Text(item, "layout", context);
                 var kind = layout switch
                 {
-                    "id-rows" => ConfigTableKind.Rows,
+                    "id-rows" or "counted-id-rows" => ConfigTableKind.Rows,
                     "entity-keyed" => ConfigTableKind.Keyed,
                     "armor-passive" => ConfigTableKind.Passive,
                     "recharge" => ConfigTableKind.Recharge,
@@ -84,10 +86,16 @@ public sealed class ConfigTableRegistry
                 var ceiling = kind == ConfigTableKind.Passive ? 4096 : 250_000;
                 var limit = item.TryGetProperty("maxRecords", out _) ? Integer(item, "maxRecords", context) : ceiling;
                 if (limit < 1 || limit > ceiling) throw Invalid($"{context}: maxRecords must be between 1 and {ceiling}");
+                var headerSize = item.TryGetProperty("headerSize", out _) ? Integer(item, "headerSize", context) : 16;
+                var countOffset = item.TryGetProperty("countOffset", out _) ? Integer(item, "countOffset", context) : 8;
+                if (kind == ConfigTableKind.Rows && (headerSize is < 4 or > 4096 || headerSize % 4 != 0 || countOffset < 0 || countOffset % 4 != 0 || countOffset > headerSize - 4))
+                    throw Invalid($"{context}: counted row layouts require a 4-byte-aligned count field within a 4–4096-byte header");
+                if (layout == "id-rows" && (headerSize != 16 || countOffset != 8))
+                    throw Invalid($"{context}: use counted-id-rows to define a custom header and count offset");
                 var variants = new List<ConfigTableVariant>();
                 if (kind is ConfigTableKind.Passive or ConfigTableKind.Recharge)
                 {
-                    if (new[] { "recordSize", "idOffset", "fields", "variants" }.Any(key => item.TryGetProperty(key, out _)))
+                    if (new[] { "recordSize", "idOffset", "fields", "variants", "headerSize", "countOffset" }.Any(key => item.TryGetProperty(key, out _)))
                         throw Invalid($"{context}: {layout} structure rules are owned by its C# handler");
                 }
                 else if (item.TryGetProperty("variants", out var alternatives))
@@ -105,7 +113,7 @@ public sealed class ConfigTableRegistry
                 else variants.Add(Variant(item, kind, context));
                 if (variants.Select(variant => (variant.RecordSize, variant.IdOffset)).Distinct().Count() != variants.Count)
                     throw Invalid($"{context}: duplicate layout variants");
-                tables.Add(new(type, name, kind, limit, variants.AsReadOnly()));
+                tables.Add(new(type, name, kind, limit, variants.AsReadOnly(), headerSize, countOffset));
             }
             return new(tables.AsReadOnly());
         }

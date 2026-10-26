@@ -165,10 +165,16 @@ short final cell when needed. Identical writes do not conflict; conflicting writ
 report the final winner, including when three or more mods touch the same value.
 
 `StructuredConfigMerger` matches the LDLD block sequence by type and occurrence.
-Block count, type order, file prefix, and inter-block framing must be preserved.
 Header positions may move when an earlier payload grows or shrinks. Headers and
 payload lengths are rebuilt; reserved header correction bytes are not gameplay
-edits. Whole-block insertion/removal or reordering remains unsupported.
+edits. Whole-block insertion or removal is supported when exactly one
+highest-priority mod changes the block sequence, each block type is unique,
+retained blocks stay in their original order, and there are no inter-block gaps.
+Retained blocks still merge against stock; added blocks come from that structural
+mod. Deleting a block conflicts with lower-priority edits to its payload.
+Multiple structural mods, reordered blocks, repeated block types, or mixed
+block-sequence and retained-block size changes use the existing exclusive-file
+fallback.
 
 `ConfigTable` recognizes these record layouts only when their full stock layout
 validates exactly; a guessed byte anchor or apparent padding is not sufficient:
@@ -398,6 +404,7 @@ record size, and absence of unhandled pointers against decrypted files.
 | Layout | Structural contract owned by C# |
 | --- | --- |
 | `id-rows` | A 16-byte header with count at byte 8 and reserved zero at byte 12; fixed-size records with unique u32 IDs at `idOffset` (default 0). |
+| `counted-id-rows` | A verified fixed-size header (4–4096 bytes) with a configurable aligned u32 count offset, followed by fixed-size records with unique u32 IDs. Use only after checking all other header fields and confirming there are no payload-relative pointers. |
 | `entity-keyed` | A validated linear-probing index of 16-byte buckets containing u64 entity IDs and row indexes, followed by fixed-size records. IDs live in the index; `idOffset` must be absent or 0. |
 | `recharge` | Four-byte entity values with a validated bucket index, zero or one retained unindexed value, and an optional 16-byte internal hash-correction area in mod inputs. The stock layout determines whether the unindexed value is present. No configurable sizes, offsets, fields, or variants. |
 | `armor-passive` | A 56-byte header, modifier and weapon-stat arrays, pointer/count rebuilding, and the three-described-modifier limit. No configurable record size, ID offset, fields, or variants. |

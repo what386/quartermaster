@@ -50,14 +50,17 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
     private static ConfigTable? ReadRows(ReadOnlySpan<byte> data, ConfigTableDefinition definition, ConfigTableVariant variant, int start, bool last, CancellationToken ct)
     {
         var stride = variant.RecordSize;
-        if (data.Length < 16 || U32(data, 12) != 0) return null;
-        var count = U32(data, 8);
-        if (count > definition.MaxRecords || 16L + (long)count * stride > data.Length) return null;
-        var length = checked(16 + (int)count * stride);
+        var headerSize = definition.HeaderSize;
+        var countOffset = definition.CountOffset;
+        if (data.Length < headerSize) return null;
+        if (headerSize == 16 && countOffset == 8 && U32(data, 12) != 0) return null;
+        var count = U32(data, countOffset);
+        if (count > definition.MaxRecords || headerSize + (long)count * stride > data.Length) return null;
+        var length = checked(headerSize + (int)count * stride);
         if (!ValidEnd(data, length, start, last)) return null;
-        var records = Records(data, 16, (int)count, stride, ct, variant.IdOffset);
+        var records = Records(data, headerSize, (int)count, stride, ct, variant.IdOffset);
         if (records is null) return null;
-        var header = data[..16].ToArray(); header.AsSpan(8, 4).Clear();
+        var header = data[..headerSize].ToArray(); header.AsSpan(countOffset, 4).Clear();
         return new(definition, variant.IdOffset, header, [new("record", stride, records)], length);
     }
 
@@ -194,7 +197,7 @@ internal sealed record ConfigTable(ConfigTableDefinition Definition, int IdOffse
             throw new InvalidDataException("Merged armor passive would exceed the game's limit of three described modifiers.");
         var length = checked(header.Length + sets.Select((records, i) => checked(records.Count * Sets[i].Stride)).Sum());
         var bytes = new byte[length]; header.CopyTo(bytes, 0);
-        if (Kind == ConfigTableKind.Rows) BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(8), (uint)sets[0].Count);
+        if (Kind == ConfigTableKind.Rows) BinaryPrimitives.WriteUInt32LittleEndian(bytes.AsSpan(Definition.CountOffset), (uint)sets[0].Count);
         else
         {
             BinaryPrimitives.WriteUInt64LittleEndian(bytes.AsSpan(16), sets[0].Count == 0 ? ulong.MaxValue : 56);

@@ -1,7 +1,7 @@
 # TODO — quartermaster
 
 @created: 2026-10-03
-@modified: 2026-10-25
+@modified: 2026-10-26
 
 
 ## Tasks
@@ -18,5 +18,9 @@
 - [x] Support size-changing file mods for recognized damage, component, and armor passive tables
       @created 2026-10-23 22:40
 
-- [ ] Extend structural merging to additional config table layouts and whole-block additions/removals
+- [x] Merge whole-block additions/removals for a single highest-priority structural mod
+      @created 2026-10-23 22:40
+
+- [x] Add verified game table definitions using the counted ID-row layout where applicable
+      @created 2026-10-23 22:40
 

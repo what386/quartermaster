@@ -8,7 +8,8 @@ internal static class StructuredConfigMerger
         ConfigTableRegistry registry, CancellationToken ct, out byte[] output, out IReadOnlyList<MergeConflict> conflicts, out string reason)
     {
         output = []; conflicts = []; reason = "The config block layout cannot be matched safely.";
-        if (inputs.Any(input => !SameFrames(stock, input.Document))) return false;
+        if (inputs.Any(input => !SameFrames(stock, input.Document)))
+            return TryMergeBlockChanges(target, stock, inputs, registry, ct, out output, out conflicts, out reason);
         if (!SameRecordGroups(stock, inputs, registry, ct))
         { reason = "Records moved between repeated config blocks; this block reordering cannot be merged safely."; return false; }
         var payloads = new List<byte[]>(); var reports = new List<MergeConflict>(); var changed = false;
@@ -70,6 +71,107 @@ internal static class StructuredConfigMerger
         return true;
     }
 
+    // Whole-block insertion/removal has no record identity. Support it only when exactly one,
+    // highest-priority input changes the block sequence and every block type is unique.
+    private static bool TryMergeBlockChanges(string target, ConfigDocument stock, IReadOnlyList<ConfigInput> inputs,
+        ConfigTableRegistry registry, CancellationToken ct, out byte[] output,
+        out IReadOnlyList<MergeConflict> conflicts, out string reason)
+    {
+        output = []; conflicts = []; reason = "Whole-block changes are ambiguous or conflict with another structural edit.";
+        if (stock.Blocks.Select(block => block.Type).Distinct().Count() != stock.Blocks.Count ||
+            inputs.Any(input => input.Document.Blocks.Select(block => block.Type).Distinct().Count() != input.Document.Blocks.Count)) return false;
+        var baselineTypes = stock.Blocks.Select(block => block.Type).ToArray();
+        var structural = inputs.Where(input => !input.Document.Blocks.Select(block => block.Type).SequenceEqual(baselineTypes)).ToArray();
+        if (structural.Length != 1 || !ReferenceEquals(structural[0], inputs[^1])) return false;
+        var chosen = structural[0].Document;
+        var chosenTypes = chosen.Blocks.Select(block => block.Type).ToArray();
+        var common = chosenTypes.Where(type => baselineTypes.Contains(type)).ToArray();
+        if (!common.SequenceEqual(baselineTypes.Where(chosenTypes.Contains)))
+        { reason = "Reordering existing config blocks is still unsupported."; return false; }
+        if (!stock.Bytes.AsSpan(0, stock.Blocks[0].Header).SequenceEqual(chosen.Bytes.AsSpan(0, chosen.Blocks[0].Header)) ||
+            inputs.Take(inputs.Count - 1).Any(input => !stock.Bytes.AsSpan(0, stock.Blocks[0].Header)
+                .SequenceEqual(input.Document.Bytes.AsSpan(0, input.Document.Blocks[0].Header)))) return false;
+
+        // The parser permits short inter-block gaps; preserve only layouts with no such bytes here.
+        if (HasInterBlockGaps(stock) || HasInterBlockGaps(chosen) || inputs.Take(inputs.Count - 1).Any(input => HasInterBlockGaps(input.Document))) return false;
+        var reports = new List<MergeConflict>();
+        var payloads = new Dictionary<uint, byte[]>();
+        foreach (var block in chosen.Blocks)
+        {
+            ct.ThrowIfCancellationRequested();
+            var originalIndex = Array.FindIndex(baselineTypes, type => type == block.Type);
+            if (originalIndex < 0)
+            {
+                payloads[block.Type] = chosen.Bytes.AsSpan(block.Data, block.Size).ToArray();
+                continue;
+            }
+            var baselineBlock = stock.Blocks[originalIndex];
+            var sourceBlocks = inputs.Select(input => input.Document.Blocks.Single(candidate => candidate.Type == block.Type)).ToArray();
+            if (sourceBlocks.Any(candidate => candidate.Size != baselineBlock.Size))
+            { reason = "A retained block also changes size; its structure cannot be merged safely."; return false; }
+            var values = new ConfigValueMerger(target, originalIndex, block.Type, reports, ct);
+            var table = ConfigTable.Read(stock, originalIndex, registry, ct, allowTrailer: false);
+            if (table is not null)
+            {
+                var tables = inputs.Select((input, i) => ConfigTable.Read(input.Document,
+                    Array.FindIndex(input.Document.Blocks.ToArray(), candidate => candidate.Type == block.Type), registry, ct, baseline: table)).ToArray();
+                if (tables.Any(candidate => candidate is null || !SameTable(table, candidate)))
+                { reason = "A config table has an unsupported or ambiguous record layout."; return false; }
+                var header = values.Merge(table.Header, inputs.Select((input, i) => new ConfigValueInput(input.Mod, tables[i]!.Header)).ToArray(), "table header").Bytes;
+                var sets = table.Sets.Select((set, setIndex) => ConfigRecordMerger.Merge(set,
+                    inputs.Select((input, i) => (input.Mod, tables[i]!.Sets[setIndex])).ToArray(), values, ct)).ToArray();
+                try { payloads[block.Type] = table.Write(sets, header, ct); }
+                catch (InvalidDataException ex) { reason = ex.Message; return false; }
+            }
+            else
+            {
+                var baseline = stock.Bytes.AsSpan(baselineBlock.Data, baselineBlock.Size).ToArray();
+                var rawInputs = inputs.Select((input, i) => new ConfigValueInput(input.Mod,
+                    input.Document.Bytes.AsSpan(sourceBlocks[i].Data, sourceBlocks[i].Size).ToArray())).ToArray();
+                payloads[block.Type] = values.Merge(baseline, rawInputs).Bytes;
+            }
+        }
+        foreach (var removed in baselineTypes.Except(chosenTypes))
+        {
+            var original = stock.Blocks[Array.FindIndex(baselineTypes, type => type == removed)];
+            var baseline = stock.Bytes.AsSpan(original.Data, original.Size);
+            foreach (var input in inputs.Take(inputs.Count - 1))
+            {
+                var candidate = input.Document.Blocks.Single(block => block.Type == removed);
+                if (!input.Document.Bytes.AsSpan(candidate.Data, candidate.Size).SequenceEqual(baseline))
+                    reports.Add(new(target, removed, Array.FindIndex(baselineTypes, type => type == removed), -1,
+                        input.Mod.Name, inputs[^1].Mod.Name)
+                    { LosingSource = input.Mod.Source, WinningSource = inputs[^1].Mod.Source, RecordId = $"block 0x{removed:x8}" });
+            }
+        }
+        var estimatedLength = stock.Blocks[0].Header + chosen.Blocks.Sum(block => 24L + payloads[block.Type].Length);
+        if (estimatedLength > 256L * 1024 * 1024 - GameConfigCodec.SealBytes - 15)
+        { reason = "The combined config exceeds the supported file-size limit."; return false; }
+        using var stream = new MemoryStream((int)estimatedLength);
+        stream.Write(stock.Bytes.AsSpan(0, stock.Blocks[0].Header));
+        foreach (var block in chosen.Blocks)
+        {
+            var old = stock.Blocks.FirstOrDefault(candidate => candidate.Type == block.Type);
+            var header = old is null ? chosen.Bytes.AsSpan(block.Header, 24).ToArray() : stock.Bytes.AsSpan(old.Header, 24).ToArray();
+            var payload = payloads[block.Type];
+            BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(12), (uint)payload.Length);
+            stream.Write(header); stream.Write(payload);
+        }
+        output = stream.ToArray(); conflicts = reports;
+        Validate(ConfigDocument.Parse(output), stock, registry, ct);
+        return true;
+    }
+
+    private static bool HasInterBlockGaps(ConfigDocument document)
+    {
+        for (var i = 1; i < document.Blocks.Count; i++)
+        {
+            var previous = document.Blocks[i - 1]; var current = document.Blocks[i];
+            if (current.Header != previous.Data + previous.Size) return true;
+        }
+        return false;
+    }
+
     private static bool SameRecordGroups(ConfigDocument stock, IReadOnlyList<ConfigInput> inputs, ConfigTableRegistry registry, CancellationToken ct)
     {
         foreach (var group in stock.Blocks.Select((block, index) => (block, index))
@@ -97,7 +199,7 @@ internal static class StructuredConfigMerger
 
     private static bool SameTable(ConfigTable before, ConfigTable after) => before.Kind == after.Kind && before.IdOffset == after.IdOffset &&
         before.Sets.Count == after.Sets.Count && before.Sets.Select(set => set.Stride).SequenceEqual(after.Sets.Select(set => set.Stride)) &&
-        (before.Kind != ConfigTableKind.Rows || before.Header.AsSpan(0, 8).SequenceEqual(after.Header.AsSpan(0, 8))) &&
+        (before.Kind != ConfigTableKind.Rows || before.Header.AsSpan().SequenceEqual(after.Header)) &&
         (before.Kind != ConfigTableKind.Passive || ConfigTable.U32(before.Header, 0) == ConfigTable.U32(after.Header, 0));
 
     private static bool SameRecords(IReadOnlyList<ConfigRecord> before, IReadOnlyList<ConfigRecord> after) =>
@@ -128,12 +230,20 @@ internal static class StructuredConfigMerger
     // Verify rebuilt table indexes, counts and offsets before sealing, and again after hash correction.
     internal static void Validate(ConfigDocument document, ConfigDocument stock, ConfigTableRegistry registry, CancellationToken ct)
     {
+        var outputByType = document.Blocks.GroupBy(block => block.Type).ToDictionary(group => group.Key, group => group.ToArray());
+        var seen = new Dictionary<uint, int>();
         for (var index = 0; index < stock.Blocks.Count; index++)
-            if (ConfigTable.Read(stock, index, registry, ct, allowTrailer: false) is { } baseline)
+        {
+            var type = stock.Blocks[index].Type;
+            var occurrence = seen.GetValueOrDefault(type); seen[type] = occurrence + 1;
+            if (ConfigTable.Read(stock, index, registry, ct, allowTrailer: false) is { } baseline &&
+                outputByType.TryGetValue(type, out var candidates) && occurrence < candidates.Length)
             {
-                var parsed = ConfigTable.Read(document, index, registry, ct, baseline: baseline);
+                var outputIndex = Array.FindIndex(document.Blocks.ToArray(), block => block == candidates[occurrence]);
+                var parsed = ConfigTable.Read(document, outputIndex, registry, ct, baseline: baseline);
                 if (parsed is null || !SameTable(baseline, parsed))
                     throw new InvalidDataException("Merged config table failed its record/index/offset validation.");
             }
+        }
     }
 }

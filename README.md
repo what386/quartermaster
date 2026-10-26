@@ -184,8 +184,12 @@ are skipped; incomplete deployments protect library content until you purge or r
 Provider credentials are stored separately and are excluded from exports.
 
 Application data is stored under `Quartermaster` in your user's local application
-data directory. Its location is shown in Settings. Set
-`QUARTERMASTER_DATA_DIRECTORY` to use another location.
+data directory by default. Use **Settings → Storage → Move data folder…** to
+relocate the library, profiles, settings, credentials, and app data to an empty
+folder on another drive. Quartermaster verifies copied files and restarts at the
+new location. It removes the old data after the new library opens; if startup or
+cleanup fails, it keeps the old copy. The active location is shown in Settings.
+`QUARTERMASTER_DATA_DIRECTORY` continues to override the saved location when set.
 
 ## Development
 

@@ -73,8 +73,10 @@ sources. `MergeConflict.RecordId` identifies a structured record, with a
 record-relative `Offset` (`-1` for whole-record conflicts); otherwise `Offset` is
 payload-relative. These are binary identities and offsets, not named stats.
 
-Block positions may shift when a supported table grows, while block count/type
-order and framing gaps remain unchanged. Ambiguous layouts, unknown resizing,
+Block positions may shift when a supported table grows. A single highest-priority
+mod can also add or remove unique-type blocks when retained blocks keep their
+order and framing has no inter-block gaps; retained payloads still merge against
+stock. Ambiguous layouts, multiple structural edits, unknown resizing,
 duplicate record IDs, invalid indexes/offsets, or unsafe combined passive arrays
 remain exclusive: only the highest-priority candidate for that file is installed,
 byte for byte; the others appear in `Skipped`. Other targets merge independently.
