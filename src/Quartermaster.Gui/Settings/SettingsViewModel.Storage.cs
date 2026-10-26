@@ -1,4 +1,5 @@
 using Quartermaster.Library.Storage;
+using Quartermaster.Gui.Services;
 using Quartermaster.Gui.Shared;
 
 namespace Quartermaster.Gui.Settings;

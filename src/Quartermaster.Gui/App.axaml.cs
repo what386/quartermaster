@@ -31,7 +31,13 @@ public partial class App : Application
                 }));
             var viewModel = new MainWindowViewModel(services);
             window.DataContext = viewModel;
-            window.Opened += async (_, _) => await viewModel.InitializeAsync();
+            window.Opened += async (_, _) =>
+            {
+                await viewModel.InitializeAsync();
+                try { await Task.Run(() => DataDirectoryRelocator.FinalizePreviousMove(services.DataDirectory, AppServices.DataDirectoryPointer)); }
+                catch (IOException) { /* Keep the prior copy if cleanup is unavailable. */ }
+                catch (UnauthorizedAccessException) { /* Keep the prior copy if cleanup is unavailable. */ }
+            };
             var inbox = new NxmInbox(services.DataDirectory);
             var processingLink = false;
             var promptedLinks = new HashSet<string>();
