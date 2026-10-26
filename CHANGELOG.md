@@ -1,6 +1,15 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-25*
+*Generated on 2026-10-26*
+
+## 0.12.0 — 2026-10-26
+
+### Changes
+
+- support size-changing file mods for recognized damage, component, and armor passive tables
+- merge whole-block additions/removals for a single high priority mod
+- add verified game table definitions where applicable
+
 
 ## 0.11.1 — 2026-10-25
 
