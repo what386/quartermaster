@@ -62,10 +62,18 @@ internal static class ManifestReader
             }
             return ordered.ToArray();
         }
-        var options = (manifest.Options ?? []).Select(o => new ModOption(Guid.NewGuid(), o.Name, o.Description,
+        var options = (manifest.Options ?? []).Select((o, optionIndex) => new ModOption(Guid.NewGuid(), ManifestLabel(o.Name, o.Description, optionIndex), o.Description,
             Resolve(o.Include, (o.SubOptions ?? []).SelectMany(c => c.Include ?? []).ToArray()),
-            (o.SubOptions ?? []).Select(c => new OptionChoice(c.Name, Resolve(c.Include))).ToArray())).ToArray();
+            (o.SubOptions ?? []).Select((c, choiceIndex) => new OptionChoice(ManifestLabel(c.Name, c.Description, choiceIndex), Resolve(c.Include))).ToArray())).ToArray();
         return (manifest, options);
+    }
+
+    private static string ManifestLabel(string? name, string? description, int index)
+    {
+        if (!string.IsNullOrWhiteSpace(name)) return name.Trim();
+        var fallback = description?.Trim().TrimStart('.', '…', ' ', '-', ':').Trim();
+        if (string.IsNullOrWhiteSpace(fallback)) return $"Option {index + 1}";
+        return char.ToUpperInvariant(fallback[0]) + fallback[1..];
     }
 
     internal static string? SelectManifest(IReadOnlyList<string> files)
