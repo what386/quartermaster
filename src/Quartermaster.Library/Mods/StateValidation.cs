@@ -32,9 +32,15 @@ public static class StateValidation
                     ValidateFiles(set.Files);
                 }
                 foreach (var option in mod.Options)
-                    if (string.IsNullOrWhiteSpace(option.Name) || option.Choices.Any(c => string.IsNullOrWhiteSpace(c.Name)) ||
-                        option.PatchSetIds.Concat(option.Choices.SelectMany(c => c.PatchSetIds)).Any(id => mod.PatchSets.All(s => s.Id != id)))
-                        throw new ArgumentException("Option references a missing patch set.");
+                {
+                    if (string.IsNullOrWhiteSpace(option.Name)) throw new ArgumentException("Option name is required.");
+                    if (option.Choices.Any(choice => string.IsNullOrWhiteSpace(choice.Name)))
+                        throw new ArgumentException($"Option '{option.Name}' contains a choice with no name.");
+                    var patchIds = option.PatchSetIds.Concat(option.Choices.SelectMany(choice => choice.PatchSetIds));
+                    var missing = patchIds.Where(id => mod.PatchSets.All(set => set.Id != id)).Distinct().ToArray();
+                    if (missing.Length > 0)
+                        throw new ArgumentException($"Option '{option.Name}' references missing patch set(s): {string.Join(", ", missing)}.");
+                }
             }
             catch (ArgumentException ex)
             { throw new ArgumentException($"Invalid data for mod '{mod.Name}' ({mod.Id}): {ex.Message}", ex); }

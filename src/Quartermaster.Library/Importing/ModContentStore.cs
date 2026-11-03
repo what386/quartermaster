@@ -50,9 +50,13 @@ public sealed class ModContentStore : IModContentStore
     {
         try
         {
-            var manifestPath = ManagedPaths.Enumerate(GetModDirectory(mod.Id)).SingleOrDefault(path =>
-                Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase));
-            if (manifestPath is null) return null;
+            var root = GetModDirectory(mod.Id);
+            var files = ManagedPaths.Enumerate(root).Where(path =>
+                    Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase))
+                .Select(path => Path.GetRelativePath(root, path).Replace('\\', '/')).ToArray();
+            var selected = ManifestReader.SelectManifest(files);
+            if (selected is null) return null;
+            var manifestPath = ManagedPaths.Resolve(root, selected);
             var manifest = global::System.Text.Json.JsonSerializer.Deserialize<Manifest>(File.ReadAllText(manifestPath), JsonFiles.Options);
             return manifest is null ? null : (Path.GetDirectoryName(manifestPath)!, manifest);
         }
