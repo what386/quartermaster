@@ -20,13 +20,12 @@ internal static class ManifestReader
     public static async Task<(Manifest? Manifest, IReadOnlyList<ModOption> Options)> ReadAsync(
         string root, IReadOnlyList<string> files, IReadOnlyList<PatchSet> sets, CancellationToken ct)
     {
-        var manifests = files.Where(f => Path.GetFileName(f).Equals("manifest.json", StringComparison.OrdinalIgnoreCase)).ToArray();
-        if (manifests.Length == 0) return (null, []);
-        if (manifests.Length > 1) throw new InvalidDataException("Import contains multiple mod manifests.");
-        var manifest = await JsonFiles.ReadAsync<Manifest>(ManagedPaths.Resolve(root, manifests[0]), ct).ConfigureAwait(false);
+        var manifestPath = SelectManifest(files);
+        if (manifestPath is null) return (null, []);
+        var manifest = await JsonFiles.ReadAsync<Manifest>(ManagedPaths.Resolve(root, manifestPath), ct).ConfigureAwait(false);
         if (manifest.Version != 1)
-            throw new InvalidDataException($"Unsupported manifest schema version {manifest.Version} in '{manifests[0]}'. Supported schema: 1. A mod release version belongs in ModVersion.");
-        var baseFolder = Path.GetDirectoryName(manifests[0])?.Replace('\\', '/') ?? "";
+            throw new InvalidDataException($"Unsupported manifest schema version {manifest.Version} in '{manifestPath}'. Supported schema: 1. A mod release version belongs in ModVersion.");
+        var baseFolder = Path.GetDirectoryName(manifestPath)?.Replace('\\', '/') ?? "";
         string ResolvePrefix(string raw)
         {
             var folder = raw.Replace('\\', '/').TrimEnd('/');
@@ -69,6 +68,17 @@ internal static class ManifestReader
         return (manifest, options);
     }
 
+    internal static string? SelectManifest(IReadOnlyList<string> files)
+    {
+        var manifests = files.Where(f => Path.GetFileName(f).Equals("manifest.json", StringComparison.OrdinalIgnoreCase)).ToArray();
+        if (manifests.Length == 0) return null;
+        static int Depth(string path) => path.Count(character => character is '/' or '\\');
+        var shallowest = manifests.Min(Depth);
+        var candidates = manifests.Where(path => Depth(path) == shallowest).ToArray();
+        if (candidates.Length != 1) throw new InvalidDataException("Import contains multiple mod manifests at the same folder level.");
+        return candidates[0];
+    }
+
     /// <summary>Corrects old recursive parent includes while retaining IDs used by saved profiles.</summary>
     public static async Task<Mod> CorrectLegacyIncludesAsync(string root, Mod mod, CancellationToken ct)
     {
@@ -77,7 +87,9 @@ internal static class ManifestReader
         if (!Directory.Exists(directory)) return mod;
         var manifests = ManagedPaths.Enumerate(directory).Where(path => Path.GetFileName(path).Equals("manifest.json", StringComparison.OrdinalIgnoreCase))
             .Select(path => Path.GetRelativePath(directory, path).Replace('\\', '/')).ToArray();
-        if (manifests.Length != 1) return mod;
+        if (manifests.Length == 0) return mod;
+        try { if (SelectManifest(manifests) is null) return mod; }
+        catch (InvalidDataException) { return mod; }
         var (_, parsed) = await ReadAsync(directory, manifests, mod.PatchSets, ct).ConfigureAwait(false);
         if (parsed.Count != mod.Options.Count) return mod;
         for (var i = 0; i < parsed.Count; i++)
