@@ -1,6 +1,14 @@
 # Changelog — Quartermaster
 
-*Generated on 2026-10-26*
+*Generated on 2026-11-03*
+
+## 0.12.1 — 2026-11-03
+
+### Changes
+
+- fix: isssue with nested manifests for import
+- fix: issue with mods that have blank choice names
+
 
 ## 0.12.0 — 2026-10-26
 
